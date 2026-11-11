@@ -1,12 +1,8 @@
-from django.contrib import admin
-
-# Register your models here.
-
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import User, EmailOTP
+from .models import User, PendingSignup, EmailOTP
 
 
 @admin.register(User)
@@ -32,6 +28,18 @@ class CustomUserAdmin(UserAdmin):
             "fields": ("email", "email_verified"),
         }),
     )
+
+
+@admin.register(PendingSignup)
+class PendingSignupAdmin(admin.ModelAdmin):
+    list_display = (
+        "username",
+        "email",
+        "created_at",
+        "expires_at",
+    )
+
+    search_fields = ("username", "email")
 
 
 @admin.register(EmailOTP)

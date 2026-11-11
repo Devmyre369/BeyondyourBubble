@@ -1,6 +1,3 @@
-from django.db import models
-
-# Create your models here.
 
 import uuid
 
@@ -9,21 +6,13 @@ from django.db import models
 
 
 class User(AbstractUser):
-    """
-    Custom BYB user model.
-    Users can log in using their username and password.
-    """
-
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
         editable=False
     )
 
-    email = models.EmailField(
-        unique=True,
-        db_index=True
-    )
+    email = models.EmailField(unique=True, db_index=True)
 
     email_verified = models.BooleanField(default=False)
 
@@ -31,11 +20,28 @@ class User(AbstractUser):
         return self.username
 
 
+class PendingSignup(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+
+    username = models.CharField(max_length=150, unique=True)
+
+    email = models.EmailField(unique=True)
+
+    password_hash = models.CharField(max_length=128)
+
+    expires_at = models.DateTimeField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.username} - {self.email}"
+
+
 class EmailOTP(models.Model):
-    """
-    Stores email OTP verification records.
-    OTPs will be stored as hashes, not plaintext.
-    """
 
     class Purpose(models.TextChoices):
         SIGNUP = "signup", "Signup"

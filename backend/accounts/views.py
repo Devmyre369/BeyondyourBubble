@@ -1,6 +1,6 @@
 
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -9,8 +9,6 @@ from rest_framework.views import APIView
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.serializers import SignupSerializer, LoginSerializer
-from accounts.services.signup_service import start_signup, verify_signup
 from accounts.serializers import (
     SignupSerializer,
     LoginSerializer,
@@ -18,10 +16,16 @@ from accounts.serializers import (
     PasswordResetConfirmSerializer,
 )
 
+from accounts.services.signup_service import (
+    start_signup,
+    verify_signup,
+)
+
 from accounts.services.password_reset_service import (
     request_password_reset,
     confirm_password_reset,
 )
+
 
 User = get_user_model()
 
@@ -106,19 +110,18 @@ class VerifySignupView(APIView):
             )
 
         try:
-            with transaction.atomic():
-                user = verify_signup(
-                    email=email,
-                    submitted_otp=otp,
-                )
+            user = verify_signup(
+                email=email,
+                submitted_otp=otp,
+            )
 
-                return Response(
-                    generate_auth_response(
-                        user,
-                        "Your BYB account has been created successfully.",
-                    ),
-                    status=status.HTTP_201_CREATED,
-                )
+            return Response(
+                generate_auth_response(
+                    user,
+                    "Your BYB account has been created successfully.",
+                ),
+                status=status.HTTP_201_CREATED,
+            )
 
         except IntegrityError:
             return Response(
@@ -141,17 +144,12 @@ class LoginView(APIView):
         )
 
         serializer.is_valid(raise_exception=True)
-
         user = serializer.validated_data["user"]
 
         return Response(
-            generate_auth_response(
-                user,
-                "Login successful.",
-            ),
+            generate_auth_response(user, "Login successful."),
             status=status.HTTP_200_OK,
         )
-
 
 
 class PasswordResetRequestView(APIView):
@@ -159,7 +157,9 @@ class PasswordResetRequestView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer = PasswordResetRequestSerializer(
+            data=request.data
+        )
         serializer.is_valid(raise_exception=True)
 
         request_password_reset(
@@ -183,7 +183,9 @@ class PasswordResetConfirmView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer = PasswordResetConfirmSerializer(
+            data=request.data
+        )
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data

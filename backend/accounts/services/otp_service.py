@@ -23,12 +23,6 @@ def generate_otp():
 
 @transaction.atomic
 def create_otp(email, purpose):
-    """
-    Create and store a hashed OTP.
-
-    Returns the plaintext OTP so the email service can send it.
-    Never store or log this plaintext OTP.
-    """
     email = email.strip().lower()
     now = timezone.now()
 
@@ -47,17 +41,21 @@ def create_otp(email, purpose):
         )
 
         if now < cooldown_end:
-            remaining = int((cooldown_end - now).total_seconds()) + 1
+            remaining = int(
+                (cooldown_end - now).total_seconds()
+            ) + 1
 
             raise ValidationError({
-                "otp": f"Please wait {remaining} seconds before requesting another OTP."
+                "otp": (
+                    f"Please wait {remaining} seconds "
+                    "before requesting another OTP."
+                )
             })
 
-    # Invalidate all previous unused OTPs for this email and purpose.
     EmailOTP.objects.filter(
         email=email,
         purpose=purpose,
-        is_used=False
+        is_used=False,
     ).update(is_used=True)
 
     otp = generate_otp()
@@ -66,81 +64,98 @@ def create_otp(email, purpose):
         email=email,
         purpose=purpose,
         otp_hash=make_password(otp),
-        expires_at=now + timedelta(minutes=OTP_EXPIRY_MINUTES),
+        expires_at=now + timedelta(
+            minutes=OTP_EXPIRY_MINUTES
+        ),
     )
 
     return otp
 
 
-@transaction.atomic
 def verify_otp(email, purpose, submitted_otp):
     """
-    Verify an OTP.
-
-    Returns True if valid.
-    Raises ValidationError if invalid, expired, or exhausted.
+    Verify OTP and persist failed attempts before
+    raising validation errors.
     """
+
     email = email.strip().lower()
-    now = timezone.now()
+    error_message = None
 
-    otp_record = (
-        EmailOTP.objects
-        .select_for_update()
-        .filter(
-            email=email,
-            purpose=purpose,
-            is_used=False
+    with transaction.atomic():
+
+        otp_record = (
+            EmailOTP.objects
+            .select_for_update()
+            .filter(
+                email=email,
+                purpose=purpose,
+                is_used=False,
+            )
+            .order_by("-created_at")
+            .first()
         )
-        .order_by("-created_at")
-        .first()
-    )
 
-    if not otp_record:
-        raise ValidationError({
-            "otp": "No active OTP found. Please request a new one."
-        })
+        if not otp_record:
+            error_message = (
+                "No active OTP found. Please request a new one."
+            )
 
-    if otp_record.expires_at <= now:
-        otp_record.is_used = True
-        otp_record.save(update_fields=["is_used"])
-
-        raise ValidationError({
-            "otp": "OTP has expired. Please request a new one."
-        })
-
-    if otp_record.attempts >= OTP_MAX_ATTEMPTS:
-        otp_record.is_used = True
-        otp_record.save(update_fields=["is_used"])
-
-        raise ValidationError({
-            "otp": "Maximum verification attempts reached. Please request a new OTP."
-        })
-
-    if not isinstance(submitted_otp, str) or len(submitted_otp) != 6 or not submitted_otp.isdigit():
-        otp_record.attempts += 1
-
-        if otp_record.attempts >= OTP_MAX_ATTEMPTS:
+        elif otp_record.expires_at <= timezone.now():
             otp_record.is_used = True
+            otp_record.save(update_fields=["is_used"])
 
-        otp_record.save(update_fields=["attempts", "is_used"])
+            error_message = (
+                "OTP has expired. Please request a new one."
+            )
 
-        raise ValidationError({
-            "otp": "Invalid OTP."
-        })
-
-    if not check_password(submitted_otp, otp_record.otp_hash):
-        otp_record.attempts += 1
-
-        if otp_record.attempts >= OTP_MAX_ATTEMPTS:
+        elif otp_record.attempts >= OTP_MAX_ATTEMPTS:
             otp_record.is_used = True
+            otp_record.save(update_fields=["is_used"])
 
-        otp_record.save(update_fields=["attempts", "is_used"])
+            error_message = (
+                "Maximum verification attempts reached. "
+                "Please request a new OTP."
+            )
 
+        elif (
+            not isinstance(submitted_otp, str)
+            or len(submitted_otp) != 6
+            or not submitted_otp.isdigit()
+        ):
+            otp_record.attempts += 1
+
+            if otp_record.attempts >= OTP_MAX_ATTEMPTS:
+                otp_record.is_used = True
+
+            otp_record.save(
+                update_fields=["attempts", "is_used"]
+            )
+
+            error_message = "Invalid OTP."
+
+        elif not check_password(
+            submitted_otp,
+            otp_record.otp_hash,
+        ):
+            otp_record.attempts += 1
+
+            if otp_record.attempts >= OTP_MAX_ATTEMPTS:
+                otp_record.is_used = True
+
+            otp_record.save(
+                update_fields=["attempts", "is_used"]
+            )
+
+            error_message = "Invalid OTP."
+
+        else:
+            otp_record.is_used = True
+            otp_record.save(update_fields=["is_used"])
+
+    # Raise after the transaction has committed.
+    if error_message:
         raise ValidationError({
-            "otp": "Invalid OTP."
+            "otp": error_message
         })
-
-    otp_record.is_used = True
-    otp_record.save(update_fields=["is_used"])
 
     return True

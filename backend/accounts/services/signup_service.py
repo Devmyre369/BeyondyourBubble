@@ -21,11 +21,6 @@ PENDING_SIGNUP_EXPIRY_MINUTES = 15
 
 @transaction.atomic
 def start_signup(username, email, password):
-    """
-    Start signup by creating a pending account
-    and sending an email verification OTP.
-    """
-
     username = username.strip()
     email = email.strip().lower()
 
@@ -41,13 +36,13 @@ def start_signup(username, email, password):
 
     now = timezone.now()
 
-    # Remove expired pending signups.
-    PendingSignup.objects.filter(expires_at__lte=now).delete()
+    PendingSignup.objects.filter(
+        expires_at__lte=now
+    ).delete()
 
-    # Check whether this username or email is already pending.
     existing_pending = PendingSignup.objects.filter(
-        Q(username__iexact=username) |
-        Q(email__iexact=email)
+        Q(username__iexact=username)
+        | Q(email__iexact=email)
     )
 
     for pending in existing_pending:
@@ -62,7 +57,6 @@ def start_signup(username, email, password):
                 "for another pending signup."
             )
 
-    # Replace an existing pending signup for the same account.
     existing_pending.delete()
 
     PendingSignup.objects.create(
@@ -92,20 +86,12 @@ def start_signup(username, email, password):
     }
 
 
-@transaction.atomic
 def verify_signup(email, submitted_otp):
-    """
-    Verify the signup OTP and create the actual user account.
-    """
-
     email = email.strip().lower()
 
-    pending_signup = (
-        PendingSignup.objects
-        .select_for_update()
-        .filter(email__iexact=email)
-        .first()
-    )
+    pending_signup = PendingSignup.objects.filter(
+        email__iexact=email
+    ).first()
 
     if not pending_signup:
         raise ValidationError({
@@ -117,30 +103,50 @@ def verify_signup(email, submitted_otp):
             "signup": "Your signup session has expired. Please sign up again."
         })
 
+    # OTP verification commits its own transaction.
     verify_otp(
         email=email,
         purpose=EmailOTP.Purpose.SIGNUP,
         submitted_otp=submitted_otp,
     )
 
-    if User.objects.filter(
-        Q(username__iexact=pending_signup.username) |
-        Q(email__iexact=email)
-    ).exists():
-        raise ValidationError(
-            "An account with this username or email already exists."
+    # Only successful account creation happens here.
+    with transaction.atomic():
+
+        pending_signup = (
+            PendingSignup.objects
+            .select_for_update()
+            .filter(email__iexact=email)
+            .first()
         )
 
-    user = User(
-        username=pending_signup.username,
-        email=pending_signup.email,
-        email_verified=True,
-    )
+        if not pending_signup:
+            raise ValidationError({
+                "email": "No pending signup found. Please sign up again."
+            })
 
-    # Preserve the already-hashed password.
-    user.password = pending_signup.password_hash
-    user.save()
+        if pending_signup.expires_at <= timezone.now():
+            raise ValidationError({
+                "signup": "Your signup session has expired. Please sign up again."
+            })
 
-    pending_signup.delete()
+        if User.objects.filter(
+            Q(username__iexact=pending_signup.username)
+            | Q(email__iexact=email)
+        ).exists():
+            raise ValidationError(
+                "An account with this username or email already exists."
+            )
+
+        user = User(
+            username=pending_signup.username,
+            email=pending_signup.email,
+            email_verified=True,
+        )
+
+        user.password = pending_signup.password_hash
+        user.save()
+
+        pending_signup.delete()
 
     return user

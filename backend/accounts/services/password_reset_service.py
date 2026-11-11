@@ -2,7 +2,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
-from django.utils import timezone
 
 from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.token_blacklist.models import (
@@ -28,7 +27,6 @@ def request_password_reset(email):
         email_verified=True,
     ).first()
 
-    # Return the same response whether the email exists or not.
     if not user:
         return
 
@@ -45,44 +43,49 @@ def request_password_reset(email):
         )
 
 
-@transaction.atomic
 def confirm_password_reset(email, otp, new_password):
     email = email.strip().lower()
 
-    user = (
-        User.objects
-        .select_for_update()
-        .filter(
-            email__iexact=email,
-            is_active=True,
-            email_verified=True,
-        )
-        .first()
-    )
+    user = User.objects.filter(
+        email__iexact=email,
+        is_active=True,
+        email_verified=True,
+    ).first()
 
     if not user:
         raise ValidationError({
             "email": "Unable to complete password reset."
         })
 
+    # Verify OTP separately so failed attempts are committed.
     verify_otp(
         email=user.email,
         purpose=EmailOTP.Purpose.PASSWORD_RESET,
         submitted_otp=otp,
     )
 
-    user.password = make_password(new_password)
-    user.save(update_fields=["password"])
+    # Update password and revoke existing refresh tokens atomically.
+    with transaction.atomic():
 
-    # Revoke all outstanding refresh tokens for this user.
-    outstanding_tokens = OutstandingToken.objects.filter(user=user)
+        user = (
+            User.objects
+            .select_for_update()
+            .get(pk=user.pk)
+        )
 
-    BlacklistedToken.objects.bulk_create(
-        [
-            BlacklistedToken(token=token)
-            for token in outstanding_tokens
-        ],
-        ignore_conflicts=True,
-    )
+        user.password = make_password(new_password)
+        user.save(update_fields=["password"])
+
+        outstanding_tokens = OutstandingToken.objects.filter(
+            user=user
+        )
+
+        BlacklistedToken.objects.bulk_create(
+            [
+                BlacklistedToken(token=token)
+                for token in outstanding_tokens
+            ],
+            ignore_conflicts=True,
+        )
 
     return True

@@ -11,7 +11,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.serializers import SignupSerializer, LoginSerializer
 from accounts.services.signup_service import start_signup, verify_signup
+from accounts.serializers import (
+    SignupSerializer,
+    LoginSerializer,
+    PasswordResetRequestSerializer,
+    PasswordResetConfirmSerializer,
+)
 
+from accounts.services.password_reset_service import (
+    request_password_reset,
+    confirm_password_reset,
+)
 
 User = get_user_model()
 
@@ -139,5 +149,58 @@ class LoginView(APIView):
                 user,
                 "Login successful.",
             ),
+            status=status.HTTP_200_OK,
+        )
+
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        request_password_reset(
+            email=serializer.validated_data["email"]
+        )
+
+        return Response(
+            {
+                "success": True,
+                "message": (
+                    "If an eligible account exists for this email, "
+                    "a password reset OTP will be sent."
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+
+        confirm_password_reset(
+            email=data["email"],
+            otp=data["otp"],
+            new_password=data["new_password"],
+        )
+
+        return Response(
+            {
+                "success": True,
+                "message": (
+                    "Password reset successful. "
+                    "Please log in with your new password."
+                ),
+            },
             status=status.HTTP_200_OK,
         )

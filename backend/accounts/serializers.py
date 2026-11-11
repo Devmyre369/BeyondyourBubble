@@ -1,5 +1,5 @@
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 
@@ -70,4 +70,41 @@ class SignupSerializer(serializers.Serializer):
                 "password": list(error.messages)
             })
 
+        return attrs
+
+
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField(
+        max_length=150,
+        trim_whitespace=True
+    )
+
+    password = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False
+    )
+
+    def validate(self, attrs):
+        username = attrs["username"].strip()
+        password = attrs["password"]
+
+        request = self.context.get("request")
+
+        user = authenticate(
+            request=request,
+            username=username,
+            password=password,
+        )
+
+        if user is None:
+            raise serializers.ValidationError(
+                "Invalid username or password."
+            )
+
+        if not user.is_active or not user.email_verified:
+            raise serializers.ValidationError(
+                "This account is not eligible to log in."
+            )
+
+        attrs["user"] = user
         return attrs

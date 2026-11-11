@@ -1,6 +1,3 @@
-from django.shortcuts import render
-
-# Create your views here.
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
@@ -12,11 +9,30 @@ from rest_framework.views import APIView
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.serializers import SignupSerializer
+from accounts.serializers import SignupSerializer, LoginSerializer
 from accounts.services.signup_service import start_signup, verify_signup
 
 
 User = get_user_model()
+
+
+def generate_auth_response(user, message):
+    refresh = RefreshToken.for_user(user)
+
+    return {
+        "success": True,
+        "message": message,
+        "user": {
+            "id": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "email_verified": user.email_verified,
+        },
+        "tokens": {
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        },
+    }
 
 
 class SignupView(APIView):
@@ -86,23 +102,11 @@ class VerifySignupView(APIView):
                     submitted_otp=otp,
                 )
 
-                refresh = RefreshToken.for_user(user)
-
                 return Response(
-                    {
-                        "success": True,
-                        "message": "Your BYB account has been created successfully.",
-                        "user": {
-                            "id": str(user.id),
-                            "username": user.username,
-                            "email": user.email,
-                            "email_verified": user.email_verified,
-                        },
-                        "tokens": {
-                            "access": str(refresh.access_token),
-                            "refresh": str(refresh),
-                        },
-                    },
+                    generate_auth_response(
+                        user,
+                        "Your BYB account has been created successfully.",
+                    ),
                     status=status.HTTP_201_CREATED,
                 )
 
@@ -114,3 +118,26 @@ class VerifySignupView(APIView):
                 },
                 status=status.HTTP_409_CONFLICT,
             )
+
+
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = LoginSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data["user"]
+
+        return Response(
+            generate_auth_response(
+                user,
+                "Login successful.",
+            ),
+            status=status.HTTP_200_OK,
+        )

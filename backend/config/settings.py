@@ -8,7 +8,18 @@ import os
 from pathlib import Path
 from datetime import timedelta
 
+import dj_database_url
+from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
+
+
+# --------------------------------------------------
+# BASE DIRECTORY AND ENVIRONMENT
+# --------------------------------------------------
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / ".env")
 
 
 # --------------------------------------------------
@@ -98,17 +109,21 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 
 # --------------------------------------------------
-# DATABASE
+# DATABASE - NEON POSTGRESQL
 # --------------------------------------------------
 
-# SQLite for initial local development.
-# We will configure PostgreSQL separately.
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise ImproperlyConfigured(
+        "DATABASE_URL is missing. Please configure it in your backend .env file."
+    )
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=600,
+    )
 }
 
 

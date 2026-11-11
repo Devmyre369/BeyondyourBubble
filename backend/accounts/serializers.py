@@ -108,3 +108,50 @@ class LoginSerializer(serializers.Serializer):
 
         attrs["user"] = user
         return attrs
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    otp = serializers.RegexField(
+        regex=r"^\d{6}$",
+        error_messages={
+            "invalid": "Enter a valid six-digit OTP."
+        }
+    )
+
+    new_password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        trim_whitespace=False
+    )
+
+    confirm_password = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False
+    )
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError({
+                "confirm_password": "Passwords do not match."
+            })
+
+        try:
+            validate_password(attrs["new_password"])
+        except DjangoValidationError as error:
+            raise serializers.ValidationError({
+                "new_password": list(error.messages)
+            })
+
+        return attrs

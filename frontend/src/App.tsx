@@ -10,35 +10,9 @@ import ResetPasswordPage from './features/auth/pages/ResetPasswordPage'
 
 import ProtectedRoute from './features/auth/components/ProtectedRoute'
 import ProfileRoute from './features/profile/components/ProfileRoute'
+
 import ProfileSetupPage from './features/profile/pages/ProfileSetupPage'
-
-import { useAuth } from './context/AuthContext'
-
-function HomePage() {
-  const { user, profile, logout } = useAuth()
-
-  return (
-    <main className="home-placeholder">
-      <div className="home-placeholder-content">
-        <span className="auth-eyebrow">BEYOND YOUR BUBBLE</span>
-
-        <h1>
-          Welcome to BYB, {profile?.first_name || user?.username}.
-        </h1>
-
-        <p>Your VibeSpace is ready. Your journey beyond your bubble starts here.</p>
-
-        <button
-          type="button"
-          className="auth-submit-button"
-          onClick={logout}
-        >
-          Log Out
-        </button>
-      </div>
-    </main>
-  )
-}
+import ProfilePage from './features/profile/pages/ProfilePage'
 
 export default function App() {
   return (
@@ -71,7 +45,7 @@ export default function App() {
         />
 
         <Route element={<ProfileRoute />}>
-          <Route path="/home" element={<HomePage />} />
+          <Route path="/home" element={<ProfilePage />} />
         </Route>
       </Route>
 

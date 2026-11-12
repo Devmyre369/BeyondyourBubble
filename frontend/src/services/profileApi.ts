@@ -3,6 +3,7 @@ import api from './api'
 
 export type ProfileType = 'student' | 'professional'
 export type ProfileVisibility = 'public' | 'private'
+export type ProfileImageType = 'profile_picture' | 'cover_image'
 
 export interface UserProfile {
   id: string
@@ -45,7 +46,12 @@ export interface UserProfile {
 
 export type CreateProfileData = Omit<
   UserProfile,
-  'id' | 'username' | 'created_at' | 'updated_at'
+  | 'id'
+  | 'username'
+  | 'profile_picture'
+  | 'cover_image'
+  | 'created_at'
+  | 'updated_at'
 >
 
 export type UpdateProfileData = Partial<CreateProfileData>
@@ -56,11 +62,20 @@ interface ProfileResponse {
   profile: UserProfile
 }
 
+interface ProfileImageResponse {
+  success: boolean
+  message?: string
+  image_type?: ProfileImageType
+  image_url?: string
+  profile: UserProfile
+}
+
 export const profileApi = {
   getMyProfile: async (): Promise<UserProfile> => {
     const response = await api.get<ProfileResponse>(
       '/accounts/profile/'
     )
+
     return response.data.profile
   },
 
@@ -71,6 +86,7 @@ export const profileApi = {
       '/accounts/profile/',
       data
     )
+
     return response.data.profile
   },
 
@@ -81,6 +97,7 @@ export const profileApi = {
       '/accounts/profile/',
       data
     )
+
     return response.data.profile
   },
 
@@ -90,6 +107,32 @@ export const profileApi = {
     const response = await api.get<ProfileResponse>(
       `/accounts/profile/${encodeURIComponent(username)}/`
     )
+
+    return response.data.profile
+  },
+
+  uploadProfileImage: async (
+    imageType: ProfileImageType,
+    file: File
+  ): Promise<UserProfile> => {
+    const formData = new FormData()
+    formData.append('image', file)
+
+    const response = await api.post<ProfileImageResponse>(
+      `/accounts/profile/image/${imageType}/`,
+      formData
+    )
+
+    return response.data.profile
+  },
+
+  deleteProfileImage: async (
+    imageType: ProfileImageType
+  ): Promise<UserProfile> => {
+    const response = await api.delete<ProfileImageResponse>(
+      `/accounts/profile/image/${imageType}/`
+    )
+
     return response.data.profile
   },
 }

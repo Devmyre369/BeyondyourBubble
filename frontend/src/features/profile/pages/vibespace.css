@@ -1,0 +1,460 @@
+
+.vibespace-page {
+  min-height: 100vh;
+  padding: 38px 24px 28px;
+  background:
+    radial-gradient(ellipse at 80% 0%, rgba(229, 57, 79, 0.08), transparent 38%),
+    var(--byb-bg);
+  color: var(--byb-text);
+}
+
+.vibespace-container {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.vibespace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.vibespace-eyebrow,
+.vibespace-section-label {
+  color: var(--byb-crimson);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+}
+
+.vibespace-header h1 {
+  margin: 8px 0 0;
+  font-size: clamp(25px, 4vw, 34px);
+  letter-spacing: -1.2px;
+}
+
+.vibespace-visibility {
+  padding: 9px 13px;
+  border: 1px solid var(--byb-border);
+  border-radius: 30px;
+  color: var(--byb-muted);
+  background: var(--byb-surface);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.vibespace-hero {
+  overflow: hidden;
+  border: 1px solid var(--byb-border);
+  border-radius: 17px;
+  background: var(--byb-surface);
+}
+
+.vibespace-cover {
+  position: relative;
+  height: clamp(155px, 25vw, 275px);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 75% 20%, rgba(229, 57, 79, 0.35), transparent 48%),
+    linear-gradient(120deg, #202027, #351b25 65%, #18181e);
+}
+
+.vibespace-cover img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.vibespace-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(ellipse at 75% 20%, rgba(229, 57, 79, 0.32), transparent 48%),
+    linear-gradient(120deg, #202027, #351b25 65%, #18181e);
+}
+
+.vibespace-cover-placeholder span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: clamp(10px, 2vw, 13px);
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-align: center;
+}
+
+.vibespace-identity {
+  display: flex;
+  align-items: flex-end;
+  gap: 22px;
+  padding: 0 34px;
+  margin-top: -48px;
+  position: relative;
+}
+
+.vibespace-avatar {
+  flex: 0 0 112px;
+  width: 112px;
+  height: 112px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 5px solid var(--byb-surface);
+  border-radius: 50%;
+  background: var(--byb-crimson);
+  color: #fff;
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.vibespace-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vibespace-identity-details {
+  min-width: 0;
+  padding-bottom: 5px;
+}
+
+.vibespace-profile-type {
+  color: var(--byb-crimson);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+}
+
+.vibespace-identity-details h2 {
+  margin: 5px 0 3px;
+  font-size: clamp(21px, 3vw, 29px);
+  letter-spacing: -0.8px;
+  overflow-wrap: anywhere;
+}
+
+.vibespace-username {
+  margin: 0;
+  color: var(--byb-muted);
+  font-size: 13px;
+}
+
+.vibespace-signature {
+  margin: 9px 0 0;
+  color: #e9a0aa;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.vibespace-bio {
+  max-width: 720px;
+  margin: 22px 34px 0;
+  color: #d1d1d8;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vibespace-location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 13px 34px 26px;
+  color: var(--byb-muted);
+  font-size: 12px;
+}
+
+.vibespace-location span {
+  color: var(--byb-crimson);
+  font-size: 18px;
+}
+
+.vibespace-identity:not(:has(+ .vibespace-bio)):not(:has(~ .vibespace-location)) {
+  padding-bottom: 24px;
+}
+
+.vibespace-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: 20px;
+  margin-top: 22px;
+}
+
+.vibespace-main-column,
+.vibespace-sidebar {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.vibespace-card {
+  min-width: 0;
+  padding: 25px;
+  border: 1px solid var(--byb-border);
+  border-radius: 15px;
+  background: var(--byb-surface);
+}
+
+.vibespace-card h2 {
+  margin: 0 0 19px;
+  font-size: 17px;
+  letter-spacing: -0.3px;
+}
+
+.vibespace-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 22px;
+}
+
+.vibespace-section-heading h2 {
+  margin: 7px 0 0;
+  font-size: 20px;
+}
+
+.vibespace-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 25px;
+}
+
+.vibespace-info-item {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.vibespace-info-item span {
+  color: var(--byb-muted);
+  font-size: 11px;
+}
+
+.vibespace-info-item strong {
+  color: var(--byb-text);
+  font-size: 13px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.vibespace-empty-note {
+  margin: 0;
+  color: var(--byb-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.vibespace-empty-state {
+  min-height: 215px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 25px 18px;
+  border: 1px dashed #393942;
+  border-radius: 11px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.vibespace-empty-icon {
+  width: 43px;
+  height: 43px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 15px;
+  border-radius: 13px;
+  background: rgba(229, 57, 79, 0.12);
+  color: var(--byb-crimson);
+  font-size: 23px;
+}
+
+.vibespace-empty-state h3 {
+  margin: 0 0 9px;
+  font-size: 15px;
+}
+
+.vibespace-empty-state p {
+  max-width: 430px;
+  margin: 0;
+  color: var(--byb-muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.vibespace-coming-soon {
+  margin-top: 17px;
+  color: var(--byb-crimson);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.3px;
+}
+
+.vibespace-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vibespace-tag {
+  padding: 8px 11px;
+  border: 1px solid #393942;
+  border-radius: 7px;
+  color: #d5d5dc;
+  background: var(--byb-surface-light);
+  font-size: 11px;
+}
+
+.vibespace-links {
+  display: grid;
+  gap: 0;
+}
+
+.vibespace-links a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--byb-border);
+  color: #d5d5dc;
+  font-size: 12px;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.vibespace-links a:first-child {
+  padding-top: 0;
+}
+
+.vibespace-links a:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.vibespace-links a:hover {
+  color: var(--byb-crimson);
+}
+
+.vibespace-links a span {
+  color: var(--byb-crimson);
+}
+
+.vibespace-philosophy {
+  border-color: rgba(229, 57, 79, 0.3);
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(229, 57, 79, 0.14), transparent 65%),
+    var(--byb-surface);
+}
+
+.vibespace-philosophy > span {
+  color: var(--byb-crimson);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+
+.vibespace-philosophy p {
+  margin: 14px 0 0;
+  color: #e8e1e3;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.vibespace-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 28px 3px 5px;
+  color: var(--byb-muted);
+  font-size: 10px;
+}
+
+.vibespace-footer span:first-child {
+  color: var(--byb-crimson);
+  font-weight: 800;
+  letter-spacing: 1.3px;
+}
+
+@media (max-width: 850px) {
+  .vibespace-content-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vibespace-sidebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vibespace-philosophy {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .vibespace-page {
+    padding: 25px 14px 20px;
+  }
+
+  .vibespace-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .vibespace-identity {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0 19px;
+    margin-top: -42px;
+  }
+
+  .vibespace-avatar {
+    flex-basis: 92px;
+    width: 92px;
+    height: 92px;
+    font-size: 27px;
+  }
+
+  .vibespace-identity-details h2 {
+    font-size: 24px;
+  }
+
+  .vibespace-bio {
+    margin: 18px 19px 0;
+    font-size: 13px;
+  }
+
+  .vibespace-location {
+    margin: 12px 19px 22px;
+  }
+
+  .vibespace-card {
+    padding: 19px;
+  }
+
+  .vibespace-info-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 17px;
+  }
+
+  .vibespace-sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vibespace-philosophy {
+    grid-column: auto;
+  }
+
+  .vibespace-footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

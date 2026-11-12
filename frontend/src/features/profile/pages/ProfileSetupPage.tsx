@@ -1,5 +1,5 @@
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 
@@ -8,6 +8,7 @@ import { useAuth } from '../../../context/AuthContext'
 import profileApi, {
   type CreateProfileData,
   type ProfileType,
+  type UserProfile,
 } from '../../../services/profileApi'
 
 import './profile.css'
@@ -19,9 +20,6 @@ interface FormState {
   byb_signature: string
   bio: string
   city: string
-
-  profile_picture: string
-  cover_image: string
 
   institution: string
   course: string
@@ -53,9 +51,6 @@ const initialForm: FormState = {
   bio: '',
   city: '',
 
-  profile_picture: '',
-  cover_image: '',
-
   institution: '',
   course: '',
   field_of_study: '',
@@ -76,6 +71,15 @@ const initialForm: FormState = {
 
   visibility: 'public',
 }
+
+const MAX_PROFILE_SIZE = 5 * 1024 * 1024
+const MAX_COVER_SIZE = 10 * 1024 * 1024
+
+const ALLOWED_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]
 
 function splitList(value: string): string[] {
   return [
@@ -126,13 +130,54 @@ function TextField({
   )
 }
 
+function validateImage(
+  file: File,
+  imageType: 'profile_picture' | 'cover_image'
+): string | null {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return 'Only JPG, JPEG, PNG, and WEBP images are allowed.'
+  }
+
+  const maxSize =
+    imageType === 'profile_picture'
+      ? MAX_PROFILE_SIZE
+      : MAX_COVER_SIZE
+
+  const maxSizeLabel = imageType === 'profile_picture' ? '5 MB' : '10 MB'
+
+  if (file.size > maxSize) {
+    return `Image size must not exceed ${maxSizeLabel}.`
+  }
+
+  return null
+}
+
 export default function ProfileSetupPage() {
   const navigate = useNavigate()
   const { setProfile } = useAuth()
 
   const [form, setForm] = useState<FormState>(initialForm)
+
+  const [profilePicture, setProfilePicture] = useState<File | null>(null)
+  const [coverImage, setCoverImage] = useState<File | null>(null)
+
+  const [profilePreview, setProfilePreview] = useState('')
+  const [coverPreview, setCoverPreview] = useState('')
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    return () => {
+      if (profilePreview) {
+        URL.revokeObjectURL(profilePreview)
+      }
+
+      if (coverPreview) {
+        URL.revokeObjectURL(coverPreview)
+      }
+    }
+  }, [profilePreview, coverPreview])
 
   const updateField = <K extends keyof FormState>(
     key: K,
@@ -142,6 +187,35 @@ export default function ProfileSetupPage() {
       ...previous,
       [key]: value,
     }))
+  }
+
+  const handleImageChange = (
+    event: ChangeEvent<HTMLInputElement>,
+    imageType: 'profile_picture' | 'cover_image'
+  ) => {
+    const file = event.target.files?.[0]
+
+    if (!file) return
+
+    const validationError = validateImage(file, imageType)
+
+    if (validationError) {
+      setError(validationError)
+      event.target.value = ''
+      return
+    }
+
+    setError('')
+
+    const previewUrl = URL.createObjectURL(file)
+
+    if (imageType === 'profile_picture') {
+      setProfilePicture(file)
+      setProfilePreview(previewUrl)
+    } else {
+      setCoverImage(file)
+      setCoverPreview(previewUrl)
+    }
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -162,9 +236,6 @@ export default function ProfileSetupPage() {
       byb_signature: form.byb_signature.trim() || null,
       bio: form.bio.trim(),
       city: form.city.trim(),
-
-      profile_picture: form.profile_picture.trim(),
-      cover_image: form.cover_image.trim(),
 
       institution: form.institution.trim(),
       course: form.course.trim(),
@@ -194,9 +265,24 @@ export default function ProfileSetupPage() {
     setLoading(true)
 
     try {
-      const createdProfile = await profileApi.createProfile(payload)
+      let updatedProfile: UserProfile =
+        await profileApi.createProfile(payload)
 
-      setProfile(createdProfile)
+      if (profilePicture) {
+        updatedProfile = await profileApi.uploadProfileImage(
+          'profile_picture',
+          profilePicture
+        )
+      }
+
+      if (coverImage) {
+        updatedProfile = await profileApi.uploadProfileImage(
+          'cover_image',
+          coverImage
+        )
+      }
+
+      setProfile(updatedProfile)
 
       navigate('/home', { replace: true })
     } catch (err) {
@@ -204,7 +290,9 @@ export default function ProfileSetupPage() {
         const data = err.response?.data
 
         if (data?.profile) {
-          setError('A profile already exists for this account. Please log in again.')
+          setError(
+            'A profile already exists for this account. Please log in again.'
+          )
         } else if (data && typeof data === 'object') {
           const messages = Object.entries(data)
             .flatMap(([field, value]) => {
@@ -467,27 +555,57 @@ export default function ProfileSetupPage() {
           <span className="profile-step">04</span>
           <div>
             <h3>Your online presence</h3>
-            <p>Add images and links to your profile.</p>
+            <p>Personalise your VibeSpace with images and links.</p>
           </div>
         </div>
 
-        <TextField
-          label="Profile picture URL"
-          name="profile_picture"
-          type="url"
-          value={form.profile_picture}
-          onChange={(value) => updateField('profile_picture', value)}
-          placeholder="https://example.com/profile.jpg"
-        />
+        <div className="form-group">
+          <label htmlFor="profile_picture">Profile picture</label>
 
-        <TextField
-          label="Cover image URL"
-          name="cover_image"
-          type="url"
-          value={form.cover_image}
-          onChange={(value) => updateField('cover_image', value)}
-          placeholder="https://example.com/cover.jpg"
-        />
+          <input
+            id="profile_picture"
+            name="profile_picture"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) =>
+              handleImageChange(event, 'profile_picture')
+            }
+          />
+
+          <span className="profile-field-hint">
+            JPG, PNG or WEBP. Maximum size: 5 MB.
+          </span>
+
+          {profilePreview && (
+            <div className="profile-image-preview">
+              <img src={profilePreview} alt="Profile picture preview" />
+            </div>
+          )}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="cover_image">Cover image</label>
+
+          <input
+            id="cover_image"
+            name="cover_image"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) =>
+              handleImageChange(event, 'cover_image')
+            }
+          />
+
+          <span className="profile-field-hint">
+            JPG, PNG or WEBP. Maximum size: 10 MB.
+          </span>
+
+          {coverPreview && (
+            <div className="cover-image-preview">
+              <img src={coverPreview} alt="Cover image preview" />
+            </div>
+          )}
+        </div>
 
         <TextField
           label="LinkedIn URL"

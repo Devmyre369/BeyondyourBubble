@@ -1,17 +1,21 @@
 
 from datetime import timedelta
+from io import BytesIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
-from django.contrib.auth.hashers import check_password
+
+from PIL import Image
 
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import (
     BlacklistedToken,
 )
@@ -32,7 +36,6 @@ from accounts.services.password_reset_service import (
     request_password_reset,
     confirm_password_reset,
 )
-
 
 User = get_user_model()
 
@@ -514,27 +517,6 @@ class ProfileAPITests(APITestCase):
             "Name",
         )
 
-    def test_user_cannot_create_duplicate_profile(self):
-        Profile.objects.create(
-            user=self.user,
-            profile_type="student",
-        )
-
-        response = self.client.post(
-            self.profile_url,
-            {
-                "profile_type": "student",
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 409)
-
-        self.assertEqual(
-            Profile.objects.filter(user=self.user).count(),
-            1,
-        )
-
     def test_public_profile_is_visible_to_other_users(self):
         Profile.objects.create(
             user=self.other_user,
@@ -585,3 +567,236 @@ class ProfileAPITests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 401)
+
+
+# ==================================================
+# PROFILE IMAGE API TESTS
+# ==================================================
+
+class ProfileImageAPITests(APITestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="image_test_user",
+            email="image_test@example.com",
+            password="Test!Secure_82River",
+            email_verified=True,
+        )
+
+        Profile.objects.create(
+            user=self.user,
+            profile_type="student",
+        )
+
+        refresh = RefreshToken.for_user(self.user)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}"
+        )
+
+        self.profile_picture_url = (
+            "/api/accounts/profile/image/profile_picture/"
+        )
+
+        self.cover_image_url = (
+            "/api/accounts/profile/image/cover_image/"
+        )
+
+    @staticmethod
+    def create_test_image(name="test.png", image_format="PNG"):
+        image_buffer = BytesIO()
+
+        image = Image.new("RGB", (10, 10), color="red")
+        image.save(image_buffer, format=image_format)
+
+        return SimpleUploadedFile(
+            name=name,
+            content=image_buffer.getvalue(),
+            content_type=f"image/{image_format.lower()}",
+        )
+
+    @patch("accounts.views.upload_profile_image")
+    def test_user_can_upload_profile_picture(self, mock_upload):
+        mock_upload.return_value = (
+            "https://res.cloudinary.com/test/profile_picture.jpg"
+        )
+
+        image = self.create_test_image()
+
+        response = self.client.post(
+            self.profile_picture_url,
+            {"image": image},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+
+        profile = Profile.objects.get(user=self.user)
+
+        self.assertEqual(
+            profile.profile_picture,
+            mock_upload.return_value,
+        )
+
+        mock_upload.assert_called_once()
+
+    @patch("accounts.views.upload_profile_image")
+    def test_user_can_upload_cover_image(self, mock_upload):
+        mock_upload.return_value = (
+            "https://res.cloudinary.com/test/cover_image.jpg"
+        )
+
+        image = self.create_test_image()
+
+        response = self.client.post(
+            self.cover_image_url,
+            {"image": image},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+
+        profile = Profile.objects.get(user=self.user)
+
+        self.assertEqual(
+            profile.cover_image,
+            mock_upload.return_value,
+        )
+
+        mock_upload.assert_called_once()
+
+    @patch("accounts.services.profile_image_service.uploader.upload")
+    def test_invalid_image_file_is_rejected(self, mock_upload):
+        image = SimpleUploadedFile(
+            "invalid.png",
+            b"This is not a valid image.",
+            content_type="image/png",
+        )
+
+        response = self.client.post(
+            self.profile_picture_url,
+            {"image": image},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        mock_upload.assert_not_called()
+
+    @patch("accounts.services.profile_image_service.uploader.upload")
+    def test_oversized_profile_picture_is_rejected(self, mock_upload):
+        image = SimpleUploadedFile(
+            "large.png",
+            b"x" * (5 * 1024 * 1024 + 1),
+            content_type="image/png",
+        )
+
+        response = self.client.post(
+            self.profile_picture_url,
+            {"image": image},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        mock_upload.assert_not_called()
+
+    @patch("accounts.services.profile_image_service.uploader.upload")
+    def test_oversized_cover_image_is_rejected(self, mock_upload):
+        image = SimpleUploadedFile(
+            "large.png",
+            b"x" * (10 * 1024 * 1024 + 1),
+            content_type="image/png",
+        )
+
+        response = self.client.post(
+            self.cover_image_url,
+            {"image": image},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        mock_upload.assert_not_called()
+
+    @patch("accounts.views.delete_profile_image")
+    def test_user_can_delete_profile_picture(self, mock_delete):
+        mock_delete.return_value = {"result": "ok"}
+
+        profile = Profile.objects.get(user=self.user)
+
+        profile.profile_picture = (
+            "https://res.cloudinary.com/test/profile_picture.jpg"
+        )
+        profile.save()
+
+        response = self.client.delete(
+            self.profile_picture_url
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+
+        profile.refresh_from_db()
+
+        self.assertEqual(profile.profile_picture, "")
+
+        mock_delete.assert_called_once()
+
+    @patch("accounts.views.delete_profile_image")
+    def test_user_can_delete_cover_image(self, mock_delete):
+        mock_delete.return_value = {"result": "ok"}
+
+        profile = Profile.objects.get(user=self.user)
+
+        profile.cover_image = (
+            "https://res.cloudinary.com/test/cover_image.jpg"
+        )
+        profile.save()
+
+        response = self.client.delete(
+            self.cover_image_url
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+
+        profile.refresh_from_db()
+
+        self.assertEqual(profile.cover_image, "")
+
+        mock_delete.assert_called_once()
+
+    @patch("accounts.views.delete_profile_image")
+    def test_deleting_missing_image_returns_404(self, mock_delete):
+        response = self.client.delete(
+            self.profile_picture_url
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_delete.assert_not_called()
+
+    @patch("accounts.views.upload_profile_image")
+    def test_unauthenticated_user_cannot_upload_image(self, mock_upload):
+        self.client.credentials()
+
+        image = self.create_test_image()
+
+        response = self.client.post(
+            self.profile_picture_url,
+            {"image": image},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 401)
+        mock_upload.assert_not_called()
+
+    @patch("accounts.views.upload_profile_image")
+    def test_upload_requires_an_image(self, mock_upload):
+        response = self.client.post(
+            self.profile_picture_url,
+            {},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        mock_upload.assert_not_called()

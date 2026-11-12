@@ -2,7 +2,13 @@
 from rest_framework import serializers
 
 from events.models import Event
-from .models import Vibe, Moment
+from .models import (
+    Vibe,
+    Moment,
+    Comment,
+    Revibe,
+    SavedContent,
+)
 
 
 class EventAssociationValidationMixin:
@@ -31,7 +37,6 @@ class VibeSerializer(
     EventAssociationValidationMixin,
     serializers.ModelSerializer
 ):
-
     author_username = serializers.CharField(
         source="author.username",
         read_only=True
@@ -62,7 +67,6 @@ class VibeSerializer(
 
     class Meta:
         model = Vibe
-
         fields = [
             "id",
             "author_username",
@@ -72,7 +76,6 @@ class VibeSerializer(
             "created_at",
             "updated_at",
         ]
-
         read_only_fields = [
             "id",
             "author_username",
@@ -86,7 +89,6 @@ class MomentSerializer(
     EventAssociationValidationMixin,
     serializers.ModelSerializer
 ):
-
     author_username = serializers.CharField(
         source="author.username",
         read_only=True
@@ -120,7 +122,6 @@ class MomentSerializer(
 
     class Meta:
         model = Moment
-
         fields = [
             "id",
             "author_username",
@@ -131,7 +132,6 @@ class MomentSerializer(
             "created_at",
             "updated_at",
         ]
-
         read_only_fields = [
             "id",
             "author_username",
@@ -140,3 +140,148 @@ class MomentSerializer(
             "created_at",
             "updated_at",
         ]
+
+
+# ==================================================
+# COMMENT SERIALIZER
+# ==================================================
+
+class CommentSerializer(serializers.ModelSerializer):
+
+    author_username = serializers.CharField(
+        source="author.username",
+        read_only=True
+    )
+
+    text = serializers.CharField(
+        max_length=1000,
+        trim_whitespace=True,
+        allow_blank=False
+    )
+
+    class Meta:
+        model = Comment
+        fields = [
+            "id",
+            "author_username",
+            "text",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "author_username",
+            "created_at",
+            "updated_at",
+        ]
+
+
+# ==================================================
+# REVIBE SERIALIZER
+# ==================================================
+
+class RevibeSerializer(serializers.ModelSerializer):
+
+    author_username = serializers.CharField(
+        source="author.username",
+        read_only=True
+    )
+
+    vibe = serializers.PrimaryKeyRelatedField(read_only=True)
+    moment = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    quote_text = serializers.CharField(
+        max_length=1000,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True
+    )
+
+    class Meta:
+        model = Revibe
+        fields = [
+            "id",
+            "author_username",
+            "vibe",
+            "moment",
+            "revibe_type",
+            "quote_text",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "author_username",
+            "vibe",
+            "moment",
+            "created_at",
+        ]
+
+    def validate(self, attrs):
+        revibe_type = attrs.get(
+            "revibe_type",
+            getattr(
+                self.instance,
+                "revibe_type",
+                Revibe.RevibeType.DIRECT
+            )
+        )
+
+        quote_text = attrs.get(
+            "quote_text",
+            getattr(self.instance, "quote_text", "")
+        )
+
+        if revibe_type == Revibe.RevibeType.DIRECT and quote_text:
+            raise serializers.ValidationError({
+                "quote_text": "Direct Revibes cannot contain additional text."
+            })
+
+        if revibe_type == Revibe.RevibeType.QUOTE and not quote_text.strip():
+            raise serializers.ValidationError({
+                "quote_text": "Quote Revibes must contain additional text."
+            })
+
+        return attrs
+
+
+# ==================================================
+# SAVED CONTENT SERIALIZER
+# ==================================================
+
+class SavedContentSerializer(serializers.ModelSerializer):
+
+    vibe = serializers.PrimaryKeyRelatedField(
+        queryset=Vibe.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
+    moment = serializers.PrimaryKeyRelatedField(
+        queryset=Moment.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
+    class Meta:
+        model = SavedContent
+        fields = [
+            "id",
+            "vibe",
+            "moment",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_at",
+        ]
+
+    def validate(self, attrs):
+        vibe = attrs.get("vibe")
+        moment = attrs.get("moment")
+
+        if (vibe is None) == (moment is None):
+            raise serializers.ValidationError(
+                "Select exactly one Vibe or Moment to save."
+            )
+
+        return attrs

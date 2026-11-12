@@ -2,7 +2,7 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
-
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -28,6 +28,17 @@ from accounts.services.signup_service import (
 from accounts.services.password_reset_service import (
     request_password_reset,
     confirm_password_reset,
+)
+
+from accounts.services.profile_image_service import (
+    ProfileImageError,
+    upload_profile_image,
+    delete_profile_image,
+)
+from accounts.services.profile_image_service import (
+    ProfileImageError,
+    upload_profile_image,
+    delete_profile_image,
 )
 
 
@@ -307,6 +318,127 @@ class MyProfileView(APIView):
         )
 
 
+
+# ==================================================
+# PROFILE IMAGE UPLOAD / DELETE
+# ==================================================
+
+class ProfileImageView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    ALLOWED_IMAGE_TYPES = {
+        "profile_picture",
+        "cover_image",
+    }
+
+    def post(self, request, image_type):
+        if image_type not in self.ALLOWED_IMAGE_TYPES:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Invalid image type.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile = get_object_or_404(
+            Profile.objects.select_related("user"),
+            user=request.user,
+        )
+
+        uploaded_file = request.FILES.get("image")
+
+        if not uploaded_file:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Please select an image to upload.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            image_url = upload_profile_image(
+                user_id=request.user.id,
+                image_type=image_type,
+                uploaded_file=uploaded_file,
+            )
+
+            setattr(profile, image_type, image_url)
+            profile.save(update_fields=[image_type, "updated_at"])
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Image uploaded successfully.",
+                    "profile": ProfileSerializer(profile).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except ProfileImageError as error:
+            return Response(
+                {
+                    "success": False,
+                    "message": str(error),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    def delete(self, request, image_type):
+        if image_type not in self.ALLOWED_IMAGE_TYPES:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Invalid image type.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile = get_object_or_404(
+            Profile.objects.select_related("user"),
+            user=request.user,
+        )
+
+        if not getattr(profile, image_type):
+            return Response(
+                {
+                    "success": False,
+                    "message": "No image is currently set.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            delete_profile_image(
+                user_id=request.user.id,
+                image_type=image_type,
+            )
+
+            setattr(profile, image_type, "")
+            profile.save(update_fields=[image_type, "updated_at"])
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Image removed successfully.",
+                    "profile": ProfileSerializer(profile).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except ProfileImageError as error:
+            return Response(
+                {
+                    "success": False,
+                    "message": str(error),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+
+
+
 # ==================================================
 # PUBLIC USER PROFILE
 # ==================================================
@@ -339,3 +471,134 @@ class PublicProfileView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+# ==================================================
+# PROFILE IMAGE UPLOAD / DELETE
+# ==================================================
+
+class ProfileImageView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    ALLOWED_IMAGE_TYPES = {
+        "profile_picture",
+        "cover_image",
+    }
+
+    def post(self, request, image_type):
+        if image_type not in self.ALLOWED_IMAGE_TYPES:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Invalid image type.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile = get_object_or_404(
+            Profile.objects.select_related("user"),
+            user=request.user,
+        )
+
+        uploaded_file = request.FILES.get("image")
+
+        if not uploaded_file:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Please select an image to upload.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            image_url = upload_profile_image(
+                user_id=request.user.id,
+                image_type=image_type,
+                uploaded_file=uploaded_file,
+            )
+
+            setattr(profile, image_type, image_url)
+            profile.save(update_fields=[image_type, "updated_at"])
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Image uploaded successfully.",
+                    "image_type": image_type,
+                    "image_url": image_url,
+                    "profile": ProfileSerializer(profile).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except ProfileImageError as error:
+            return Response(
+                {
+                    "success": False,
+                    "message": str(error),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    def delete(self, request, image_type):
+        if image_type not in self.ALLOWED_IMAGE_TYPES:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Invalid image type.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile = get_object_or_404(
+            Profile.objects.select_related("user"),
+            user=request.user,
+        )
+
+        current_image = getattr(profile, image_type)
+
+        if not current_image:
+            return Response(
+                {
+                    "success": False,
+                    "message": "No image is currently set.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            result = delete_profile_image(
+                user_id=request.user.id,
+                image_type=image_type,
+            )
+
+            if result.get("result") not in {"ok", "not found"}:
+                return Response(
+                    {
+                        "success": False,
+                        "message": "Cloudinary could not delete the image.",
+                    },
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            setattr(profile, image_type, "")
+            profile.save(update_fields=[image_type, "updated_at"])
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Image removed successfully.",
+                    "profile": ProfileSerializer(profile).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except ProfileImageError as error:
+            return Response(
+                {
+                    "success": False,
+                    "message": str(error),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )

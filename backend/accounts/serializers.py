@@ -240,6 +240,8 @@ class ProfileSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "username",
+            "profile_picture",
+            "cover_image",
             "created_at",
             "updated_at",
         ]

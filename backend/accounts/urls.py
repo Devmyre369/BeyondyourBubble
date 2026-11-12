@@ -3,6 +3,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.views import (
+    ProfileImageView,
     SignupView,
     VerifySignupView,
     LoginView,
@@ -54,5 +55,11 @@ urlpatterns = [
         "profile/<str:username>/",
         PublicProfileView.as_view(),
         name="public-profile",
+    ),
+
+        path(
+        "profile/image/<str:image_type>/",
+        ProfileImageView.as_view(),
+        name="profile-image",
     ),
 ]

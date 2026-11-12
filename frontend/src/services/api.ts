@@ -15,6 +15,15 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${accessToken}`
   }
 
+  // Allow Axios to automatically set multipart/form-data
+  // with the correct boundary when uploading files.
+  if (
+    typeof FormData !== 'undefined' &&
+    config.data instanceof FormData
+  ) {
+    config.headers.delete('Content-Type')
+  }
+
   return config
 })
 

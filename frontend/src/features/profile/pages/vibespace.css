@@ -656,3 +656,290 @@
     font-size: 24px;
   }
 }
+
+
+/* =========================================
+   MODULE 3 — VIBESPACE CONTENT
+========================================= */
+
+.vibespace-content {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.vibespace-post-section {
+  min-width: 0;
+}
+
+.vibespace-count {
+  min-width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0 9px;
+  border: 1px solid rgba(229, 57, 79, 0.3);
+  border-radius: 20px;
+  color: var(--byb-crimson);
+  background: rgba(229, 57, 79, 0.1);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.vibespace-composer {
+  display: grid;
+  gap: 13px;
+  padding: 17px;
+  border: 1px solid var(--byb-border);
+  border-radius: 11px;
+  background: var(--byb-surface-light);
+}
+
+.vibespace-composer textarea,
+.vibespace-composer select,
+.vibespace-composer input[type="file"] {
+  width: 100%;
+  min-width: 0;
+  color: var(--byb-text);
+  background: #15151b;
+  border: 1px solid var(--byb-border);
+  border-radius: 8px;
+  outline: none;
+  font: inherit;
+}
+
+.vibespace-composer textarea {
+  min-height: 95px;
+  padding: 13px;
+  resize: vertical;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.vibespace-composer textarea::placeholder {
+  color: #777783;
+}
+
+.vibespace-composer select {
+  max-width: 270px;
+  padding: 10px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.vibespace-composer input[type="file"] {
+  padding: 11px;
+  font-size: 12px;
+}
+
+.vibespace-composer input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  padding: 8px 12px;
+  color: white;
+  background: var(--byb-surface-light);
+  border: 1px solid var(--byb-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.vibespace-composer textarea:focus,
+.vibespace-composer select:focus,
+.vibespace-composer input:focus {
+  border-color: var(--byb-crimson);
+}
+
+.vibespace-composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.vibespace-character-count {
+  color: var(--byb-muted);
+  font-size: 10px;
+}
+
+.vibespace-composer-footer button {
+  padding: 10px 17px;
+  color: white;
+  background: var(--byb-crimson);
+  border: 0;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.vibespace-composer-footer button:hover:not(:disabled) {
+  background: var(--byb-crimson-hover);
+}
+
+.vibespace-composer-footer button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vibespace-post-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.vibespace-post {
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid var(--byb-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.vibespace-post-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--byb-muted);
+  font-size: 10px;
+}
+
+.vibespace-event-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 5px 9px;
+  border: 1px solid rgba(229, 57, 79, 0.25);
+  border-radius: 20px;
+  color: #e9a0aa;
+  background: rgba(229, 57, 79, 0.08);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.vibespace-post-text {
+  margin: 14px 0;
+  color: #e7e7ec;
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vibespace-post-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid var(--byb-border);
+}
+
+.vibespace-post-actions button,
+.vibespace-moment-info button {
+  padding: 6px 10px;
+  color: var(--byb-danger);
+  background: transparent;
+  border: 1px solid var(--byb-border);
+  border-radius: 6px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.vibespace-post-actions button:hover,
+.vibespace-moment-info button:hover {
+  background: rgba(255, 100, 117, 0.08);
+}
+
+.vibespace-selected-file {
+  margin: 0;
+  color: var(--byb-success);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.vibespace-moment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+  margin-top: 18px;
+}
+
+.vibespace-moment-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--byb-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.vibespace-moment-card > img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--byb-surface-light);
+}
+
+.vibespace-moment-info {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 13px;
+}
+
+.vibespace-moment-info > span:first-child {
+  color: var(--byb-muted);
+  font-size: 10px;
+}
+
+.vibespace-moment-info p {
+  margin: 0;
+  color: #e7e7ec;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.vibespace-message {
+  padding: 12px 15px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.vibespace-message-error {
+  color: var(--byb-danger);
+  border-color: rgba(255, 100, 117, 0.2);
+  background: rgba(255, 100, 117, 0.08);
+}
+
+.vibespace-message-success {
+  color: var(--byb-success);
+  border-color: rgba(69, 201, 138, 0.2);
+  background: rgba(69, 201, 138, 0.08);
+}
+
+@media (max-width: 560px) {
+  .vibespace-composer {
+    padding: 13px;
+  }
+
+  .vibespace-composer-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vibespace-composer-footer select {
+    max-width: none;
+  }
+
+  .vibespace-composer-footer button {
+    width: 100%;
+  }
+
+  .vibespace-moment-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -1,6 +1,7 @@
 
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../../context/AuthContext'
+import VibeSpaceContent from '../components/VibeSpaceContent'
 
 import './vibespace.css'
 
@@ -82,6 +83,8 @@ export default function ProfilePage() {
           </div>
         </header>
 
+        {/* PROFILE HERO */}
+
         <section className="vibespace-hero">
           <div className="vibespace-cover">
             {profile.cover_image ? (
@@ -133,12 +136,19 @@ export default function ProfilePage() {
           )}
         </section>
 
+        {/* PROFILE CONTENT */}
+
         <div className="vibespace-content-grid">
           <div className="vibespace-main-column">
+
+            {/* ABOUT ME */}
+
             <section className="vibespace-card">
               <div className="vibespace-section-heading">
                 <div>
-                  <span className="vibespace-section-label">01 / IDENTITY</span>
+                  <span className="vibespace-section-label">
+                    01 / IDENTITY
+                  </span>
                   <h2>About me</h2>
                 </div>
               </div>
@@ -147,13 +157,25 @@ export default function ProfilePage() {
                 <div className="vibespace-info-grid">
                   <InfoItem label="Institution" value={profile.institution} />
                   <InfoItem label="Course" value={profile.course} />
-                  <InfoItem label="Field of study" value={profile.field_of_study} />
-                  <InfoItem label="Academic year" value={profile.academic_year} />
-                  <InfoItem label="Graduation year" value={profile.graduation_year} />
+                  <InfoItem
+                    label="Field of study"
+                    value={profile.field_of_study}
+                  />
+                  <InfoItem
+                    label="Academic year"
+                    value={profile.academic_year}
+                  />
+                  <InfoItem
+                    label="Graduation year"
+                    value={profile.graduation_year}
+                  />
                 </div>
               ) : (
                 <div className="vibespace-info-grid">
-                  <InfoItem label="Organisation" value={profile.current_organization} />
+                  <InfoItem
+                    label="Organisation"
+                    value={profile.current_organization}
+                  />
                   <InfoItem label="Job title" value={profile.job_title} />
                   <InfoItem label="Industry" value={profile.industry} />
                   <InfoItem
@@ -177,53 +199,19 @@ export default function ProfilePage() {
                 )}
             </section>
 
-            <section className="vibespace-card vibespace-experiences">
-              <div className="vibespace-section-heading">
-                <div>
-                  <span className="vibespace-section-label">02 / EXPERIENCES</span>
-                  <h2>Your Vibes</h2>
-                </div>
-              </div>
+            {/* VIBESPACE CONTENT */}
 
-              <div className="vibespace-empty-state">
-                <span className="vibespace-empty-icon">✳</span>
-                <h3>Your experiences deserve to be heard.</h3>
-                <p>
-                  Event-related Vibes you share will appear here.
-                  Connect your thoughts and experiences to the real
-                  events that inspire them.
-                </p>
-                <span className="vibespace-coming-soon">
-                  VIBE POSTING — COMING SOON
-                </span>
-              </div>
-            </section>
+            <VibeSpaceContent
+              username={profile.username || user?.username || ''}
+            />
 
-            <section className="vibespace-card vibespace-experiences">
-              <div className="vibespace-section-heading">
-                <div>
-                  <span className="vibespace-section-label">03 / MOMENTS</span>
-                  <h2>Captured moments</h2>
-                </div>
-              </div>
-
-              <div className="vibespace-empty-state">
-                <span className="vibespace-empty-icon">▧</span>
-                <h3>Every event has a story.</h3>
-                <p>
-                  Your event-related photo Moments will live here,
-                  helping others experience what happened even
-                  when they couldn't attend.
-                </p>
-                <span className="vibespace-coming-soon">
-                  MOMENTS — COMING SOON
-                </span>
-              </div>
-            </section>
           </div>
+
+          {/* PROFILE SIDEBAR */}
 
           <aside className="vibespace-sidebar">
             <TagList title="Interests" items={profile.interests || []} />
+
             <TagList title="Skills" items={profile.skills || []} />
 
             <section className="vibespace-card">
@@ -231,19 +219,31 @@ export default function ProfilePage() {
 
               <div className="vibespace-links">
                 {profile.linkedin_url && (
-                  <a href={profile.linkedin_url} target="_blank" rel="noreferrer">
+                  <a
+                    href={profile.linkedin_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     LinkedIn <span>↗</span>
                   </a>
                 )}
 
                 {profile.github_url && (
-                  <a href={profile.github_url} target="_blank" rel="noreferrer">
+                  <a
+                    href={profile.github_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     GitHub <span>↗</span>
                   </a>
                 )}
 
                 {profile.website_url && (
-                  <a href={profile.website_url} target="_blank" rel="noreferrer">
+                  <a
+                    href={profile.website_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     Personal website <span>↗</span>
                   </a>
                 )}
@@ -267,6 +267,8 @@ export default function ProfilePage() {
             </section>
           </aside>
         </div>
+
+        {/* FOOTER */}
 
         <footer className="vibespace-footer">
           <span>BEYOND YOUR BUBBLE</span>

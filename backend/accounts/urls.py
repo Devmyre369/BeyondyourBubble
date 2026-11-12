@@ -8,10 +8,13 @@ from accounts.views import (
     LoginView,
     PasswordResetRequestView,
     PasswordResetConfirmView,
+    MyProfileView,
+    PublicProfileView,
 )
 
 
 urlpatterns = [
+    # Authentication
     path("signup/", SignupView.as_view(), name="signup"),
 
     path(
@@ -38,5 +41,18 @@ urlpatterns = [
         "token/refresh/",
         TokenRefreshView.as_view(),
         name="token-refresh",
+    ),
+
+    # Individual profile / VibeSpace
+    path(
+        "profile/",
+        MyProfileView.as_view(),
+        name="my-profile",
+    ),
+
+    path(
+        "profile/<str:username>/",
+        PublicProfileView.as_view(),
+        name="public-profile",
     ),
 ]

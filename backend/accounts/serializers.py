@@ -5,9 +5,15 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 
 from rest_framework import serializers
 
+from accounts.models import Profile
+
 
 User = get_user_model()
 
+
+# ==================================================
+# AUTHENTICATION SERIALIZERS
+# ==================================================
 
 class SignupSerializer(serializers.Serializer):
     username = serializers.CharField(
@@ -155,3 +161,151 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             })
 
         return attrs
+
+
+# ==================================================
+# PROFILE / VIBESPACE SERIALIZER
+# ==================================================
+
+class ProfileSerializer(serializers.ModelSerializer):
+
+    username = serializers.CharField(
+        source="user.username",
+        read_only=True
+    )
+
+    class Meta:
+        model = Profile
+
+        fields = [
+            "id",
+            "username",
+            "profile_type",
+            "byb_signature",
+            "bio",
+            "city",
+            "profile_picture",
+            "cover_image",
+
+            # Student information
+            "institution",
+            "course",
+            "field_of_study",
+            "academic_year",
+            "graduation_year",
+
+            # Professional information
+            "current_organization",
+            "job_title",
+            "industry",
+            "experience_years",
+
+            # Shared information
+            "interests",
+            "skills",
+
+            # Social links
+            "linkedin_url",
+            "github_url",
+            "website_url",
+
+            # Privacy
+            "visibility",
+
+            "created_at",
+            "updated_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "username",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_bio(self, value):
+        return value.strip()
+
+    def validate_byb_signature(self, value):
+        if not value:
+            return value
+
+        value = value.strip()
+
+        queryset = Profile.objects.filter(
+            byb_signature__iexact=value
+        )
+
+        if self.instance:
+            queryset = queryset.exclude(
+                pk=self.instance.pk
+            )
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "This BYB signature is already taken."
+            )
+
+        return value
+
+    def validate_interests(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError(
+                "Interests must be a list."
+            )
+
+        if len(value) > 30:
+            raise serializers.ValidationError(
+                "You can add a maximum of 30 interests."
+            )
+
+        if not all(
+            isinstance(item, str) and item.strip()
+            for item in value
+        ):
+            raise serializers.ValidationError(
+                "Every interest must be a non-empty string."
+            )
+
+        return list(dict.fromkeys(
+            item.strip() for item in value
+        ))
+
+    def validate_skills(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError(
+                "Skills must be a list."
+            )
+
+        if len(value) > 30:
+            raise serializers.ValidationError(
+                "You can add a maximum of 30 skills."
+            )
+
+        if not all(
+            isinstance(item, str) and item.strip()
+            for item in value
+        ):
+            raise serializers.ValidationError(
+                "Every skill must be a non-empty string."
+            )
+
+        return list(dict.fromkeys(
+            item.strip() for item in value
+        ))
+
+    def validate_graduation_year(self, value):
+        if value is not None and not 2000 <= value <= 2100:
+            raise serializers.ValidationError(
+                "Enter a valid graduation year."
+            )
+
+        return value
+
+    def validate_experience_years(self, value):
+        if value is not None and value > 60:
+            raise serializers.ValidationError(
+                "Experience years cannot exceed 60."
+            )
+
+        return value

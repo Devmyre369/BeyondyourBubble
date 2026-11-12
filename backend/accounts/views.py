@@ -1,19 +1,23 @@
 
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
+from django.shortcuts import get_object_or_404
 
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from accounts.models import Profile
 
 from accounts.serializers import (
     SignupSerializer,
     LoginSerializer,
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
+    ProfileSerializer,
 )
 
 from accounts.services.signup_service import (
@@ -29,6 +33,10 @@ from accounts.services.password_reset_service import (
 
 User = get_user_model()
 
+
+# ==================================================
+# AUTHENTICATION RESPONSE
+# ==================================================
 
 def generate_auth_response(user, message):
     refresh = RefreshToken.for_user(user)
@@ -48,6 +56,10 @@ def generate_auth_response(user, message):
         },
     }
 
+
+# ==================================================
+# AUTHENTICATION VIEWS
+# ==================================================
 
 class SignupView(APIView):
     permission_classes = [AllowAny]
@@ -203,6 +215,127 @@ class PasswordResetConfirmView(APIView):
                     "Password reset successful. "
                     "Please log in with your new password."
                 ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# ==================================================
+# MY PROFILE / VIBESPACE
+# ==================================================
+
+class MyProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile = get_object_or_404(
+            Profile.objects.select_related("user"),
+            user=request.user,
+        )
+
+        serializer = ProfileSerializer(profile)
+
+        return Response(
+            {
+                "success": True,
+                "profile": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request):
+        if Profile.objects.filter(user=request.user).exists():
+            return Response(
+                {
+                    "success": False,
+                    "message": "Your profile already exists. Use PATCH to update it.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        serializer = ProfileSerializer(data=request.data)
+
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                profile = serializer.save(user=request.user)
+
+                request.user.onboarding_completed = True
+                request.user.save(update_fields=["onboarding_completed"])
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Your BYB profile has been created successfully.",
+                    "profile": ProfileSerializer(profile).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        except IntegrityError:
+            return Response(
+                {
+                    "success": False,
+                    "message": "A profile with conflicting information already exists.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+    def patch(self, request):
+        profile = get_object_or_404(
+            Profile.objects.select_related("user"),
+            user=request.user,
+        )
+
+        serializer = ProfileSerializer(
+            profile,
+            data=request.data,
+            partial=True,
+        )
+
+        serializer.is_valid(raise_exception=True)
+        profile = serializer.save()
+
+        return Response(
+            {
+                "success": True,
+                "message": "Your profile has been updated successfully.",
+                "profile": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# ==================================================
+# PUBLIC USER PROFILE
+# ==================================================
+
+class PublicProfileView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, username):
+        user = get_object_or_404(
+            User.objects.filter(
+                username__iexact=username,
+                is_active=True,
+                email_verified=True,
+            )
+        )
+
+        profile = get_object_or_404(
+            Profile.objects.select_related("user"),
+            user=user,
+            visibility=Profile.Visibility.PUBLIC,
+        )
+
+        serializer = ProfileSerializer(profile)
+
+        return Response(
+            {
+                "success": True,
+                "profile": serializer.data,
             },
             status=status.HTTP_200_OK,
         )

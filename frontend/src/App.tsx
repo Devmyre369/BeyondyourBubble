@@ -10,20 +10,23 @@ import ResetPasswordPage from './features/auth/pages/ResetPasswordPage'
 
 import ProtectedRoute from './features/auth/components/ProtectedRoute'
 import ProfileRoute from './features/profile/components/ProfileRoute'
+import ProfileSetupPage from './features/profile/pages/ProfileSetupPage'
 
 import { useAuth } from './context/AuthContext'
 
 function HomePage() {
-  const { user, logout } = useAuth()
+  const { user, profile, logout } = useAuth()
 
   return (
     <main className="home-placeholder">
       <div className="home-placeholder-content">
         <span className="auth-eyebrow">BEYOND YOUR BUBBLE</span>
 
-        <h1>Welcome to BYB, {user?.username}.</h1>
+        <h1>
+          Welcome to BYB, {profile?.first_name || user?.username}.
+        </h1>
 
-        <p>Your journey beyond your bubble starts here.</p>
+        <p>Your VibeSpace is ready. Your journey beyond your bubble starts here.</p>
 
         <button
           type="button"
@@ -32,20 +35,6 @@ function HomePage() {
         >
           Log Out
         </button>
-      </div>
-    </main>
-  )
-}
-
-function CompleteProfilePage() {
-  return (
-    <main className="home-placeholder">
-      <div className="home-placeholder-content">
-        <span className="auth-eyebrow">BEYOND YOUR BUBBLE</span>
-
-        <h1>Let's build your VibeSpace.</h1>
-
-        <p>Complete your individual profile to continue.</p>
       </div>
     </main>
   )
@@ -76,7 +65,10 @@ export default function App() {
       />
 
       <Route element={<ProtectedRoute />}>
-        <Route path="/complete-profile" element={<CompleteProfilePage />} />
+        <Route
+          path="/complete-profile"
+          element={<ProfileSetupPage />}
+        />
 
         <Route element={<ProfileRoute />}>
           <Route path="/home" element={<HomePage />} />

@@ -1,0 +1,133 @@
+
+.profile-onboarding {
+  gap: 19px;
+  padding-bottom: 20px;
+}
+
+.profile-onboarding .form-group {
+  gap: 8px;
+}
+
+.profile-onboarding .form-group input,
+.profile-onboarding .form-group select,
+.profile-onboarding .form-group textarea {
+  width: 100%;
+  border: 1px solid var(--byb-border);
+  border-radius: 9px;
+  outline: none;
+  background: var(--byb-surface);
+  color: var(--byb-text);
+  font-family: inherit;
+  font-size: 13px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.profile-onboarding .form-group input,
+.profile-onboarding .form-group select {
+  min-height: 49px;
+  padding: 0 14px;
+}
+
+.profile-onboarding .form-group textarea {
+  min-height: 110px;
+  padding: 13px 14px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.profile-onboarding .form-group input::placeholder,
+.profile-onboarding .form-group textarea::placeholder {
+  color: #696975;
+}
+
+.profile-onboarding .form-group input:focus,
+.profile-onboarding .form-group select:focus,
+.profile-onboarding .form-group textarea:focus {
+  border-color: var(--byb-crimson);
+  box-shadow: 0 0 0 3px rgba(229, 57, 79, 0.10);
+}
+
+.profile-onboarding .form-group select {
+  cursor: pointer;
+}
+
+.profile-onboarding .form-group select option {
+  background: #1c1b22;
+  color: white;
+}
+
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.profile-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 15px;
+  padding-top: 23px;
+  border-top: 1px solid var(--byb-border);
+}
+
+.profile-step {
+  width: 37px;
+  height: 37px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(229, 57, 79, 0.35);
+  border-radius: 10px;
+  background: rgba(229, 57, 79, 0.09);
+  color: var(--byb-crimson);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.profile-section-heading h3 {
+  margin: 0 0 4px;
+  color: var(--byb-text);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.profile-section-heading p {
+  margin: 0;
+  color: var(--byb-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.required-mark {
+  color: var(--byb-crimson);
+}
+
+.profile-field-hint {
+  color: var(--byb-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.profile-submit-note {
+  margin: 0;
+  color: var(--byb-muted);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.profile-onboarding .auth-submit-button {
+  margin-top: 8px;
+}
+
+@media (max-width: 520px) {
+  .profile-form-grid {
+    grid-template-columns: 1fr;
+    gap: 19px;
+  }
+
+  .profile-section-heading {
+    margin-top: 10px;
+  }
+}

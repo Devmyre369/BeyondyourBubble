@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
 from rest_framework import generics, status
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -75,7 +76,10 @@ class ContentCommentListCreateView(APIView):
         if content_type == "vibe":
             return "vibe", get_visible_vibe(self.request.user, content_id)
 
-        return "moment", get_visible_moment(self.request.user, content_id)
+        if content_type == "moment":
+            return "moment", get_visible_moment(self.request.user, content_id)
+
+        raise NotFound("Invalid content type.")
 
     def get(self, request, *args, **kwargs):
         content_type, content = self.get_content()
@@ -120,6 +124,7 @@ class ContentCommentListCreateView(APIView):
 
 class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CommentSerializer
+
     queryset = Comment.objects.select_related(
         "author",
         "vibe__author",
@@ -127,6 +132,7 @@ class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
         "moment__author",
         "moment__author__profile",
     )
+
     lookup_field = "id"
     lookup_url_kwarg = "comment_id"
 
@@ -148,7 +154,6 @@ class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         if self.request.method in ("PUT", "PATCH", "DELETE"):
             if comment.author_id != self.request.user.id:
-                from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied(
                     "Only the comment author can edit or delete this comment."
                 )
@@ -158,8 +163,8 @@ class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class ContentRevibeView(APIView):
     """
-    Create or update the current user's Revibe of a Vibe or Moment.
-    DELETE removes the current user's Revibe.
+    Retrieve, create, update, or remove the current user's Revibe
+    of a Vibe or Moment.
     """
 
     permission_classes = [IsAuthenticated]
@@ -171,7 +176,27 @@ class ContentRevibeView(APIView):
         if content_type == "vibe":
             return "vibe", get_visible_vibe(self.request.user, content_id)
 
-        return "moment", get_visible_moment(self.request.user, content_id)
+        if content_type == "moment":
+            return "moment", get_visible_moment(self.request.user, content_id)
+
+        raise NotFound("Invalid content type.")
+
+    def get(self, request, *args, **kwargs):
+        content_type, content = self.get_content()
+
+        filters = {"author": request.user}
+
+        if content_type == "vibe":
+            filters["vibe"] = content
+        else:
+            filters["moment"] = content
+
+        revibe = Revibe.objects.filter(**filters).first()
+
+        if not revibe:
+            return Response(None, status=status.HTTP_200_OK)
+
+        return Response(RevibeSerializer(revibe).data)
 
     def post(self, request, *args, **kwargs):
         content_type, content = self.get_content()
@@ -192,6 +217,7 @@ class ContentRevibeView(APIView):
             data=request.data,
             partial=existing is not None,
         )
+
         serializer.is_valid(raise_exception=True)
 
         if existing:
@@ -208,8 +234,8 @@ class ContentRevibeView(APIView):
             else:
                 revibe = serializer.save(
                     author=request.user,
-                    moment=content,
                     vibe=None,
+                    moment=content,
                 )
 
             message = "Revibe published successfully."
@@ -334,6 +360,7 @@ class SavedContentListCreateView(generics.ListCreateAPIView):
 class SavedContentDetailView(generics.DestroyAPIView):
     serializer_class = SavedContentSerializer
     permission_classes = [IsAuthenticated]
+
     lookup_field = "id"
     lookup_url_kwarg = "saved_id"
 

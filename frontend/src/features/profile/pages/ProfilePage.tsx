@@ -1,5 +1,6 @@
+
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../../context/AuthContext'
-import './vibespace.css'
 
 import './vibespace.css'
 
@@ -57,7 +58,6 @@ export default function ProfilePage() {
   }
 
   const fullName = `${profile.first_name} ${profile.last_name}`.trim()
-
   const isStudent = profile.profile_type === 'student'
 
   return (
@@ -69,9 +69,17 @@ export default function ProfilePage() {
             <h1>Your VibeSpace</h1>
           </div>
 
-          <span className="vibespace-visibility">
-            {profile.visibility === 'public' ? 'Public profile' : 'Private profile'}
-          </span>
+          <div className="vibespace-header-actions">
+            <span className="vibespace-visibility">
+              {profile.visibility === 'public'
+                ? 'Public profile'
+                : 'Private profile'}
+            </span>
+
+            <Link to="/edit-profile" className="vibespace-edit-button">
+              Edit Profile
+            </Link>
+          </div>
         </header>
 
         <section className="vibespace-hero">
@@ -148,11 +156,14 @@ export default function ProfilePage() {
                   <InfoItem label="Organisation" value={profile.current_organization} />
                   <InfoItem label="Job title" value={profile.job_title} />
                   <InfoItem label="Industry" value={profile.industry} />
-                  <InfoItem label="Experience" value={
-                    profile.experience_years !== null
-                      ? `${profile.experience_years} years`
-                      : null
-                  } />
+                  <InfoItem
+                    label="Experience"
+                    value={
+                      profile.experience_years !== null
+                        ? `${profile.experience_years} years`
+                        : null
+                    }
+                  />
                 </div>
               )}
 
@@ -182,7 +193,9 @@ export default function ProfilePage() {
                   Connect your thoughts and experiences to the real
                   events that inspire them.
                 </p>
-                <span className="vibespace-coming-soon">VIBE POSTING — COMING SOON</span>
+                <span className="vibespace-coming-soon">
+                  VIBE POSTING — COMING SOON
+                </span>
               </div>
             </section>
 
@@ -202,7 +215,9 @@ export default function ProfilePage() {
                   helping others experience what happened even
                   when they couldn't attend.
                 </p>
-                <span className="vibespace-coming-soon">MOMENTS — COMING SOON</span>
+                <span className="vibespace-coming-soon">
+                  MOMENTS — COMING SOON
+                </span>
               </div>
             </section>
           </div>

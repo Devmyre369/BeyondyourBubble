@@ -174,12 +174,33 @@ class ProfileSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    # These fields are stored on the related User model.
+    # They are write-only here and added to API responses
+    # through to_representation().
+    first_name = serializers.CharField(
+        max_length=150,
+        write_only=True,
+        required=True,
+        allow_blank=False,
+        trim_whitespace=True
+    )
+
+    last_name = serializers.CharField(
+        max_length=150,
+        write_only=True,
+        required=True,
+        allow_blank=False,
+        trim_whitespace=True
+    )
+
     class Meta:
         model = Profile
 
         fields = [
             "id",
             "username",
+            "first_name",
+            "last_name",
             "profile_type",
             "byb_signature",
             "bio",
@@ -222,6 +243,64 @@ class ProfileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def create(self, validated_data):
+        first_name = validated_data.pop("first_name")
+        last_name = validated_data.pop("last_name")
+
+        user = validated_data.pop("user")
+
+        user.first_name = first_name
+        user.last_name = last_name
+
+        user.save(
+            update_fields=["first_name", "last_name"]
+        )
+
+        return Profile.objects.create(
+            user=user,
+            **validated_data
+        )
+
+    def update(self, instance, validated_data):
+        first_name = validated_data.pop(
+            "first_name",
+            None
+        )
+
+        last_name = validated_data.pop(
+            "last_name",
+            None
+        )
+
+        user = instance.user
+        user_fields_to_update = []
+
+        if first_name is not None:
+            user.first_name = first_name
+            user_fields_to_update.append("first_name")
+
+        if last_name is not None:
+            user.last_name = last_name
+            user_fields_to_update.append("last_name")
+
+        if user_fields_to_update:
+            user.save(
+                update_fields=user_fields_to_update
+            )
+
+        return super().update(
+            instance,
+            validated_data
+        )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        data["first_name"] = instance.user.first_name
+        data["last_name"] = instance.user.last_name
+
+        return data
 
     def validate_bio(self, value):
         return value.strip()

@@ -8,13 +8,17 @@ import {
 } from 'react'
 
 import type { AuthUser, AuthResponse } from '../services/authApi'
+import type { UserProfile } from '../services/profileApi'
 
 interface AuthContextType {
   user: AuthUser | null
+  profile: UserProfile | null
   accessToken: string | null
   refreshToken: string | null
   isAuthenticated: boolean
+  profileLoaded: boolean
   completeAuthentication: (data: AuthResponse) => void
+  setProfile: (profile: UserProfile | null) => void
   logout: () => void
 }
 
@@ -40,6 +44,9 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(getStoredUser)
 
+  const [profile, setProfileState] = useState<UserProfile | null>(null)
+  const [profileLoaded, setProfileLoaded] = useState(false)
+
   const [accessToken, setAccessToken] = useState<string | null>(
     () => sessionStorage.getItem(ACCESS_TOKEN_KEY)
   )
@@ -56,6 +63,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAccessToken(data.tokens.access)
     setRefreshToken(data.tokens.refresh)
     setUser(data.user)
+
+    setProfileState(null)
+    setProfileLoaded(false)
+  }
+
+  const setProfile = (newProfile: UserProfile | null) => {
+    setProfileState(newProfile)
+    setProfileLoaded(true)
   }
 
   const logout = () => {
@@ -66,18 +81,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAccessToken(null)
     setRefreshToken(null)
     setUser(null)
+    setProfileState(null)
+    setProfileLoaded(false)
   }
 
   const value = useMemo(
     () => ({
       user,
+      profile,
       accessToken,
       refreshToken,
       isAuthenticated: Boolean(user && accessToken),
+      profileLoaded,
       completeAuthentication,
+      setProfile,
       logout,
     }),
-    [user, accessToken, refreshToken]
+    [user, profile, accessToken, refreshToken, profileLoaded]
   )
 
   return (

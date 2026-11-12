@@ -9,6 +9,8 @@ import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage'
 import ResetPasswordPage from './features/auth/pages/ResetPasswordPage'
 
 import ProtectedRoute from './features/auth/components/ProtectedRoute'
+import ProfileRoute from './features/profile/components/ProfileRoute'
+
 import { useAuth } from './context/AuthContext'
 
 function HomePage() {
@@ -30,6 +32,20 @@ function HomePage() {
         >
           Log Out
         </button>
+      </div>
+    </main>
+  )
+}
+
+function CompleteProfilePage() {
+  return (
+    <main className="home-placeholder">
+      <div className="home-placeholder-content">
+        <span className="auth-eyebrow">BEYOND YOUR BUBBLE</span>
+
+        <h1>Let's build your VibeSpace.</h1>
+
+        <p>Complete your individual profile to continue.</p>
       </div>
     </main>
   )
@@ -60,7 +76,11 @@ export default function App() {
       />
 
       <Route element={<ProtectedRoute />}>
-        <Route path="/home" element={<HomePage />} />
+        <Route path="/complete-profile" element={<CompleteProfilePage />} />
+
+        <Route element={<ProfileRoute />}>
+          <Route path="/home" element={<HomePage />} />
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

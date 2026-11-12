@@ -5,19 +5,10 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
+from django.contrib.auth.hashers import check_password
 
 from rest_framework.exceptions import ValidationError
-
-from accounts.models import EmailOTP, PendingSignup
-from accounts.services.otp_service import (
-    create_otp,
-    verify_otp,
-)
-from accounts.services.signup_service import (
-    start_signup,
-    verify_signup,
-)
-from django.contrib.auth.hashers import check_password
+from rest_framework.test import APITestCase
 
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
@@ -25,13 +16,30 @@ from rest_framework_simplejwt.token_blacklist.models import (
     BlacklistedToken,
 )
 
+from accounts.models import EmailOTP, PendingSignup, Profile
+
+from accounts.services.otp_service import (
+    create_otp,
+    verify_otp,
+)
+
+from accounts.services.signup_service import (
+    start_signup,
+    verify_signup,
+)
+
 from accounts.services.password_reset_service import (
     request_password_reset,
     confirm_password_reset,
 )
 
+
 User = get_user_model()
 
+
+# ==================================================
+# OTP SERVICE TESTS
+# ==================================================
 
 class OTPServiceTests(TestCase):
 
@@ -125,6 +133,10 @@ class OTPServiceTests(TestCase):
         )
 
 
+# ==================================================
+# SIGNUP SERVICE TESTS
+# ==================================================
+
 class SignupServiceTests(TestCase):
 
     def setUp(self):
@@ -143,14 +155,17 @@ class SignupServiceTests(TestCase):
         )
 
         self.assertEqual(result["email"], self.email)
+
         self.assertTrue(
             PendingSignup.objects.filter(
                 email=self.email
             ).exists()
         )
+
         self.assertFalse(
             User.objects.filter(email=self.email).exists()
         )
+
         mock_email.assert_called_once()
 
     @patch("accounts.services.signup_service.send_signup_otp")
@@ -168,9 +183,6 @@ class SignupServiceTests(TestCase):
             purpose=EmailOTP.Purpose.SIGNUP,
         )
 
-        from django.contrib.auth.hashers import check_password
-
-        # Retrieve the OTP from the mocked email call.
         otp = mock_email.call_args.args[1]
 
         user = verify_signup(
@@ -180,14 +192,17 @@ class SignupServiceTests(TestCase):
 
         self.assertEqual(user.username, self.username)
         self.assertTrue(user.email_verified)
+
         self.assertTrue(
             check_password(self.password, user.password)
         )
+
         self.assertFalse(
             PendingSignup.objects.filter(
                 email=self.email
             ).exists()
         )
+
         self.assertTrue(otp_record.pk)
 
     @patch("accounts.services.signup_service.send_signup_otp")
@@ -217,6 +232,11 @@ class SignupServiceTests(TestCase):
 
         self.assertEqual(otp_record.attempts, 1)
         self.assertFalse(otp_record.is_used)
+
+
+# ==================================================
+# PASSWORD RESET SERVICE TESTS
+# ==================================================
 
 class PasswordResetServiceTests(TestCase):
 
@@ -293,7 +313,6 @@ class PasswordResetServiceTests(TestCase):
 
         otp = mock_email.call_args.args[1]
 
-        # Create an outstanding refresh token before resetting.
         refresh = RefreshToken.for_user(self.user)
         old_refresh_token = str(refresh)
 
@@ -321,6 +340,248 @@ class PasswordResetServiceTests(TestCase):
             ).exists()
         )
 
-        # The old refresh token must no longer be accepted.
         with self.assertRaises(TokenError):
             RefreshToken(old_refresh_token)
+
+
+# ==================================================
+# PROFILE API TESTS
+# ==================================================
+
+class ProfileAPITests(APITestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="profile_test_user",
+            email="profile_test@example.com",
+            password="Test!Secure_82River",
+            email_verified=True,
+        )
+
+        self.other_user = User.objects.create_user(
+            username="other_profile_user",
+            email="other_profile@example.com",
+            password="Test!Secure_92Orbit",
+            email_verified=True,
+        )
+
+        refresh = RefreshToken.for_user(self.user)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}"
+        )
+
+        self.profile_url = "/api/accounts/profile/"
+
+    def test_authenticated_user_can_create_profile(self):
+        response = self.client.post(
+            self.profile_url,
+            {
+                "first_name": "Devansh",
+                "last_name": "Shukla",
+                "profile_type": "student",
+                "institution": "Test University",
+                "course": "Computer Science",
+                "city": "Lucknow",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+
+        self.assertTrue(
+            Profile.objects.filter(user=self.user).exists()
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertTrue(self.user.onboarding_completed)
+        self.assertEqual(self.user.first_name, "Devansh")
+        self.assertEqual(self.user.last_name, "Shukla")
+
+        self.assertEqual(
+            response.data["profile"]["first_name"],
+            "Devansh",
+        )
+
+        self.assertEqual(
+            response.data["profile"]["last_name"],
+            "Shukla",
+        )
+
+    def test_user_cannot_create_duplicate_profile(self):
+        Profile.objects.create(
+            user=self.user,
+            profile_type="student",
+        )
+
+        response = self.client.post(
+            self.profile_url,
+            {
+                "profile_type": "student",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+
+        self.assertEqual(
+            Profile.objects.filter(user=self.user).count(),
+            1,
+        )
+
+    def test_authenticated_user_can_retrieve_own_profile(self):
+        Profile.objects.create(
+            user=self.user,
+            profile_type="student",
+            institution="Test University",
+        )
+
+        response = self.client.get(self.profile_url)
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            response.data["profile"]["username"],
+            self.user.username,
+        )
+
+        self.assertEqual(
+            response.data["profile"]["first_name"],
+            "",
+        )
+
+        self.assertEqual(
+            response.data["profile"]["last_name"],
+            "",
+        )
+
+    def test_authenticated_user_can_update_own_profile(self):
+        Profile.objects.create(
+            user=self.user,
+            profile_type="student",
+        )
+
+        response = self.client.patch(
+            self.profile_url,
+            {
+                "bio": "Connecting beyond boundaries.",
+                "city": "Lucknow",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        profile = Profile.objects.get(user=self.user)
+
+        self.assertEqual(
+            profile.bio,
+            "Connecting beyond boundaries.",
+        )
+
+        self.assertEqual(profile.city, "Lucknow")
+
+    def test_user_can_update_first_and_last_name(self):
+        Profile.objects.create(
+            user=self.user,
+            profile_type="student",
+        )
+
+        response = self.client.patch(
+            self.profile_url,
+            {
+                "first_name": "Updated",
+                "last_name": "Name",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.user.refresh_from_db()
+
+        self.assertEqual(self.user.first_name, "Updated")
+        self.assertEqual(self.user.last_name, "Name")
+
+        self.assertEqual(
+            response.data["profile"]["first_name"],
+            "Updated",
+        )
+
+        self.assertEqual(
+            response.data["profile"]["last_name"],
+            "Name",
+        )
+
+    def test_user_cannot_create_duplicate_profile(self):
+        Profile.objects.create(
+            user=self.user,
+            profile_type="student",
+        )
+
+        response = self.client.post(
+            self.profile_url,
+            {
+                "profile_type": "student",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+
+        self.assertEqual(
+            Profile.objects.filter(user=self.user).count(),
+            1,
+        )
+
+    def test_public_profile_is_visible_to_other_users(self):
+        Profile.objects.create(
+            user=self.other_user,
+            profile_type="professional",
+            visibility="public",
+        )
+
+        response = self.client.get(
+            f"{self.profile_url}{self.other_user.username}/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            response.data["profile"]["username"],
+            self.other_user.username,
+        )
+
+    def test_private_profile_is_not_visible_to_other_users(self):
+        Profile.objects.create(
+            user=self.other_user,
+            profile_type="professional",
+            visibility="private",
+        )
+
+        response = self.client.get(
+            f"{self.profile_url}{self.other_user.username}/"
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_unauthenticated_user_cannot_access_own_profile(self):
+        self.client.credentials()
+
+        response = self.client.get(self.profile_url)
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_unauthenticated_user_cannot_create_profile(self):
+        self.client.credentials()
+
+        response = self.client.post(
+            self.profile_url,
+            {
+                "profile_type": "student",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 401)

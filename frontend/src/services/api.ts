@@ -8,5 +8,14 @@ const api = axios.create({
   },
 })
 
-export default api
+api.interceptors.request.use((config) => {
+  const accessToken = sessionStorage.getItem('byb_access_token')
 
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`
+  }
+
+  return config
+})
+
+export default api

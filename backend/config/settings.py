@@ -77,6 +77,10 @@ INSTALLED_APPS = [
 
     # BYB applications
     "accounts",
+    # BYB applications
+
+    "events",
+    "vibespace",
 ]
 
 

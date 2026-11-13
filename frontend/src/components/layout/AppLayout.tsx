@@ -1,6 +1,7 @@
 ﻿
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import Sidebar from './Sidebar'
 import RightSidebar from './RightSidebar'
 import './app-layout.css'
@@ -63,6 +64,7 @@ function MobileNavigationIcon({
 }
 
 export default function AppLayout() {
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
     window.matchMedia('(max-width: 850px)').matches,
@@ -96,7 +98,7 @@ export default function AppLayout() {
 
   const openComposer = (type: 'vibe' | 'moment') => {
     setUploadMenuOpen(false)
-    navigate(`/home?compose=${type}`)
+    navigate(`/create/${type}`)
   }
 
   const renderNavigationItem = (
@@ -110,7 +112,15 @@ export default function AppLayout() {
           `byb-mobile-nav-item${isActive ? ' active' : ''}`
         }
       >
-        <MobileNavigationIcon name={item.icon} />
+        {item.icon === 'profile' && profile?.profile_picture ? (
+          <img
+            className="byb-mobile-profile-avatar"
+            src={profile.profile_picture}
+            alt=""
+          />
+        ) : (
+          <MobileNavigationIcon name={item.icon} />
+        )}
         <span>{item.label}</span>
       </NavLink>
     ) : (

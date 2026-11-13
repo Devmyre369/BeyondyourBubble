@@ -2,16 +2,14 @@
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
   type FormEvent,
 } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { feedApi, type FeedEntry } from '../../services/feedApi'
 import vibespaceApi, {
   type Comment,
-  type EventChoice,
   type LikeState,
   type PostCounts,
   type Revibe,
@@ -38,27 +36,12 @@ const createCountsMap = (items: FeedEntry[]): Record<string, PostCounts> =>
 
 export default function FeedPage() {
   const { user, isAuthenticated } = useAuth()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const composerParam = searchParams.get('compose')
-  const activeComposer =
-    composerParam === 'vibe' || composerParam === 'moment'
-      ? composerParam
-      : null
+  const navigate = useNavigate()
   const [entries, setEntries] = useState<FeedEntry[]>([])
-  const [events, setEvents] = useState<EventChoice[]>([])
   const [nextPage, setNextPage] = useState<number | null>(1)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
-  const [composerError, setComposerError] = useState('')
-  const [composerSuccess, setComposerSuccess] = useState('')
-  const [vibeText, setVibeText] = useState('')
-  const [vibeEvent, setVibeEvent] = useState('')
-  const [momentImage, setMomentImage] = useState<File | null>(null)
-  const [momentCaption, setMomentCaption] = useState('')
-  const [momentEvent, setMomentEvent] = useState('')
-  const [publishing, setPublishing] = useState(false)
-  const momentFileInput = useRef<HTMLInputElement>(null)
   const [likes, setLikes] = useState<Record<string, LikeState>>({})
   const [likeLoading, setLikeLoading] = useState<Record<string, boolean>>({})
   const [revibes, setRevibes] = useState<Record<string, Revibe | null>>({})
@@ -72,16 +55,6 @@ export default function FeedPage() {
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
   const [actionError, setActionError] = useState('')
   const [counts, setCounts] = useState<Record<string, PostCounts>>({})
-
-  const setActiveComposer = (composer: 'vibe' | 'moment' | null) => {
-    const nextParams = new URLSearchParams(searchParams)
-    if (composer) {
-      nextParams.set('compose', composer)
-    } else {
-      nextParams.delete('compose')
-    }
-    setSearchParams(nextParams, { replace: true })
-  }
 
   const loadFeed = useCallback(async (page: number, append = false) => {
     try {
@@ -117,29 +90,6 @@ export default function FeedPage() {
   useEffect(() => {
     loadFeed(1)
   }, [loadFeed])
-
-  useEffect(() => {
-    let cancelled = false
-
-    const loadEvents = async () => {
-      try {
-        const eventChoices = await vibespaceApi.getEventChoices()
-        if (!cancelled) setEvents(eventChoices)
-      } catch {
-        if (!cancelled) {
-          setComposerError(
-            'Unable to load event options. You can still publish without one.',
-          )
-        }
-      }
-    }
-
-    void loadEvents()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     if (!isAuthenticated || entries.length === 0) return
@@ -220,78 +170,6 @@ export default function FeedPage() {
       cancelled = true
     }
   }, [entries, isAuthenticated])
-
-  const handleVibeSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    if (!vibeText.trim()) {
-      setComposerError('Please write something before publishing.')
-      return
-    }
-
-    setPublishing(true)
-    setComposerError('')
-    setComposerSuccess('')
-
-    try {
-      await vibespaceApi.createVibe({
-        text: vibeText.trim(),
-        event: vibeEvent || null,
-      })
-      setVibeText('')
-      setVibeEvent('')
-      setActiveComposer(null)
-      setComposerSuccess('Your Vibe has been published.')
-      await loadFeed(1)
-    } catch {
-      setComposerError('Unable to publish your Vibe. Please try again.')
-    } finally {
-      setPublishing(false)
-    }
-  }
-
-  const handleMomentSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    if (!momentImage) {
-      setComposerError('Please select an image for your Moment.')
-      return
-    }
-
-    if (momentImage.size > 10 * 1024 * 1024) {
-      setComposerError('Image size must not exceed 10 MB.')
-      return
-    }
-
-    setPublishing(true)
-    setComposerError('')
-    setComposerSuccess('')
-
-    try {
-      await vibespaceApi.createMoment({
-        image: momentImage,
-        caption: momentCaption.trim(),
-        event: momentEvent || null,
-      })
-      setMomentImage(null)
-      setMomentCaption('')
-      setMomentEvent('')
-      if (momentFileInput.current) momentFileInput.current.value = ''
-      setActiveComposer(null)
-      setComposerSuccess('Your Moment has been published.')
-      await loadFeed(1)
-    } catch {
-      setComposerError('Unable to publish your Moment. Please try again.')
-    } finally {
-      setPublishing(false)
-    }
-  }
-
-  const toggleComposer = (composer: 'vibe' | 'moment') => {
-    setActiveComposer(activeComposer === composer ? null : composer)
-    setComposerError('')
-    setComposerSuccess('')
-  }
 
   const handleLike = async (entry: FeedEntry) => {
     const key = getKey(entry)
@@ -524,7 +402,10 @@ export default function FeedPage() {
         </div>
       </header>
 
-      <section className="feed-publish" aria-label="Publish to your feed">
+      <section
+        className="feed-publish feed-home-publish"
+        aria-label="Publish to your feed"
+      >
         <div className="feed-publish-heading">
           <div>
             <h2>Share your experience</h2>
@@ -533,120 +414,18 @@ export default function FeedPage() {
           <div className="feed-publish-actions">
             <button
               type="button"
-              aria-expanded={activeComposer === 'vibe'}
-              aria-controls="feed-vibe-composer"
-              onClick={() => toggleComposer('vibe')}
+              onClick={() => navigate('/create/vibe')}
             >
               Upload a vibe
             </button>
             <button
               type="button"
-              aria-expanded={activeComposer === 'moment'}
-              aria-controls="feed-moment-composer"
-              onClick={() => toggleComposer('moment')}
+              onClick={() => navigate('/create/moment')}
             >
               Upload a moment
             </button>
           </div>
         </div>
-
-        {composerError && (
-          <p className="feed-publish-message feed-publish-error" role="alert">
-            {composerError}
-          </p>
-        )}
-        {composerSuccess && (
-          <p
-            className="feed-publish-message feed-publish-success"
-            role="status"
-          >
-            {composerSuccess}
-          </p>
-        )}
-
-        {activeComposer === 'vibe' && (
-          <form
-            id="feed-vibe-composer"
-            className="feed-composer"
-            onSubmit={(event) => void handleVibeSubmit(event)}
-          >
-            <textarea
-              value={vibeText}
-              onChange={(event) => setVibeText(event.target.value)}
-              placeholder="What's happening in your world?"
-              maxLength={2000}
-              rows={4}
-              required
-            />
-            <div className="feed-composer-footer">
-              <span>{vibeText.length}/2000</span>
-              <select
-                value={vibeEvent}
-                onChange={(event) => setVibeEvent(event.target.value)}
-                aria-label="Associate Vibe with an event"
-              >
-                <option value="">Publish independently</option>
-                {events.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    Associate with: {item.title}
-                  </option>
-                ))}
-              </select>
-              <button type="submit" disabled={publishing || !vibeText.trim()}>
-                {publishing ? 'Publishing...' : 'Publish Vibe'}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {activeComposer === 'moment' && (
-          <form
-            id="feed-moment-composer"
-            className="feed-composer"
-            onSubmit={(event) => void handleMomentSubmit(event)}
-          >
-            <label htmlFor="feed-moment-image">Select an image</label>
-            <input
-              ref={momentFileInput}
-              id="feed-moment-image"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(event) =>
-                setMomentImage(event.target.files?.[0] || null)
-              }
-            />
-            {momentImage && (
-              <p className="feed-selected-file">
-                Selected: {momentImage.name}
-              </p>
-            )}
-            <textarea
-              value={momentCaption}
-              onChange={(event) => setMomentCaption(event.target.value)}
-              placeholder="Add a caption to this Moment (optional)"
-              maxLength={500}
-              rows={2}
-            />
-            <div className="feed-composer-footer">
-              <span>{momentCaption.length}/500</span>
-              <select
-                value={momentEvent}
-                onChange={(event) => setMomentEvent(event.target.value)}
-                aria-label="Associate Moment with an event"
-              >
-                <option value="">Publish independently</option>
-                {events.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    Associate with: {item.title}
-                  </option>
-                ))}
-              </select>
-              <button type="submit" disabled={publishing || !momentImage}>
-                {publishing ? 'Uploading...' : 'Publish Moment'}
-              </button>
-            </div>
-          </form>
-        )}
       </section>
 
       {actionError && (

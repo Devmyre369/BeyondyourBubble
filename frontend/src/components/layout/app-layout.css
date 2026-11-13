@@ -476,7 +476,7 @@
   }
 
   .byb-app-layout.sidebar-collapsed {
-    grid-template-columns: var(--byb-sidebar-collapsed-width) minmax(0, 1fr);
+    grid-template-columns: 52px minmax(0, 1fr);
   }
 
   .byb-right-sidebar {
@@ -508,9 +508,8 @@
 
   .byb-sidebar,
   .byb-sidebar.collapsed {
-    position: sticky;
+    position: relative;
     z-index: 20;
-    top: 0;
     display: flex;
     align-items: stretch;
     width: 100%;
@@ -532,6 +531,16 @@
     justify-content: flex-start;
     gap: 18px;
     margin-bottom: 22px;
+  }
+
+  .byb-sidebar.collapsed .byb-sidebar-top {
+    margin-bottom: 0;
+  }
+
+  .byb-sidebar.collapsed .byb-brand,
+  .byb-sidebar.collapsed .byb-sidebar-scroll,
+  .byb-sidebar.collapsed .byb-sidebar-bottom {
+    display: none;
   }
 
   .byb-brand {
@@ -625,6 +634,16 @@
     display: block;
     width: 22px;
     height: 22px;
+  }
+
+  .byb-mobile-profile-avatar {
+    display: block;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    object-fit: cover;
   }
 
   .byb-mobile-create {

@@ -16,6 +16,7 @@ import ProfilePage from './features/profile/pages/ProfilePage'
 import ProfileEditPage from './features/profile/pages/ProfileEditPage'
 
 import FeedPage from './features/feed/FeedPage'
+import CreatePostPage from './features/feed/CreatePostPage'
 import AppLayout from './components/layout/AppLayout'
 
 export default function App() {
@@ -49,6 +50,14 @@ export default function App() {
 
           <Route element={<ProfileRoute />}>
             <Route path="/home" element={<FeedPage />} />
+            <Route
+              path="/create/vibe"
+              element={<CreatePostPage type="vibe" />}
+            />
+            <Route
+              path="/create/moment"
+              element={<CreatePostPage type="moment" />}
+            />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/edit-profile" element={<ProfileEditPage />} />
           </Route>

@@ -186,6 +186,23 @@
   color: var(--byb-success);
 }
 
+.create-post-back {
+  flex-shrink: 0;
+  color: var(--byb-crimson);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.create-post-back:hover {
+  color: var(--byb-crimson-hover);
+}
+
+.create-post-back:focus-visible {
+  outline: 2px solid var(--byb-crimson);
+  outline-offset: 3px;
+}
+
 /* FEED LIST */
 
 .feed-list {
@@ -547,6 +564,12 @@
 }
 
 /* MOBILE */
+
+@media (max-width: 850px) {
+  .feed-home-publish {
+    display: none;
+  }
+}
 
 @media (max-width: 768px) {
   .feed-page {

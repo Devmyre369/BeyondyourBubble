@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
 } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { feedApi, type FeedEntry } from '../../services/feedApi'
 import vibespaceApi, {
@@ -37,6 +38,12 @@ const createCountsMap = (items: FeedEntry[]): Record<string, PostCounts> =>
 
 export default function FeedPage() {
   const { user, isAuthenticated } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const composerParam = searchParams.get('compose')
+  const activeComposer =
+    composerParam === 'vibe' || composerParam === 'moment'
+      ? composerParam
+      : null
   const [entries, setEntries] = useState<FeedEntry[]>([])
   const [events, setEvents] = useState<EventChoice[]>([])
   const [nextPage, setNextPage] = useState<number | null>(1)
@@ -45,9 +52,6 @@ export default function FeedPage() {
   const [error, setError] = useState('')
   const [composerError, setComposerError] = useState('')
   const [composerSuccess, setComposerSuccess] = useState('')
-  const [activeComposer, setActiveComposer] = useState<
-    'vibe' | 'moment' | null
-  >(null)
   const [vibeText, setVibeText] = useState('')
   const [vibeEvent, setVibeEvent] = useState('')
   const [momentImage, setMomentImage] = useState<File | null>(null)
@@ -68,6 +72,16 @@ export default function FeedPage() {
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
   const [actionError, setActionError] = useState('')
   const [counts, setCounts] = useState<Record<string, PostCounts>>({})
+
+  const setActiveComposer = (composer: 'vibe' | 'moment' | null) => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (composer) {
+      nextParams.set('compose', composer)
+    } else {
+      nextParams.delete('compose')
+    }
+    setSearchParams(nextParams, { replace: true })
+  }
 
   const loadFeed = useCallback(async (page: number, append = false) => {
     try {
@@ -274,9 +288,7 @@ export default function FeedPage() {
   }
 
   const toggleComposer = (composer: 'vibe' | 'moment') => {
-    setActiveComposer((current) =>
-      current === composer ? null : composer,
-    )
+    setActiveComposer(activeComposer === composer ? null : composer)
     setComposerError('')
     setComposerSuccess('')
   }

@@ -41,13 +41,13 @@ export default function App() {
       />
 
       <Route element={<ProtectedRoute />}>
-        <Route
-          path="/complete-profile"
-          element={<ProfileSetupPage />}
-        />
+        <Route element={<AppLayout />}>
+          <Route
+            path="/complete-profile"
+            element={<ProfileSetupPage />}
+          />
 
-        <Route element={<ProfileRoute />}>
-          <Route element={<AppLayout />}>
+          <Route element={<ProfileRoute />}>
             <Route path="/home" element={<FeedPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/edit-profile" element={<ProfileEditPage />} />

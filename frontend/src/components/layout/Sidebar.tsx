@@ -31,9 +31,14 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   }
 
   return (
-    <aside className={`byb-sidebar${collapsed ? ' collapsed' : ''}`}>
+    <aside className={`byb-sidebar${collapsed ? ' collapsed' : ''}`} aria-label="Main sidebar">
       <div className="byb-sidebar-top">
-        <NavLink to="/home" className="byb-brand" title="BYB Home">
+        <NavLink
+          to="/home"
+          className="byb-brand"
+          title="BYB Home"
+          aria-label="BYB Home"
+        >
           <span className="byb-brand-mark">B</span>
           <span className="byb-brand-name">
             BYB<span>.</span>
@@ -62,7 +67,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 <NavLink
                   key={item.path}
                   to={item.path}
-                  title={collapsed ? item.label : undefined}
+                  title={item.label}
+                  aria-label={item.label}
                   className={({ isActive }) =>
                     `byb-nav-item${isActive ? ' active' : ''}`
                   }
@@ -96,7 +102,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
         <NavLink
           to="/profile"
-          title={collapsed ? displayName : undefined}
+          title={displayName}
+          aria-label={`Open profile for ${displayName}`}
           className={({ isActive }) =>
             `byb-profile-link${isActive ? ' active' : ''}`
           }
@@ -123,7 +130,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           type="button"
           className="byb-logout-button"
           onClick={handleLogout}
-          title={collapsed ? 'Log out' : undefined}
+          title="Log out"
+          aria-label="Log out"
         >
           <span aria-hidden="true">{'\u2197'}</span>
           <span className="byb-logout-text">Log out</span>

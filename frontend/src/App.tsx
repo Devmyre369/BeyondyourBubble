@@ -15,6 +15,8 @@ import ProfileSetupPage from './features/profile/pages/ProfileSetupPage'
 import ProfilePage from './features/profile/pages/ProfilePage'
 import ProfileEditPage from './features/profile/pages/ProfileEditPage'
 
+import FeedPage from './features/feed/FeedPage'
+
 export default function App() {
   return (
     <Routes>
@@ -46,7 +48,8 @@ export default function App() {
         />
 
         <Route element={<ProfileRoute />}>
-          <Route path="/home" element={<ProfilePage />} />
+          <Route path="/home" element={<FeedPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/edit-profile" element={<ProfileEditPage />} />
         </Route>
       </Route>

@@ -1,0 +1,277 @@
+
+.feed-page {
+  width: 100%;
+  max-width: 850px;
+  margin: 0 auto;
+  padding: 32px 24px 60px;
+  color: var(--byb-text);
+}
+
+.feed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--byb-border);
+}
+
+.feed-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: -0.8px;
+}
+
+.feed-header p {
+  margin: 8px 0 0;
+  color: var(--byb-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.feed-card {
+  overflow: hidden;
+  padding: 20px;
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: 15px;
+  transition: border-color 0.2s ease;
+}
+
+.feed-card:hover {
+  border-color: #484852;
+}
+
+.feed-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.feed-avatar {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--byb-surface-light);
+}
+
+.feed-avatar-placeholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-size: 17px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #b92740, #e5394f);
+}
+
+.feed-author-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.feed-author-info strong {
+  overflow: hidden;
+  color: var(--byb-text);
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+}
+
+.feed-author-info span {
+  color: var(--byb-muted);
+  font-size: 12px;
+}
+
+.feed-content-type {
+  margin-left: auto;
+  padding: 6px 10px;
+  color: var(--byb-crimson);
+  background: rgba(229, 57, 79, 0.1);
+  border: 1px solid rgba(229, 57, 79, 0.2);
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.8px;
+}
+
+.feed-event {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 17px;
+  padding: 11px 13px;
+  background: var(--byb-surface-light);
+  border-left: 3px solid var(--byb-crimson);
+  border-radius: 5px;
+}
+
+.feed-event span {
+  color: var(--byb-muted);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 1px;
+}
+
+.feed-event strong {
+  color: var(--byb-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feed-vibe-content {
+  margin-top: 18px;
+  color: var(--byb-text);
+  font-size: 15px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.feed-moment-content {
+  margin-top: 17px;
+}
+
+.feed-moment-image {
+  display: block;
+  width: 100%;
+  max-height: 600px;
+  object-fit: contain;
+  background: #0c0c10;
+  border-radius: 10px;
+}
+
+.feed-moment-content p {
+  margin: 13px 0 0;
+  color: var(--byb-text);
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.feed-status,
+.feed-empty,
+.feed-error {
+  padding: 48px 24px;
+  text-align: center;
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: 15px;
+}
+
+.feed-status {
+  color: var(--byb-muted);
+}
+
+.feed-empty h2 {
+  margin: 0 0 10px;
+  font-size: 19px;
+}
+
+.feed-empty p,
+.feed-error p {
+  margin: 0;
+  color: var(--byb-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.feed-error button,
+.feed-load-more button {
+  padding: 11px 22px;
+  color: white;
+  background: var(--byb-crimson);
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.feed-error button {
+  margin-top: 18px;
+}
+
+.feed-error button:hover,
+.feed-load-more button:hover {
+  background: var(--byb-crimson-hover);
+}
+
+.feed-load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+.feed-load-more button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .feed-page {
+    padding: 24px 16px 45px;
+  }
+
+  .feed-header h1 {
+    font-size: 25px;
+  }
+
+  .feed-card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .feed-moment-image {
+    max-height: 500px;
+  }
+}
+
+@media (max-width: 480px) {
+  .feed-page {
+    padding: 20px 12px 40px;
+  }
+
+  .feed-header {
+    margin-bottom: 20px;
+    padding-bottom: 17px;
+  }
+
+  .feed-header h1 {
+    font-size: 23px;
+  }
+
+  .feed-header p {
+    font-size: 12px;
+  }
+
+  .feed-list {
+    gap: 13px;
+  }
+
+  .feed-card {
+    padding: 14px;
+  }
+
+  .feed-avatar {
+    width: 39px;
+    height: 39px;
+  }
+
+  .feed-vibe-content {
+    font-size: 14px;
+  }
+}

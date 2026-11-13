@@ -60,6 +60,11 @@ export interface SavedContent {
   created_at: string
 }
 
+export interface LikeState {
+  liked: boolean
+  like_count: number
+}
+
 interface MomentCreateResponse {
   success: boolean
   message: string
@@ -296,6 +301,41 @@ export const vibespaceApi = {
 
   removeMomentRevibe: async (momentId: string): Promise<void> => {
     await api.delete(`/vibespace/moment/${momentId}/revibe/`)
+  },
+
+  // LIKES
+
+  getLikeState: async (
+    type: 'vibe' | 'moment',
+    id: string,
+  ): Promise<LikeState> => {
+    const response = await api.get<LikeState>(
+      `/vibespace/${type}/${id}/like/`,
+    )
+
+    return response.data
+  },
+
+  likeContent: async (
+    type: 'vibe' | 'moment',
+    id: string,
+  ): Promise<LikeState> => {
+    const response = await api.post<LikeState>(
+      `/vibespace/${type}/${id}/like/`,
+    )
+
+    return response.data
+  },
+
+  unlikeContent: async (
+    type: 'vibe' | 'moment',
+    id: string,
+  ): Promise<LikeState> => {
+    const response = await api.delete<LikeState>(
+      `/vibespace/${type}/${id}/like/`,
+    )
+
+    return response.data
   },
 
   // SAVED CONTENT

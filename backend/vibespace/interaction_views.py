@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from accounts.models import Profile
 
-from .models import Vibe, Moment, Comment, Revibe, SavedContent
+from .models import Vibe, Moment, Comment, Revibe, SavedContent, Like
 from .serializers import (
     CommentSerializer,
     RevibeSerializer,
@@ -282,6 +282,70 @@ class ContentRevibeView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class ContentLikeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_content(self):
+        content_type = self.kwargs["content_type"]
+        content_id = self.kwargs["content_id"]
+
+        if content_type == "vibe":
+            return "vibe", get_visible_vibe(self.request.user, content_id)
+
+        if content_type == "moment":
+            return "moment", get_visible_moment(self.request.user, content_id)
+
+        raise NotFound("Invalid content type.")
+
+    def get_like_queryset(self, content_type, content):
+        filters = {"vibe": content} if content_type == "vibe" else {"moment": content}
+        return Like.objects.filter(**filters)
+
+    def get(self, request, *args, **kwargs):
+        content_type, content = self.get_content()
+        likes = self.get_like_queryset(content_type, content)
+
+        return Response({
+            "liked": likes.filter(user=request.user).exists(),
+            "like_count": likes.count(),
+        })
+
+    def post(self, request, *args, **kwargs):
+        content_type, content = self.get_content()
+        target = (
+            {"vibe": content, "moment": None}
+            if content_type == "vibe"
+            else {"vibe": None, "moment": content}
+        )
+        _, created = Like.objects.get_or_create(
+            user=request.user,
+            **target,
+        )
+        likes = self.get_like_queryset(content_type, content)
+
+        return Response(
+            {
+                "liked": True,
+                "like_count": likes.count(),
+            },
+            status=(
+                status.HTTP_201_CREATED
+                if created
+                else status.HTTP_200_OK
+            ),
+        )
+
+    def delete(self, request, *args, **kwargs):
+        content_type, content = self.get_content()
+        likes = self.get_like_queryset(content_type, content)
+        likes.filter(user=request.user).delete()
+
+        return Response({
+            "liked": False,
+            "like_count": likes.count(),
+        })
 
 
 class SavedContentListCreateView(generics.ListCreateAPIView):

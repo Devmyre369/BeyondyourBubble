@@ -6,11 +6,19 @@ import {
   useState,
   type FormEvent,
 } from 'react'
+import { useAuth } from '../../context/AuthContext'
 import { feedApi, type FeedEntry } from '../../services/feedApi'
-import vibespaceApi, { type EventChoice } from '../../services/vibespaceApi'
+import vibespaceApi, {
+  type Comment,
+  type EventChoice,
+  type LikeState,
+  type Revibe,
+} from '../../services/vibespaceApi'
+import PostActionIcon from '../vibespace/components/PostActionIcon'
 import './feed.css'
 
 export default function FeedPage() {
+  const { user, isAuthenticated } = useAuth()
   const [entries, setEntries] = useState<FeedEntry[]>([])
   const [events, setEvents] = useState<EventChoice[]>([])
   const [nextPage, setNextPage] = useState<number | null>(1)
@@ -29,6 +37,21 @@ export default function FeedPage() {
   const [momentEvent, setMomentEvent] = useState('')
   const [publishing, setPublishing] = useState(false)
   const momentFileInput = useRef<HTMLInputElement>(null)
+  const [likes, setLikes] = useState<Record<string, LikeState>>({})
+  const [likeLoading, setLikeLoading] = useState<Record<string, boolean>>({})
+  const [revibes, setRevibes] = useState<Record<string, Revibe | null>>({})
+  const [revibeLoading, setRevibeLoading] = useState<Record<string, boolean>>({})
+  const [savedItems, setSavedItems] = useState<Record<string, string>>({})
+  const [saveLoading, setSaveLoading] = useState<Record<string, boolean>>({})
+  const [comments, setComments] = useState<Record<string, Comment[]>>({})
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
+  const [commentLoading, setCommentLoading] = useState<Record<string, boolean>>({})
+  const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({})
+  const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
+  const [actionError, setActionError] = useState('')
+
+  const getKey = (entry: FeedEntry) =>
+    `${entry.content_type}:${entry.id}`
 
   const loadFeed = useCallback(async (page: number, append = false) => {
     try {
@@ -82,6 +105,74 @@ export default function FeedPage() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated || entries.length === 0) return
+
+    let cancelled = false
+
+    const loadInteractions = async () => {
+      try {
+        const savedData = await vibespaceApi.getSavedContent()
+        if (cancelled) return
+
+        const savedMap: Record<string, string> = {}
+        savedData.forEach((item) => {
+          if (item.vibe) savedMap[`vibe:${item.vibe}`] = item.id
+          if (item.moment) savedMap[`moment:${item.moment}`] = item.id
+        })
+        setSavedItems(savedMap)
+      } catch {
+        if (!cancelled) {
+          setActionError('Unable to load saved post states.')
+        }
+      }
+
+      const results = await Promise.all(
+        entries.map(async (entry) => {
+          const [likeResult, revibeResult] = await Promise.allSettled([
+            vibespaceApi.getLikeState(entry.content_type, entry.id),
+            entry.content_type === 'vibe'
+              ? vibespaceApi.getVibeRevibe(entry.id)
+              : vibespaceApi.getMomentRevibe(entry.id),
+          ])
+
+          return {
+            key: getKey(entry),
+            like:
+              likeResult.status === 'fulfilled'
+                ? likeResult.value
+                : null,
+            revibe:
+              revibeResult.status === 'fulfilled'
+                ? revibeResult.value
+                : null,
+            likeFailed: likeResult.status === 'rejected',
+          }
+        }),
+      )
+
+      if (cancelled) return
+
+      const likeMap: Record<string, LikeState> = {}
+      const revibeMap: Record<string, Revibe | null> = {}
+      results.forEach((result) => {
+        if (result.like) likeMap[result.key] = result.like
+        revibeMap[result.key] = result.revibe
+      })
+      if (results.some((result) => result.likeFailed)) {
+        setActionError('Unable to load Like states. Try again later.')
+      }
+      setLikes(likeMap)
+      setRevibes(revibeMap)
+    }
+
+    void loadInteractions()
+
+    return () => {
+      cancelled = true
+    }
+  }, [entries, isAuthenticated])
 
   const handleVibeSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -155,6 +246,163 @@ export default function FeedPage() {
     )
     setComposerError('')
     setComposerSuccess('')
+  }
+
+  const handleLike = async (entry: FeedEntry) => {
+    const key = getKey(entry)
+    setLikeLoading((previous) => ({ ...previous, [key]: true }))
+
+    try {
+      const updated = likes[key]?.liked
+        ? await vibespaceApi.unlikeContent(entry.content_type, entry.id)
+        : await vibespaceApi.likeContent(entry.content_type, entry.id)
+      setLikes((previous) => ({ ...previous, [key]: updated }))
+    } catch {
+      setActionError('Unable to update your Like. Please try again.')
+    } finally {
+      setLikeLoading((previous) => ({ ...previous, [key]: false }))
+    }
+  }
+
+  const handleRevibe = async (entry: FeedEntry) => {
+    const key = getKey(entry)
+    setRevibeLoading((previous) => ({ ...previous, [key]: true }))
+
+    try {
+      if (revibes[key]) {
+        await (entry.content_type === 'vibe'
+          ? vibespaceApi.removeVibeRevibe(entry.id)
+          : vibespaceApi.removeMomentRevibe(entry.id))
+        setRevibes((previous) => ({ ...previous, [key]: null }))
+      } else {
+        const revibe =
+          entry.content_type === 'vibe'
+            ? await vibespaceApi.revibeVibe(entry.id, {
+                revibe_type: 'direct',
+              })
+            : await vibespaceApi.revibeMoment(entry.id, {
+                revibe_type: 'direct',
+              })
+        setRevibes((previous) => ({ ...previous, [key]: revibe }))
+      }
+    } catch {
+      setActionError('Unable to update your Revibe. Please try again.')
+    } finally {
+      setRevibeLoading((previous) => ({ ...previous, [key]: false }))
+    }
+  }
+
+  const handleSave = async (entry: FeedEntry) => {
+    const key = getKey(entry)
+    setSaveLoading((previous) => ({ ...previous, [key]: true }))
+
+    try {
+      const savedId = savedItems[key]
+      if (savedId) {
+        await vibespaceApi.removeSavedContent(savedId)
+        setSavedItems((previous) => {
+          const next = { ...previous }
+          delete next[key]
+          return next
+        })
+      } else {
+        const saved =
+          entry.content_type === 'vibe'
+            ? await vibespaceApi.saveVibe(entry.id)
+            : await vibespaceApi.saveMoment(entry.id)
+        setSavedItems((previous) => ({ ...previous, [key]: saved.id }))
+      }
+    } catch {
+      setActionError('Unable to update your saved posts. Please try again.')
+    } finally {
+      setSaveLoading((previous) => ({ ...previous, [key]: false }))
+    }
+  }
+
+  const toggleComments = async (entry: FeedEntry) => {
+    const key = getKey(entry)
+    const opening = !openComments[key]
+    setOpenComments((previous) => ({ ...previous, [key]: opening }))
+    if (!opening || comments[key]) return
+
+    setCommentLoading((previous) => ({ ...previous, [key]: true }))
+    try {
+      const data =
+        entry.content_type === 'vibe'
+          ? await vibespaceApi.getVibeComments(entry.id)
+          : await vibespaceApi.getMomentComments(entry.id)
+      setComments((previous) => ({ ...previous, [key]: data }))
+    } catch {
+      setActionError('Unable to load comments. Please try again.')
+    } finally {
+      setCommentLoading((previous) => ({ ...previous, [key]: false }))
+    }
+  }
+
+  const handleCommentSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+    entry: FeedEntry,
+  ) => {
+    event.preventDefault()
+    const key = getKey(entry)
+    const text = commentInputs[key]?.trim()
+    if (!text) return
+
+    setCommentSubmitting((previous) => ({ ...previous, [key]: true }))
+    try {
+      const comment =
+        entry.content_type === 'vibe'
+          ? await vibespaceApi.createVibeComment(entry.id, text)
+          : await vibespaceApi.createMomentComment(entry.id, text)
+      setComments((previous) => ({
+        ...previous,
+        [key]: [...(previous[key] || []), comment],
+      }))
+      setCommentInputs((previous) => ({ ...previous, [key]: '' }))
+    } catch {
+      setActionError('Unable to publish your comment. Please try again.')
+    } finally {
+      setCommentSubmitting((previous) => ({ ...previous, [key]: false }))
+    }
+  }
+
+  const handleShare = async (entry: FeedEntry) => {
+    const url = `${window.location.origin}${window.location.pathname}#${entry.content_type}-${entry.id}`
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: entry.content_type === 'vibe' ? 'BYB Vibe' : 'BYB Moment',
+          url,
+        })
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url)
+      } else {
+        setActionError('Sharing is not supported by this browser.')
+      }
+    } catch (shareError) {
+      if (shareError instanceof Error && shareError.name === 'AbortError') {
+        return
+      }
+      setActionError('Unable to share this post.')
+    }
+  }
+
+  const handleDelete = async (entry: FeedEntry) => {
+    if (!window.confirm(`Delete this ${entry.content_type}?`)) return
+
+    try {
+      if (entry.content_type === 'vibe') {
+        await vibespaceApi.deleteVibe(entry.id)
+      } else {
+        await vibespaceApi.deleteMoment(entry.id)
+      }
+      setEntries((previous) =>
+        previous.filter((item) => getKey(item) !== getKey(entry)),
+      )
+    } catch {
+      setActionError(`Unable to delete this ${entry.content_type}.`)
+    }
   }
 
   const formatDate = (date: string) => {
@@ -301,6 +549,12 @@ export default function FeedPage() {
         )}
       </section>
 
+      {actionError && (
+        <p className="feed-action-error" role="alert">
+          {actionError}
+        </p>
+      )}
+
       {loading && (
         <div className="feed-status">
           Loading your feed...
@@ -384,6 +638,139 @@ export default function FeedPage() {
 
                   {entry.content_text && (
                     <p>{entry.content_text}</p>
+                  )}
+                </div>
+              )}
+
+              <div className="feed-post-actions">
+                <button
+                  type="button"
+                  className={likes[getKey(entry)]?.liked ? 'active' : ''}
+                  disabled={likeLoading[getKey(entry)]}
+                  aria-label={
+                    likes[getKey(entry)]?.liked
+                      ? 'Unlike this post'
+                      : 'Like this post'
+                  }
+                  aria-pressed={Boolean(likes[getKey(entry)]?.liked)}
+                  onClick={() => void handleLike(entry)}
+                >
+                  <PostActionIcon
+                    name="like"
+                    active={likes[getKey(entry)]?.liked}
+                  />
+                  <span>
+                    Like
+                    {likes[getKey(entry)]?.like_count
+                      ? ` · ${likes[getKey(entry)].like_count}`
+                      : ''}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={openComments[getKey(entry)] ? 'active' : ''}
+                  aria-expanded={Boolean(openComments[getKey(entry)])}
+                  onClick={() => void toggleComments(entry)}
+                >
+                  <PostActionIcon name="comment" />
+                  <span>Comment</span>
+                </button>
+                {isAuthenticated && (
+                  <>
+                    <button
+                      type="button"
+                      className={revibes[getKey(entry)] ? 'active' : ''}
+                      disabled={revibeLoading[getKey(entry)]}
+                      aria-pressed={Boolean(revibes[getKey(entry)])}
+                      onClick={() => void handleRevibe(entry)}
+                    >
+                      <PostActionIcon name="revibe" />
+                      <span>
+                        {revibes[getKey(entry)] ? 'Revibed' : 'Revibe'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={savedItems[getKey(entry)] ? 'active' : ''}
+                      disabled={saveLoading[getKey(entry)]}
+                      aria-pressed={Boolean(savedItems[getKey(entry)])}
+                      onClick={() => void handleSave(entry)}
+                    >
+                      <PostActionIcon name="save" />
+                      <span>
+                        {savedItems[getKey(entry)] ? 'Saved' : 'Save'}
+                      </span>
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  aria-label="Share this post"
+                  onClick={() => void handleShare(entry)}
+                >
+                  <PostActionIcon name="share" />
+                  <span>Share</span>
+                </button>
+                {entry.author_username === user?.username && (
+                  <button
+                    type="button"
+                    className="feed-delete-action"
+                    aria-label={`Delete this ${entry.content_type}`}
+                    onClick={() => void handleDelete(entry)}
+                  >
+                    <PostActionIcon name="delete" />
+                    <span>Delete</span>
+                  </button>
+                )}
+              </div>
+
+              {openComments[getKey(entry)] && (
+                <div className="feed-comments">
+                  {commentLoading[getKey(entry)] ? (
+                    <p className="feed-comments-empty">Loading comments...</p>
+                  ) : comments[getKey(entry)]?.length ? (
+                    comments[getKey(entry)].map((comment) => (
+                      <div className="feed-comment" key={comment.id}>
+                        <strong>@{comment.author_username}</strong>
+                        <p>{comment.text}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="feed-comments-empty">No comments yet.</p>
+                  )}
+
+                  {isAuthenticated && (
+                    <form
+                      className="feed-comment-form"
+                      onSubmit={(event) =>
+                        void handleCommentSubmit(event, entry)
+                      }
+                    >
+                      <input
+                        value={commentInputs[getKey(entry)] || ''}
+                        onChange={(event) =>
+                          setCommentInputs((previous) => ({
+                            ...previous,
+                            [getKey(entry)]: event.target.value,
+                          }))
+                        }
+                        maxLength={1000}
+                        placeholder="Write a comment..."
+                        aria-label="Write a comment"
+                        required
+                      />
+                      <button
+                        type="submit"
+                        disabled={
+                          commentSubmitting[getKey(entry)] ||
+                          !commentInputs[getKey(entry)]?.trim()
+                        }
+                      >
+                        {commentSubmitting[getKey(entry)]
+                          ? 'Posting...'
+                          : 'Post'}
+                      </button>
+                    </form>
                   )}
                 </div>
               )}

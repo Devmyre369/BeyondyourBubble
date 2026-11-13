@@ -14,6 +14,7 @@ from .interaction_views import (
     ContentCommentListCreateView,
     CommentDetailView,
     ContentRevibeView,
+    ContentLikeView,
     SavedContentListCreateView,
     SavedContentDetailView,
 )
@@ -47,6 +48,11 @@ urlpatterns = [
         "<str:content_type>/<uuid:content_id>/revibe/",
         ContentRevibeView.as_view(),
         name="content-revibe",
+    ),
+    path(
+        "<str:content_type>/<uuid:content_id>/like/",
+        ContentLikeView.as_view(),
+        name="content-like",
     ),
 
     # Saved content

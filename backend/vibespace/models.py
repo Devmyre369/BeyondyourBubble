@@ -279,3 +279,63 @@ class SavedContent(models.Model):
 
     def __str__(self):
         return f"Saved content by {self.user.username}"
+
+
+class Like(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="vibespace_likes",
+    )
+
+    vibe = models.ForeignKey(
+        Vibe,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="likes",
+    )
+
+    moment = models.ForeignKey(
+        Moment,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="likes",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(vibe__isnull=False, moment__isnull=True)
+                    | Q(vibe__isnull=True, moment__isnull=False)
+                ),
+                name="like_exactly_one_content",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "vibe"],
+                condition=Q(vibe__isnull=False),
+                name="unique_user_vibe_like",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "moment"],
+                condition=Q(moment__isnull=False),
+                name="unique_user_moment_like",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["vibe", "created_at"]),
+            models.Index(fields=["moment", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Like by {self.user.username}"

@@ -38,7 +38,7 @@ function TagList({
   if (!items?.length) return null
 
   return (
-    <section className="vibespace-card">
+    <section className="vibespace-section">
       <h2>{title}</h2>
       <div className="vibespace-tags">
         {items.map((item) => (
@@ -77,7 +77,10 @@ export default function ProfilePage() {
                 : 'Private profile'}
             </span>
 
-            <Link to="/edit-profile" className="vibespace-edit-button">
+            <Link
+              to="/edit-profile"
+              className="vibespace-edit-button"
+            >
               Edit Profile
             </Link>
           </div>
@@ -143,7 +146,7 @@ export default function ProfilePage() {
 
             {/* ABOUT ME */}
 
-            <section className="vibespace-card">
+            <section className="vibespace-section">
               <div className="vibespace-section-heading">
                 <div>
                   <span className="vibespace-section-label">
@@ -214,7 +217,7 @@ export default function ProfilePage() {
 
             <TagList title="Skills" items={profile.skills || []} />
 
-            <section className="vibespace-card">
+            <section className="vibespace-section">
               <h2>Online presence</h2>
 
               <div className="vibespace-links">
@@ -258,7 +261,7 @@ export default function ProfilePage() {
               </div>
             </section>
 
-            <section className="vibespace-card vibespace-philosophy">
+            <section className="vibespace-section vibespace-philosophy">
               <span>THE BYB IDEA</span>
               <p>
                 You don't have to be physically present to be

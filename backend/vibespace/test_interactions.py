@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from accounts.models import User, Profile
-from vibespace.models import Vibe, Moment, Comment, Revibe, SavedContent
+from vibespace.models import Vibe, Moment, Comment, Revibe, SavedContent, Like
 
 
 class VibeSpaceInteractionAPITests(TestCase):
@@ -47,6 +47,54 @@ class VibeSpaceInteractionAPITests(TestCase):
             profile_type=Profile.ProfileType.STUDENT,
             visibility=visibility,
         )
+
+    # ==================================================
+    # LIKE TESTS
+    # ==================================================
+
+    def test_user_can_like_vibe_and_unlike_it(self):
+        self.client.force_authenticate(user=self.other_user)
+        url = f"/api/vibespace/vibe/{self.vibe.id}/like/"
+
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["liked"])
+        self.assertEqual(response.data["like_count"], 1)
+
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Like.objects.count(), 1)
+
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["liked"])
+        self.assertEqual(response.data["like_count"], 0)
+
+    def test_user_can_like_moment_and_read_like_state(self):
+        self.client.force_authenticate(user=self.other_user)
+        url = f"/api/vibespace/moment/{self.moment.id}/like/"
+
+        self.client.post(url)
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["liked"])
+        self.assertEqual(response.data["like_count"], 1)
+
+    def test_user_cannot_like_private_content(self):
+        private_vibe = Vibe.objects.create(
+            author=self.private_user,
+            text="Private Vibe",
+        )
+        self.client.force_authenticate(user=self.other_user)
+
+        response = self.client.post(
+            f"/api/vibespace/vibe/{private_vibe.id}/like/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(Like.objects.count(), 0)
 
     # ==================================================
     # COMMENT TESTS

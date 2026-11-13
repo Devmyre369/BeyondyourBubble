@@ -10,11 +10,13 @@ import { useAuth } from '../../../context/AuthContext'
 
 import vibespaceApi, {
   type Comment,
+  type LikeState,
   type Moment,
   type Revibe,
   type SavedContent,
   type Vibe,
 } from '../../../services/vibespaceApi'
+import PostActionIcon from '../../vibespace/components/PostActionIcon'
 
 interface VibeSpaceContentProps {
   username: string
@@ -54,11 +56,13 @@ export default function VibeSpaceContent({
 
   const [revibes, setRevibes] = useState<RevibeState>({})
   const [savedItems, setSavedItems] = useState<SavedState>({})
+  const [likes, setLikes] = useState<Record<string, LikeState>>({})
 
   const [quoteInputs, setQuoteInputs] = useState<TextState>({})
   const [quoteOpen, setQuoteOpen] = useState<Record<string, boolean>>({})
   const [revibeLoading, setRevibeLoading] = useState<LoadingState>({})
   const [saveLoading, setSaveLoading] = useState<LoadingState>({})
+  const [likeLoading, setLikeLoading] = useState<LoadingState>({})
 
   const [editingComments, setEditingComments] = useState<TextState>({})
   const [commentEdits, setCommentEdits] = useState<TextState>({})
@@ -136,16 +140,26 @@ export default function VibeSpaceContent({
         if (!cancelled) setSavedItems({})
       }
 
-      const results = await Promise.allSettled(
+      const results = await Promise.all(
         allItems.map(async (item) => {
-          const revibe =
+          const [revibeResult, likeResult] = await Promise.allSettled([
             item.type === 'vibe'
-              ? await vibespaceApi.getVibeRevibe(item.id)
-              : await vibespaceApi.getMomentRevibe(item.id)
+              ? vibespaceApi.getVibeRevibe(item.id)
+              : vibespaceApi.getMomentRevibe(item.id),
+            vibespaceApi.getLikeState(item.type, item.id),
+          ])
 
           return {
             key: getKey(item.type, item.id),
-            revibe,
+            revibe:
+              revibeResult.status === 'fulfilled'
+                ? revibeResult.value
+                : null,
+            like:
+              likeResult.status === 'fulfilled'
+                ? likeResult.value
+                : null,
+            likeFailed: likeResult.status === 'rejected',
           }
         }),
       )
@@ -153,14 +167,20 @@ export default function VibeSpaceContent({
       if (cancelled) return
 
       const revibeMap: RevibeState = {}
+      const likeMap: Record<string, LikeState> = {}
 
       results.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          revibeMap[result.value.key] = result.value.revibe
+        revibeMap[result.key] = result.revibe
+        if (result.like) {
+          likeMap[result.key] = result.like
         }
       })
+      if (results.some((result) => result.likeFailed)) {
+        setError('Unable to load Like states. Please refresh the page.')
+      }
 
       setRevibes(revibeMap)
+      setLikes(likeMap)
     }
 
     void loadInteractions()
@@ -169,6 +189,22 @@ export default function VibeSpaceContent({
       cancelled = true
     }
   }, [isAuthenticated, vibes, moments])
+
+  const handleLike = async (type: ContentType, id: string) => {
+    const key = getKey(type, id)
+    setLikeLoading((previous) => ({ ...previous, [key]: true }))
+
+    try {
+      const updated = likes[key]?.liked
+        ? await vibespaceApi.unlikeContent(type, id)
+        : await vibespaceApi.likeContent(type, id)
+      setLikes((previous) => ({ ...previous, [key]: updated }))
+    } catch {
+      setError('Unable to update your Like. Please try again.')
+    } finally {
+      setLikeLoading((previous) => ({ ...previous, [key]: false }))
+    }
+  }
 
   // Delete Vibe
 
@@ -539,7 +575,11 @@ export default function VibeSpaceContent({
 
   // Reusable interaction controls
 
-  const renderActions = (type: ContentType, id: string) => {
+  const renderActions = (
+    type: ContentType,
+    id: string,
+    onDelete?: () => void,
+  ) => {
     const key = getKey(type, id)
     const currentRevibe = revibes[key]
 
@@ -548,10 +588,31 @@ export default function VibeSpaceContent({
         <div className="vibespace-interaction-actions">
           <button
             type="button"
+            className={likes[key]?.liked ? 'active' : ''}
+            disabled={likeLoading[key]}
+            aria-label={
+              likes[key]?.liked
+                ? `Unlike this ${type}`
+                : `Like this ${type}`
+            }
+            aria-pressed={Boolean(likes[key]?.liked)}
+            onClick={() => void handleLike(type, id)}
+          >
+            <PostActionIcon name="like" active={likes[key]?.liked} />
+            <span>
+              {likes[key]?.like_count
+                ? `Like · ${likes[key].like_count}`
+                : 'Like'}
+            </span>
+          </button>
+          <button
+            type="button"
             className={openComments[key] ? 'active' : ''}
+            aria-label="Toggle comments"
             onClick={() => void toggleComments(type, id)}
           >
-            Comments
+            <PostActionIcon name="comment" />
+            <span>Comment</span>
           </button>
 
           {isAuthenticated && (
@@ -560,6 +621,9 @@ export default function VibeSpaceContent({
                 type="button"
                 className={currentRevibe ? 'active' : ''}
                 disabled={revibeLoading[key]}
+                aria-label={
+                  currentRevibe ? 'Remove your Revibe' : 'Revibe this post'
+                }
                 onClick={() => {
                   if (currentRevibe?.revibe_type === 'direct') {
                     void handleRevibe(type, id, 'direct')
@@ -571,34 +635,57 @@ export default function VibeSpaceContent({
                   }
                 }}
               >
-                {revibeLoading[key]
-                  ? 'Please wait...'
-                  : currentRevibe?.revibe_type === 'direct'
-                    ? 'Revibed'
-                    : 'Revibe'}
+                <PostActionIcon name="revibe" />
+                <span>
+                  {revibeLoading[key]
+                    ? 'Please wait...'
+                    : currentRevibe?.revibe_type === 'direct'
+                      ? 'Revibed'
+                      : 'Revibe'}
+                </span>
               </button>
 
               <button
                 type="button"
                 disabled={saveLoading[key]}
                 className={savedItems[key] ? 'active' : ''}
+                aria-label={
+                  savedItems[key] ? 'Remove saved post' : 'Save this post'
+                }
                 onClick={() => void handleSave(type, id)}
               >
-                {saveLoading[key]
-                  ? 'Please wait...'
-                  : savedItems[key]
-                    ? 'Saved'
-                    : 'Save'}
+                <PostActionIcon name="save" />
+                <span>
+                  {saveLoading[key]
+                    ? 'Please wait...'
+                    : savedItems[key]
+                      ? 'Saved'
+                      : 'Save'}
+                </span>
               </button>
             </>
           )}
 
           <button
             type="button"
+            aria-label="Share this post"
             onClick={() => void handleShare(type, id)}
           >
-            Share
+            <PostActionIcon name="share" />
+            <span>Share</span>
           </button>
+
+          {onDelete && (
+            <button
+              type="button"
+              className="vibespace-delete-action"
+              aria-label={`Delete this ${type}`}
+              onClick={onDelete}
+            >
+              <PostActionIcon name="delete" />
+              <span>Delete</span>
+            </button>
+          )}
         </div>
 
         {isAuthenticated && quoteOpen[key] && (
@@ -846,7 +933,7 @@ export default function VibeSpaceContent({
 
       {/* VIBES */}
 
-      <section className="vibespace-card vibespace-post-section">
+      <section className="vibespace-section vibespace-post-section">
         <div className="vibespace-section-heading">
           <div>
             <h2>Your Vibes</h2>
@@ -880,17 +967,12 @@ export default function VibeSpaceContent({
 
                 <p className="vibespace-post-text">{vibe.text}</p>
 
-                {renderActions('vibe', vibe.id)}
-
-                {isOwnProfile && vibe.author_username === currentUsername && (
-                  <div className="vibespace-post-actions">
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteVibe(vibe.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
+                {renderActions(
+                  'vibe',
+                  vibe.id,
+                  isOwnProfile && vibe.author_username === currentUsername
+                    ? () => void handleDeleteVibe(vibe.id)
+                    : undefined,
                 )}
               </article>
             ))
@@ -900,7 +982,7 @@ export default function VibeSpaceContent({
 
       {/* MOMENTS */}
 
-      <section className="vibespace-card vibespace-post-section">
+      <section className="vibespace-section vibespace-post-section">
         <div className="vibespace-section-heading">
           <div>
             <h2>Captured Moments</h2>
@@ -937,17 +1019,14 @@ export default function VibeSpaceContent({
 
                   {moment.caption && <p>{moment.caption}</p>}
 
-                  {renderActions('moment', moment.id)}
-
-                  {isOwnProfile &&
-                    moment.author_username === currentUsername && (
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteMoment(moment.id)}
-                      >
-                        Delete
-                      </button>
-                    )}
+                  {renderActions(
+                    'moment',
+                    moment.id,
+                    isOwnProfile &&
+                      moment.author_username === currentUsername
+                      ? () => void handleDeleteMoment(moment.id)
+                      : undefined,
+                  )}
                 </div>
               </article>
             ))

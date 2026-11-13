@@ -10,7 +10,6 @@ import { useAuth } from '../../../context/AuthContext'
 
 import vibespaceApi, {
   type Comment,
-  type EventChoice,
   type Moment,
   type Revibe,
   type SavedContent,
@@ -39,18 +38,8 @@ export default function VibeSpaceContent({
 
   const [vibes, setVibes] = useState<Vibe[]>([])
   const [moments, setMoments] = useState<Moment[]>([])
-  const [events, setEvents] = useState<EventChoice[]>([])
-
-  const [vibeText, setVibeText] = useState('')
-  const [vibeEvent, setVibeEvent] = useState('')
-
-  const [momentImage, setMomentImage] = useState<File | null>(null)
-  const [momentCaption, setMomentCaption] = useState('')
-  const [momentEvent, setMomentEvent] = useState('')
 
   const [loading, setLoading] = useState(true)
-  const [publishingVibe, setPublishingVibe] = useState(false)
-  const [publishingMoment, setPublishingMoment] = useState(false)
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -84,23 +73,19 @@ export default function VibeSpaceContent({
     setError('')
 
     try {
-      const [vibeData, momentData, eventData] = await Promise.all([
+      const [vibeData, momentData] = await Promise.all([
         vibespaceApi.getVibes(username),
         vibespaceApi.getMoments(username),
-        isOwnProfile
-          ? vibespaceApi.getEventChoices()
-          : Promise.resolve([]),
       ])
 
       setVibes(vibeData)
       setMoments(momentData)
-      setEvents(eventData)
     } catch {
       setError('Unable to load VibeSpace content. Please try again.')
     } finally {
       setLoading(false)
     }
-  }, [username, isOwnProfile])
+  }, [username])
 
   useEffect(() => {
     void loadContent()
@@ -184,82 +169,6 @@ export default function VibeSpaceContent({
       cancelled = true
     }
   }, [isAuthenticated, vibes, moments])
-
-  // Publish Vibe
-
-  const handleVibeSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    if (!vibeText.trim()) {
-      setError('Please write something before publishing.')
-      return
-    }
-
-    setPublishingVibe(true)
-    setError('')
-    setSuccess('')
-
-    try {
-      const newVibe = await vibespaceApi.createVibe({
-        text: vibeText.trim(),
-        event: vibeEvent || null,
-      })
-
-      setVibes((previous) => [newVibe, ...previous])
-      setVibeText('')
-      setVibeEvent('')
-      setSuccess('Your Vibe has been published.')
-    } catch {
-      setError('Unable to publish your Vibe. Please try again.')
-    } finally {
-      setPublishingVibe(false)
-    }
-  }
-
-  // Publish Moment
-
-  const handleMomentSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    if (!momentImage) {
-      setError('Please select an image for your Moment.')
-      return
-    }
-
-    if (momentImage.size > 10 * 1024 * 1024) {
-      setError('Image size must not exceed 10 MB.')
-      return
-    }
-
-    setPublishingMoment(true)
-    setError('')
-    setSuccess('')
-
-    try {
-      const newMoment = await vibespaceApi.createMoment({
-        image: momentImage,
-        caption: momentCaption.trim(),
-        event: momentEvent || null,
-      })
-
-      setMoments((previous) => [newMoment, ...previous])
-      setMomentImage(null)
-      setMomentCaption('')
-      setMomentEvent('')
-
-      const fileInput = document.getElementById(
-        'vibespace-moment-image',
-      ) as HTMLInputElement | null
-
-      if (fileInput) fileInput.value = ''
-
-      setSuccess('Your Moment has been published.')
-    } catch {
-      setError('Unable to publish your Moment. Please try again.')
-    } finally {
-      setPublishingMoment(false)
-    }
-  }
 
   // Delete Vibe
 
@@ -946,45 +855,6 @@ export default function VibeSpaceContent({
           <span className="vibespace-count">{vibes.length}</span>
         </div>
 
-        {isOwnProfile && (
-          <form onSubmit={handleVibeSubmit} className="vibespace-composer">
-            <textarea
-              value={vibeText}
-              onChange={(event) => setVibeText(event.target.value)}
-              placeholder="What's happening in your world?"
-              maxLength={2000}
-              rows={4}
-              required
-            />
-
-            <div className="vibespace-composer-footer">
-              <span className="vibespace-character-count">
-                {vibeText.length}/2000
-              </span>
-
-              <select
-                value={vibeEvent}
-                onChange={(event) => setVibeEvent(event.target.value)}
-                aria-label="Associate Vibe with an event"
-              >
-                <option value="">Publish independently</option>
-                {events.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    Associate with: {item.title}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="submit"
-                disabled={publishingVibe || !vibeText.trim()}
-              >
-                {publishingVibe ? 'Publishing...' : 'Publish Vibe'}
-              </button>
-            </div>
-          </form>
-        )}
-
         <div className="vibespace-post-list">
           {loading ? (
             <p className="vibespace-empty-state">Loading Vibes...</p>
@@ -992,9 +862,7 @@ export default function VibeSpaceContent({
             <div className="vibespace-empty-state">
               <h3>Your story starts here.</h3>
               <p>
-                {isOwnProfile
-                  ? 'Publish your first Vibe to share an experience or thought.'
-                  : 'No Vibes have been published here yet.'}
+                No Vibes have been published here yet.
               </p>
             </div>
           ) : (
@@ -1040,63 +908,6 @@ export default function VibeSpaceContent({
           </div>
           <span className="vibespace-count">{moments.length}</span>
         </div>
-
-        {isOwnProfile && (
-          <form onSubmit={handleMomentSubmit} className="vibespace-composer">
-            <label htmlFor="vibespace-moment-image">
-              Select an image
-            </label>
-
-            <input
-              id="vibespace-moment-image"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(event) =>
-                setMomentImage(event.target.files?.[0] || null)
-              }
-            />
-
-            {momentImage && (
-              <p className="vibespace-selected-file">
-                Selected: {momentImage.name}
-              </p>
-            )}
-
-            <textarea
-              value={momentCaption}
-              onChange={(event) => setMomentCaption(event.target.value)}
-              placeholder="Add a caption to this Moment (optional)"
-              maxLength={500}
-              rows={2}
-            />
-
-            <div className="vibespace-composer-footer">
-              <span className="vibespace-character-count">
-                {momentCaption.length}/500
-              </span>
-
-              <select
-                value={momentEvent}
-                onChange={(event) => setMomentEvent(event.target.value)}
-                aria-label="Associate Moment with an event"
-              >
-                <option value="">Publish independently</option>
-                {events.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    Associate with: {item.title}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="submit"
-                disabled={publishingMoment || !momentImage}
-              >
-                {publishingMoment ? 'Uploading...' : 'Publish Moment'}
-              </button>
-            </div>
-          </form>
-        )}
 
         <div className="vibespace-moment-grid">
           {loading ? (

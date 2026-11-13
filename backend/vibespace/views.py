@@ -1,5 +1,5 @@
 
-from django.db.models import Q
+from django.db.models import Count, Q
 from rest_framework import generics, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -49,7 +49,13 @@ class VibeSpaceVisibilityMixin:
                 author__username__iexact=username
             )
 
-        return queryset
+        return queryset.annotate(
+            like_count=Count("likes", distinct=True),
+            comment_count=Count("comments", distinct=True),
+            revibe_count=Count("revibes", distinct=True),
+            save_count=Count("saved_by", distinct=True),
+            share_count=Count("shares", distinct=True),
+        )
 
 
 # ==================================================

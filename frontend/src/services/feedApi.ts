@@ -1,7 +1,8 @@
 
 import api from './api'
+import type { PostCounts } from './vibespaceApi'
 
-export interface FeedEntry {
+export interface FeedEntry extends PostCounts {
   id: string
   content_type: 'vibe' | 'moment'
   author_username: string

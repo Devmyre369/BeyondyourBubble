@@ -12,10 +12,28 @@ import vibespaceApi, {
   type Comment,
   type EventChoice,
   type LikeState,
+  type PostCounts,
   type Revibe,
 } from '../../services/vibespaceApi'
 import PostActionIcon from '../vibespace/components/PostActionIcon'
 import './feed.css'
+
+const getKey = (entry: FeedEntry) =>
+  `${entry.content_type}:${entry.id}`
+
+const createCountsMap = (items: FeedEntry[]): Record<string, PostCounts> =>
+  Object.fromEntries(
+    items.map((entry) => [
+      getKey(entry),
+      {
+        like_count: entry.like_count,
+        comment_count: entry.comment_count,
+        revibe_count: entry.revibe_count,
+        save_count: entry.save_count,
+        share_count: entry.share_count,
+      },
+    ]),
+  )
 
 export default function FeedPage() {
   const { user, isAuthenticated } = useAuth()
@@ -49,9 +67,7 @@ export default function FeedPage() {
   const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({})
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
   const [actionError, setActionError] = useState('')
-
-  const getKey = (entry: FeedEntry) =>
-    `${entry.content_type}:${entry.id}`
+  const [counts, setCounts] = useState<Record<string, PostCounts>>({})
 
   const loadFeed = useCallback(async (page: number, append = false) => {
     try {
@@ -67,6 +83,11 @@ export default function FeedPage() {
 
       setEntries((previous) =>
         append ? [...previous, ...response.results] : response.results
+      )
+      setCounts((previous) =>
+        append
+          ? { ...previous, ...createCountsMap(response.results) }
+          : createCountsMap(response.results),
       )
 
       setNextPage(response.next)
@@ -165,6 +186,18 @@ export default function FeedPage() {
       }
       setLikes(likeMap)
       setRevibes(revibeMap)
+      setCounts((previous) => {
+        const next = { ...previous }
+        results.forEach((result) => {
+          if (result.like && next[result.key]) {
+            next[result.key] = {
+              ...next[result.key],
+              like_count: result.like.like_count,
+            }
+          }
+        })
+        return next
+      })
     }
 
     void loadInteractions()
@@ -257,6 +290,13 @@ export default function FeedPage() {
         ? await vibespaceApi.unlikeContent(entry.content_type, entry.id)
         : await vibespaceApi.likeContent(entry.content_type, entry.id)
       setLikes((previous) => ({ ...previous, [key]: updated }))
+      setCounts((previous) => ({
+        ...previous,
+        [key]: {
+          ...(previous[key] || entry),
+          like_count: updated.like_count,
+        },
+      }))
     } catch {
       setActionError('Unable to update your Like. Please try again.')
     } finally {
@@ -266,6 +306,7 @@ export default function FeedPage() {
 
   const handleRevibe = async (entry: FeedEntry) => {
     const key = getKey(entry)
+    const hadRevibe = Boolean(revibes[key])
     setRevibeLoading((previous) => ({ ...previous, [key]: true }))
 
     try {
@@ -285,6 +326,17 @@ export default function FeedPage() {
               })
         setRevibes((previous) => ({ ...previous, [key]: revibe }))
       }
+      setCounts((previous) => ({
+        ...previous,
+        [key]: {
+          ...(previous[key] || entry),
+          revibe_count: Math.max(
+            0,
+            (previous[key]?.revibe_count ?? entry.revibe_count) +
+              (hadRevibe ? -1 : 1),
+          ),
+        },
+      }))
     } catch {
       setActionError('Unable to update your Revibe. Please try again.')
     } finally {
@@ -294,6 +346,7 @@ export default function FeedPage() {
 
   const handleSave = async (entry: FeedEntry) => {
     const key = getKey(entry)
+    const wasSaved = Boolean(savedItems[key])
     setSaveLoading((previous) => ({ ...previous, [key]: true }))
 
     try {
@@ -312,6 +365,17 @@ export default function FeedPage() {
             : await vibespaceApi.saveMoment(entry.id)
         setSavedItems((previous) => ({ ...previous, [key]: saved.id }))
       }
+      setCounts((previous) => ({
+        ...previous,
+        [key]: {
+          ...(previous[key] || entry),
+          save_count: Math.max(
+            0,
+            (previous[key]?.save_count ?? entry.save_count) +
+              (wasSaved ? -1 : 1),
+          ),
+        },
+      }))
     } catch {
       setActionError('Unable to update your saved posts. Please try again.')
     } finally {
@@ -359,6 +423,14 @@ export default function FeedPage() {
         [key]: [...(previous[key] || []), comment],
       }))
       setCommentInputs((previous) => ({ ...previous, [key]: '' }))
+      setCounts((previous) => ({
+        ...previous,
+        [key]: {
+          ...(previous[key] || entry),
+          comment_count:
+            (previous[key]?.comment_count ?? entry.comment_count) + 1,
+        },
+      }))
     } catch {
       setActionError('Unable to publish your comment. Please try again.')
     } finally {
@@ -368,6 +440,7 @@ export default function FeedPage() {
 
   const handleShare = async (entry: FeedEntry) => {
     const url = `${window.location.origin}${window.location.pathname}#${entry.content_type}-${entry.id}`
+    let shared = false
 
     try {
       if (navigator.share) {
@@ -375,10 +448,25 @@ export default function FeedPage() {
           title: entry.content_type === 'vibe' ? 'BYB Vibe' : 'BYB Moment',
           url,
         })
+        shared = true
       } else if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url)
+        shared = true
       } else {
         setActionError('Sharing is not supported by this browser.')
+      }
+      if (shared) {
+        const result = await vibespaceApi.shareContent(
+          entry.content_type,
+          entry.id,
+        )
+        setCounts((previous) => ({
+          ...previous,
+          [getKey(entry)]: {
+            ...(previous[getKey(entry)] || entry),
+            share_count: result.share_count,
+          },
+        }))
       }
     } catch (shareError) {
       if (shareError instanceof Error && shareError.name === 'AbortError') {
@@ -581,10 +669,14 @@ export default function FeedPage() {
 
       {!loading && entries.length > 0 && (
         <section className="feed-list" aria-label="Your BYB feed">
-          {entries.map((entry) => (
+          {entries.map((entry) => {
+            const key = getKey(entry)
+            const postCounts = counts[key] || entry
+
+            return (
             <article
               className="feed-card"
-              key={`${entry.content_type}-${entry.id}`}
+              key={key}
             >
               <div className="feed-card-header">
                 {entry.author_profile_picture ? (
@@ -645,71 +737,66 @@ export default function FeedPage() {
               <div className="feed-post-actions">
                 <button
                   type="button"
-                  className={likes[getKey(entry)]?.liked ? 'active' : ''}
-                  disabled={likeLoading[getKey(entry)]}
-                  aria-label={
-                    likes[getKey(entry)]?.liked
-                      ? 'Unlike this post'
-                      : 'Like this post'
-                  }
-                  aria-pressed={Boolean(likes[getKey(entry)]?.liked)}
+                  className={likes[key]?.liked ? 'active' : ''}
+                  disabled={likeLoading[key]}
+                  aria-label={`Like; ${postCounts.like_count} total likes`}
+                  title={`${postCounts.like_count} likes`}
+                  aria-pressed={Boolean(likes[key]?.liked)}
                   onClick={() => void handleLike(entry)}
                 >
                   <PostActionIcon
                     name="like"
-                    active={likes[getKey(entry)]?.liked}
+                    active={likes[key]?.liked}
                   />
-                  <span>
-                    Like
-                    {likes[getKey(entry)]?.like_count
-                      ? ` · ${likes[getKey(entry)].like_count}`
-                      : ''}
-                  </span>
+                  <span>{postCounts.like_count}</span>
                 </button>
                 <button
                   type="button"
-                  className={openComments[getKey(entry)] ? 'active' : ''}
-                  aria-expanded={Boolean(openComments[getKey(entry)])}
+                  className={openComments[key] ? 'active' : ''}
+                  aria-label={`Comments; ${postCounts.comment_count} total`}
+                  title={`${postCounts.comment_count} comments`}
+                  aria-expanded={Boolean(openComments[key])}
                   onClick={() => void toggleComments(entry)}
                 >
                   <PostActionIcon name="comment" />
-                  <span>Comment</span>
+                  <span>{postCounts.comment_count}</span>
                 </button>
                 {isAuthenticated && (
                   <>
                     <button
                       type="button"
-                      className={revibes[getKey(entry)] ? 'active' : ''}
-                      disabled={revibeLoading[getKey(entry)]}
-                      aria-pressed={Boolean(revibes[getKey(entry)])}
+                      className={revibes[key] ? 'active' : ''}
+                      disabled={revibeLoading[key]}
+                      aria-label={`Revibe; ${postCounts.revibe_count} total`}
+                      title={`${postCounts.revibe_count} Revibes`}
+                      aria-pressed={Boolean(revibes[key])}
                       onClick={() => void handleRevibe(entry)}
                     >
                       <PostActionIcon name="revibe" />
-                      <span>
-                        {revibes[getKey(entry)] ? 'Revibed' : 'Revibe'}
-                      </span>
+                      <span>{postCounts.revibe_count}</span>
                     </button>
                     <button
                       type="button"
-                      className={savedItems[getKey(entry)] ? 'active' : ''}
-                      disabled={saveLoading[getKey(entry)]}
-                      aria-pressed={Boolean(savedItems[getKey(entry)])}
+                      className={savedItems[key] ? 'active' : ''}
+                      disabled={saveLoading[key]}
+                      aria-label={`Save; ${postCounts.save_count} total saves`}
+                      title={`${postCounts.save_count} saves`}
+                      aria-pressed={Boolean(savedItems[key])}
                       onClick={() => void handleSave(entry)}
                     >
                       <PostActionIcon name="save" />
-                      <span>
-                        {savedItems[getKey(entry)] ? 'Saved' : 'Save'}
-                      </span>
+                      <span>{postCounts.save_count}</span>
                     </button>
                   </>
                 )}
                 <button
                   type="button"
-                  aria-label="Share this post"
+                  aria-label={`Share; ${postCounts.share_count} total shares`}
+                  title={`${postCounts.share_count} shares`}
                   onClick={() => void handleShare(entry)}
                 >
                   <PostActionIcon name="share" />
-                  <span>Share</span>
+                  <span>{postCounts.share_count}</span>
                 </button>
                 {entry.author_username === user?.username && (
                   <button
@@ -719,7 +806,6 @@ export default function FeedPage() {
                     onClick={() => void handleDelete(entry)}
                   >
                     <PostActionIcon name="delete" />
-                    <span>Delete</span>
                   </button>
                 )}
               </div>
@@ -775,7 +861,8 @@ export default function FeedPage() {
                 </div>
               )}
             </article>
-          ))}
+            )
+          })}
         </section>
       )}
 

@@ -41,4 +41,10 @@ class FeedEntrySerializer(serializers.Serializer):
         allow_blank=True,
     )
 
+    like_count = serializers.IntegerField(read_only=True)
+    comment_count = serializers.IntegerField(read_only=True)
+    revibe_count = serializers.IntegerField(read_only=True)
+    save_count = serializers.IntegerField(read_only=True)
+    share_count = serializers.IntegerField(read_only=True)
+
     created_at = serializers.DateTimeField(read_only=True)

@@ -5,7 +5,15 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from accounts.models import User, Profile
-from vibespace.models import Vibe, Moment, Comment, Revibe, SavedContent, Like
+from vibespace.models import (
+    Vibe,
+    Moment,
+    Comment,
+    Revibe,
+    SavedContent,
+    Like,
+    Share,
+)
 
 
 class VibeSpaceInteractionAPITests(TestCase):
@@ -95,6 +103,66 @@ class VibeSpaceInteractionAPITests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(Like.objects.count(), 0)
+
+    def test_share_count_tracks_each_successful_share(self):
+        self.client.force_authenticate(user=self.other_user)
+        url = f"/api/vibespace/vibe/{self.vibe.id}/share/"
+
+        first_response = self.client.post(url)
+        second_response = self.client.post(url)
+
+        self.assertEqual(first_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(first_response.data["share_count"], 1)
+        self.assertEqual(second_response.data["share_count"], 2)
+        self.assertEqual(Share.objects.count(), 2)
+
+    def test_content_lists_return_all_interaction_counts(self):
+        Comment.objects.create(
+            author=self.other_user,
+            vibe=self.vibe,
+            text="A comment",
+        )
+        Revibe.objects.create(author=self.other_user, vibe=self.vibe)
+        SavedContent.objects.create(user=self.other_user, vibe=self.vibe)
+        Like.objects.create(user=self.other_user, vibe=self.vibe)
+        Share.objects.create(user=self.other_user, vibe=self.vibe)
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.get("/api/vibespace/vibes/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {
+                key: response.data[0][key]
+                for key in (
+                    "like_count",
+                    "comment_count",
+                    "revibe_count",
+                    "save_count",
+                    "share_count",
+                )
+            },
+            {
+                "like_count": 1,
+                "comment_count": 1,
+                "revibe_count": 1,
+                "save_count": 1,
+                "share_count": 1,
+            },
+        )
+
+        feed_response = self.client.get("/api/vibespace/feed/")
+        feed_vibe = next(
+            item
+            for item in feed_response.data["results"]
+            if item["content_type"] == "vibe"
+            and item["id"] == str(self.vibe.id)
+        )
+        self.assertEqual(feed_vibe["like_count"], 1)
+        self.assertEqual(feed_vibe["comment_count"], 1)
+        self.assertEqual(feed_vibe["revibe_count"], 1)
+        self.assertEqual(feed_vibe["save_count"], 1)
+        self.assertEqual(feed_vibe["share_count"], 1)
 
     # ==================================================
     # COMMENT TESTS

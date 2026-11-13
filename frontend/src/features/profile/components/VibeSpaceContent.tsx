@@ -12,6 +12,7 @@ import vibespaceApi, {
   type Comment,
   type LikeState,
   type Moment,
+  type PostCounts,
   type Revibe,
   type SavedContent,
   type Vibe,
@@ -57,6 +58,7 @@ export default function VibeSpaceContent({
   const [revibes, setRevibes] = useState<RevibeState>({})
   const [savedItems, setSavedItems] = useState<SavedState>({})
   const [likes, setLikes] = useState<Record<string, LikeState>>({})
+  const [counts, setCounts] = useState<Record<string, PostCounts>>({})
 
   const [quoteInputs, setQuoteInputs] = useState<TextState>({})
   const [quoteOpen, setQuoteOpen] = useState<Record<string, boolean>>({})
@@ -69,6 +71,49 @@ export default function VibeSpaceContent({
   const [commentActionLoading, setCommentActionLoading] = useState<LoadingState>({})
 
   const getKey = (type: ContentType, id: string) => `${type}:${id}`
+
+  const adjustCount = (
+    type: ContentType,
+    id: string,
+    field: keyof PostCounts,
+    delta: number,
+  ) => {
+    const key = getKey(type, id)
+    const items = type === 'vibe' ? vibes : moments
+    const item = items.find((post) => post.id === id)
+    if (!item) return
+
+    setCounts((previous) => ({
+      ...previous,
+      [key]: {
+        ...(previous[key] || item),
+        [field]: Math.max(
+          0,
+          (previous[key]?.[field] ?? item[field]) + delta,
+        ),
+      },
+    }))
+  }
+
+  const setCount = (
+    type: ContentType,
+    id: string,
+    field: keyof PostCounts,
+    value: number,
+  ) => {
+    const key = getKey(type, id)
+    const items = type === 'vibe' ? vibes : moments
+    const item = items.find((post) => post.id === id)
+    if (!item) return
+
+    setCounts((previous) => ({
+      ...previous,
+      [key]: {
+        ...(previous[key] || item),
+        [field]: value,
+      },
+    }))
+  }
 
   // Load VibeSpace content
 
@@ -84,6 +129,12 @@ export default function VibeSpaceContent({
 
       setVibes(vibeData)
       setMoments(momentData)
+      setCounts(
+        Object.fromEntries([
+          ...vibeData.map((item) => [getKey('vibe', item.id), item]),
+          ...momentData.map((item) => [getKey('moment', item.id), item]),
+        ]),
+      )
     } catch {
       setError('Unable to load VibeSpace content. Please try again.')
     } finally {
@@ -199,6 +250,7 @@ export default function VibeSpaceContent({
         ? await vibespaceApi.unlikeContent(type, id)
         : await vibespaceApi.likeContent(type, id)
       setLikes((previous) => ({ ...previous, [key]: updated }))
+      setCount(type, id, 'like_count', updated.like_count)
     } catch {
       setError('Unable to update your Like. Please try again.')
     } finally {
@@ -314,6 +366,7 @@ export default function VibeSpaceContent({
         ...previous,
         [key]: [...(previous[key] || []), newComment],
       }))
+      adjustCount(type, id, 'comment_count', 1)
 
       setCommentInputs((previous) => ({
         ...previous,
@@ -371,6 +424,8 @@ export default function VibeSpaceContent({
   const handleCommentDelete = async (
     commentId: string,
     contentKey: string,
+    type: ContentType,
+    contentId: string,
   ) => {
     if (!window.confirm('Delete this comment?')) return
 
@@ -388,6 +443,7 @@ export default function VibeSpaceContent({
           (comment) => comment.id !== commentId,
         ),
       }))
+      adjustCount(type, contentId, 'comment_count', -1)
     } catch {
       setError('Unable to delete this comment. Please try again.')
     } finally {
@@ -420,6 +476,8 @@ export default function VibeSpaceContent({
       [key]: true,
     }))
 
+    let countDelta = 0
+
     try {
       const existing = revibes[key]
 
@@ -433,6 +491,7 @@ export default function VibeSpaceContent({
             ...previous,
             [key]: null,
           }))
+          countDelta = -1
           setSuccess('Revibe removed.')
         } else {
           const updated =
@@ -468,7 +527,12 @@ export default function VibeSpaceContent({
           ...previous,
           [key]: created,
         }))
+        countDelta = 1
         setSuccess('Your Revibe has been published.')
+      }
+
+      if (countDelta !== 0) {
+        adjustCount(type, id, 'revibe_count', countDelta)
       }
 
       setQuoteInputs((previous) => ({
@@ -497,6 +561,7 @@ export default function VibeSpaceContent({
     id: string,
   ) => {
     const key = getKey(type, id)
+    const wasSaved = Boolean(savedItems[key])
 
     if (!isAuthenticated) return
 
@@ -527,6 +592,7 @@ export default function VibeSpaceContent({
           [key]: saved.id,
         }))
       }
+      adjustCount(type, id, 'save_count', wasSaved ? -1 : 1)
     } catch {
       setError('Unable to update saved content. Please try again.')
     } finally {
@@ -544,6 +610,7 @@ export default function VibeSpaceContent({
     id: string,
   ) => {
     const url = `${window.location.origin}${window.location.pathname}#${type}-${id}`
+    let shared = false
 
     try {
       if (navigator.share) {
@@ -551,11 +618,16 @@ export default function VibeSpaceContent({
           title: type === 'vibe' ? 'BYB Vibe' : 'BYB Moment',
           url,
         })
+        shared = true
       } else if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url)
-        setSuccess('Content link copied to clipboard.')
+        shared = true
       } else {
         setError('Sharing is not supported by this browser.')
+      }
+      if (shared) {
+        const result = await vibespaceApi.shareContent(type, id)
+        setCount(type, id, 'share_count', result.share_count)
       }
     } catch (shareError) {
       if (shareError instanceof Error && shareError.name === 'AbortError') {
@@ -582,6 +654,7 @@ export default function VibeSpaceContent({
   ) => {
     const key = getKey(type, id)
     const currentRevibe = revibes[key]
+    const postCounts = counts[key]
 
     return (
       <>
@@ -591,28 +664,25 @@ export default function VibeSpaceContent({
             className={likes[key]?.liked ? 'active' : ''}
             disabled={likeLoading[key]}
             aria-label={
-              likes[key]?.liked
-                ? `Unlike this ${type}`
-                : `Like this ${type}`
+              `Like; ${postCounts?.like_count ?? 0} total likes`
             }
+            title={`${postCounts?.like_count ?? 0} likes`}
             aria-pressed={Boolean(likes[key]?.liked)}
             onClick={() => void handleLike(type, id)}
           >
             <PostActionIcon name="like" active={likes[key]?.liked} />
-            <span>
-              {likes[key]?.like_count
-                ? `Like · ${likes[key].like_count}`
-                : 'Like'}
-            </span>
+            <span>{postCounts?.like_count ?? 0}</span>
           </button>
           <button
             type="button"
             className={openComments[key] ? 'active' : ''}
-            aria-label="Toggle comments"
+            aria-label={`Comments; ${postCounts?.comment_count ?? 0} total`}
+            title={`${postCounts?.comment_count ?? 0} comments`}
+            aria-expanded={Boolean(openComments[key])}
             onClick={() => void toggleComments(type, id)}
           >
             <PostActionIcon name="comment" />
-            <span>Comment</span>
+            <span>{postCounts?.comment_count ?? 0}</span>
           </button>
 
           {isAuthenticated && (
@@ -621,9 +691,9 @@ export default function VibeSpaceContent({
                 type="button"
                 className={currentRevibe ? 'active' : ''}
                 disabled={revibeLoading[key]}
-                aria-label={
-                  currentRevibe ? 'Remove your Revibe' : 'Revibe this post'
-                }
+                aria-label={`Revibe; ${postCounts?.revibe_count ?? 0} total`}
+                title={`${postCounts?.revibe_count ?? 0} Revibes`}
+                aria-pressed={Boolean(currentRevibe)}
                 onClick={() => {
                   if (currentRevibe?.revibe_type === 'direct') {
                     void handleRevibe(type, id, 'direct')
@@ -636,43 +706,32 @@ export default function VibeSpaceContent({
                 }}
               >
                 <PostActionIcon name="revibe" />
-                <span>
-                  {revibeLoading[key]
-                    ? 'Please wait...'
-                    : currentRevibe?.revibe_type === 'direct'
-                      ? 'Revibed'
-                      : 'Revibe'}
-                </span>
+                <span>{postCounts?.revibe_count ?? 0}</span>
               </button>
 
               <button
                 type="button"
                 disabled={saveLoading[key]}
                 className={savedItems[key] ? 'active' : ''}
-                aria-label={
-                  savedItems[key] ? 'Remove saved post' : 'Save this post'
-                }
+                aria-label={`Save; ${postCounts?.save_count ?? 0} total saves`}
+                title={`${postCounts?.save_count ?? 0} saves`}
+                aria-pressed={Boolean(savedItems[key])}
                 onClick={() => void handleSave(type, id)}
               >
                 <PostActionIcon name="save" />
-                <span>
-                  {saveLoading[key]
-                    ? 'Please wait...'
-                    : savedItems[key]
-                      ? 'Saved'
-                      : 'Save'}
-                </span>
+                <span>{postCounts?.save_count ?? 0}</span>
               </button>
             </>
           )}
 
           <button
             type="button"
-            aria-label="Share this post"
+            aria-label={`Share; ${postCounts?.share_count ?? 0} total shares`}
+            title={`${postCounts?.share_count ?? 0} shares`}
             onClick={() => void handleShare(type, id)}
           >
             <PostActionIcon name="share" />
-            <span>Share</span>
+            <span>{postCounts?.share_count ?? 0}</span>
           </button>
 
           {onDelete && (
@@ -680,10 +739,10 @@ export default function VibeSpaceContent({
               type="button"
               className="vibespace-delete-action"
               aria-label={`Delete this ${type}`}
+              title={`Delete this ${type}`}
               onClick={onDelete}
             >
               <PostActionIcon name="delete" />
-              <span>Delete</span>
             </button>
           )}
         </div>
@@ -856,7 +915,12 @@ export default function VibeSpaceContent({
                             type="button"
                             disabled={commentActionLoading[comment.id]}
                             onClick={() =>
-                              void handleCommentDelete(comment.id, key)
+                              void handleCommentDelete(
+                                comment.id,
+                                key,
+                                type,
+                                id,
+                              )
                             }
                           >
                             Delete

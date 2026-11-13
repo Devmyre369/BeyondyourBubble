@@ -1,5 +1,5 @@
 
-from django.db.models import Q
+from django.db.models import Count, Q
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -34,6 +34,13 @@ class FeedView(APIView):
             Vibe.objects
             .filter(visibility_filter)
             .select_related("author", "author__profile", "event")
+            .annotate(
+                like_count=Count("likes", distinct=True),
+                comment_count=Count("comments", distinct=True),
+                revibe_count=Count("revibes", distinct=True),
+                save_count=Count("saved_by", distinct=True),
+                share_count=Count("shares", distinct=True),
+            )
             .order_by("-created_at", "-id")
         )
 
@@ -41,6 +48,13 @@ class FeedView(APIView):
             Moment.objects
             .filter(visibility_filter)
             .select_related("author", "author__profile", "event")
+            .annotate(
+                like_count=Count("likes", distinct=True),
+                comment_count=Count("comments", distinct=True),
+                revibe_count=Count("revibes", distinct=True),
+                save_count=Count("saved_by", distinct=True),
+                share_count=Count("shares", distinct=True),
+            )
             .order_by("-created_at", "-id")
         )
 
@@ -85,6 +99,11 @@ class FeedView(APIView):
                 "content_text": vibe.text,
                 "image_url": "",
                 "created_at": vibe.created_at,
+                "like_count": vibe.like_count,
+                "comment_count": vibe.comment_count,
+                "revibe_count": vibe.revibe_count,
+                "save_count": vibe.save_count,
+                "share_count": vibe.share_count,
             })
 
         for moment in moments:
@@ -102,6 +121,11 @@ class FeedView(APIView):
                 "content_text": moment.caption or "",
                 "image_url": moment.image_url,
                 "created_at": moment.created_at,
+                "like_count": moment.like_count,
+                "comment_count": moment.comment_count,
+                "revibe_count": moment.revibe_count,
+                "save_count": moment.save_count,
+                "share_count": moment.share_count,
             })
 
         # Merge both content types into one newest-first timeline.

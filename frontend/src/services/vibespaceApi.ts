@@ -5,6 +5,14 @@ import api from './api'
 // TYPES
 // ==============================
 
+export interface PostCounts {
+  like_count: number
+  comment_count: number
+  revibe_count: number
+  save_count: number
+  share_count: number
+}
+
 export interface EventChoice {
   id: string
   title: string
@@ -14,7 +22,7 @@ export interface EventChoice {
   status: 'published' | 'completed'
 }
 
-export interface Vibe {
+export interface Vibe extends PostCounts {
   id: string
   author_username: string
   event: string | null
@@ -24,7 +32,7 @@ export interface Vibe {
   updated_at: string
 }
 
-export interface Moment {
+export interface Moment extends PostCounts {
   id: string
   author_username: string
   event: string | null
@@ -63,6 +71,10 @@ export interface SavedContent {
 export interface LikeState {
   liked: boolean
   like_count: number
+}
+
+export interface ShareState {
+  share_count: number
 }
 
 interface MomentCreateResponse {
@@ -333,6 +345,17 @@ export const vibespaceApi = {
   ): Promise<LikeState> => {
     const response = await api.delete<LikeState>(
       `/vibespace/${type}/${id}/like/`,
+    )
+
+    return response.data
+  },
+
+  shareContent: async (
+    type: 'vibe' | 'moment',
+    id: string,
+  ): Promise<ShareState> => {
+    const response = await api.post<ShareState>(
+      `/vibespace/${type}/${id}/share/`,
     )
 
     return response.data

@@ -15,6 +15,7 @@ from .interaction_views import (
     CommentDetailView,
     ContentRevibeView,
     ContentLikeView,
+    ContentShareView,
     SavedContentListCreateView,
     SavedContentDetailView,
 )
@@ -53,6 +54,11 @@ urlpatterns = [
         "<str:content_type>/<uuid:content_id>/like/",
         ContentLikeView.as_view(),
         name="content-like",
+    ),
+    path(
+        "<str:content_type>/<uuid:content_id>/share/",
+        ContentShareView.as_view(),
+        name="content-share",
     ),
 
     # Saved content

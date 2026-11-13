@@ -339,3 +339,53 @@ class Like(models.Model):
 
     def __str__(self):
         return f"Like by {self.user.username}"
+
+
+class Share(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="vibespace_shares",
+    )
+
+    vibe = models.ForeignKey(
+        Vibe,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="shares",
+    )
+
+    moment = models.ForeignKey(
+        Moment,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="shares",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(vibe__isnull=False, moment__isnull=True)
+                    | Q(vibe__isnull=True, moment__isnull=False)
+                ),
+                name="share_exactly_one_content",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["vibe", "created_at"]),
+            models.Index(fields=["moment", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Share by {self.user.username}"

@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from accounts.models import Profile
 
-from .models import Vibe, Moment, Comment, Revibe, SavedContent, Like
+from .models import Vibe, Moment, Comment, Revibe, SavedContent, Like, Share
 from .serializers import (
     CommentSerializer,
     RevibeSerializer,
@@ -346,6 +346,38 @@ class ContentLikeView(APIView):
             "liked": False,
             "like_count": likes.count(),
         })
+
+
+class ContentShareView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        content_type = self.kwargs["content_type"]
+        content_id = self.kwargs["content_id"]
+
+        if content_type == "vibe":
+            content = get_visible_vibe(request.user, content_id)
+            shares = Share.objects.filter(vibe=content)
+            Share.objects.create(
+                user=request.user,
+                vibe=content,
+                moment=None,
+            )
+        elif content_type == "moment":
+            content = get_visible_moment(request.user, content_id)
+            shares = Share.objects.filter(moment=content)
+            Share.objects.create(
+                user=request.user,
+                vibe=None,
+                moment=content,
+            )
+        else:
+            raise NotFound("Invalid content type.")
+
+        return Response(
+            {"share_count": shares.count()},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class SavedContentListCreateView(generics.ListCreateAPIView):

@@ -11,6 +11,29 @@ from .models import (
 )
 
 
+class InteractionCountSerializerMixin:
+    def get_count(self, obj, annotation, related_name):
+        count = getattr(obj, annotation, None)
+        if count is not None:
+            return count
+        return getattr(obj, related_name).count()
+
+    def get_like_count(self, obj):
+        return self.get_count(obj, "like_count", "likes")
+
+    def get_comment_count(self, obj):
+        return self.get_count(obj, "comment_count", "comments")
+
+    def get_revibe_count(self, obj):
+        return self.get_count(obj, "revibe_count", "revibes")
+
+    def get_save_count(self, obj):
+        return self.get_count(obj, "save_count", "saved_by")
+
+    def get_share_count(self, obj):
+        return self.get_count(obj, "share_count", "shares")
+
+
 class EventAssociationValidationMixin:
 
     def validate_event(self, event):
@@ -35,8 +58,15 @@ class EventAssociationValidationMixin:
 
 class VibeSerializer(
     EventAssociationValidationMixin,
+    InteractionCountSerializerMixin,
     serializers.ModelSerializer
 ):
+    like_count = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
+    revibe_count = serializers.SerializerMethodField()
+    save_count = serializers.SerializerMethodField()
+    share_count = serializers.SerializerMethodField()
+
     author_username = serializers.CharField(
         source="author.username",
         read_only=True
@@ -73,6 +103,11 @@ class VibeSerializer(
             "event",
             "event_title",
             "text",
+            "like_count",
+            "comment_count",
+            "revibe_count",
+            "save_count",
+            "share_count",
             "created_at",
             "updated_at",
         ]
@@ -80,6 +115,11 @@ class VibeSerializer(
             "id",
             "author_username",
             "event_title",
+            "like_count",
+            "comment_count",
+            "revibe_count",
+            "save_count",
+            "share_count",
             "created_at",
             "updated_at",
         ]
@@ -87,8 +127,15 @@ class VibeSerializer(
 
 class MomentSerializer(
     EventAssociationValidationMixin,
+    InteractionCountSerializerMixin,
     serializers.ModelSerializer
 ):
+    like_count = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
+    revibe_count = serializers.SerializerMethodField()
+    save_count = serializers.SerializerMethodField()
+    share_count = serializers.SerializerMethodField()
+
     author_username = serializers.CharField(
         source="author.username",
         read_only=True
@@ -129,6 +176,11 @@ class MomentSerializer(
             "event_title",
             "image_url",
             "caption",
+            "like_count",
+            "comment_count",
+            "revibe_count",
+            "save_count",
+            "share_count",
             "created_at",
             "updated_at",
         ]
@@ -137,6 +189,11 @@ class MomentSerializer(
             "author_username",
             "event_title",
             "image_url",
+            "like_count",
+            "comment_count",
+            "revibe_count",
+            "save_count",
+            "share_count",
             "created_at",
             "updated_at",
         ]

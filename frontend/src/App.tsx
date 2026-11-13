@@ -16,14 +16,13 @@ import ProfilePage from './features/profile/pages/ProfilePage'
 import ProfileEditPage from './features/profile/pages/ProfileEditPage'
 
 import FeedPage from './features/feed/FeedPage'
+import AppLayout from './components/layout/AppLayout'
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<WelcomePage />} />
-
       <Route path="/login" element={<LoginPage />} />
-
       <Route path="/signup" element={<SignupPage />} />
 
       <Route
@@ -48,9 +47,11 @@ export default function App() {
         />
 
         <Route element={<ProfileRoute />}>
-          <Route path="/home" element={<FeedPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/edit-profile" element={<ProfileEditPage />} />
+          <Route element={<AppLayout />}>
+            <Route path="/home" element={<FeedPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/edit-profile" element={<ProfileEditPage />} />
+          </Route>
         </Route>
       </Route>
 

@@ -1,4 +1,6 @@
-﻿import { NavLink, Outlet } from 'react-router-dom'
+﻿
+import { useState } from 'react'
+import { NavLink, Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import RightSidebar from './RightSidebar'
 import './app-layout.css'
@@ -11,9 +13,20 @@ const mobileNavigation = [
 ]
 
 export default function AppLayout() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((previous) => !previous)
+  }
+
   return (
-    <div className="byb-app-layout">
-      <Sidebar />
+    <div
+      className={`byb-app-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+    >
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={toggleSidebar}
+      />
 
       <main className="byb-main-content">
         <Outlet />

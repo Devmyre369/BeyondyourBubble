@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { feedApi, type FeedEntry } from '../../services/feedApi'
 import './feed.css'
+
 export default function FeedPage() {
   const [entries, setEntries] = useState<FeedEntry[]>([])
   const [nextPage, setNextPage] = useState<number | null>(1)
@@ -50,7 +51,7 @@ export default function FeedPage() {
   }
 
   return (
-    <main className="feed-page">
+    <div className="feed-page">
       <header className="feed-header">
         <div>
           <h1>BYB Feed</h1>
@@ -65,9 +66,9 @@ export default function FeedPage() {
       )}
 
       {!loading && error && (
-        <div className="feed-error">
+        <div className="feed-error" role="alert">
           <p>{error}</p>
-          <button onClick={() => loadFeed(1)}>
+          <button type="button" onClick={() => loadFeed(1)}>
             Try again
           </button>
         </div>
@@ -83,7 +84,7 @@ export default function FeedPage() {
       )}
 
       {!loading && entries.length > 0 && (
-        <section className="feed-list">
+        <section className="feed-list" aria-label="Your BYB feed">
           {entries.map((entry) => (
             <article
               className="feed-card"
@@ -97,7 +98,10 @@ export default function FeedPage() {
                     alt={`${entry.author_username}'s profile`}
                   />
                 ) : (
-                  <div className="feed-avatar feed-avatar-placeholder">
+                  <div
+                    className="feed-avatar feed-avatar-placeholder"
+                    aria-hidden="true"
+                  >
                     {entry.author_username.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -149,6 +153,7 @@ export default function FeedPage() {
       {!loading && !error && nextPage !== null && (
         <div className="feed-load-more">
           <button
+            type="button"
             onClick={() => loadFeed(nextPage, true)}
             disabled={loadingMore}
           >
@@ -156,6 +161,6 @@ export default function FeedPage() {
           </button>
         </div>
       )}
-    </main>
+    </div>
   )
 }

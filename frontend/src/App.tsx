@@ -17,6 +17,7 @@ import ProfileEditPage from './features/profile/pages/ProfileEditPage'
 
 import FeedPage from './features/feed/FeedPage'
 import CreatePostPage from './features/feed/CreatePostPage'
+import EventsPage from './features/events/EventsPage'
 import AppLayout from './components/layout/AppLayout'
 
 export default function App() {
@@ -58,6 +59,7 @@ export default function App() {
               path="/create/moment"
               element={<CreatePostPage type="moment" />}
             />
+            <Route path="/events" element={<EventsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/edit-profile" element={<ProfileEditPage />} />
           </Route>

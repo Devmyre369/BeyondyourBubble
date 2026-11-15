@@ -9,7 +9,7 @@ import './app-layout.css'
 const mobileNavigation = [
   { label: 'Home', path: '/home', icon: 'home', available: true },
   { label: 'Explore', path: '/discover', icon: 'explore', available: false },
-  { label: 'Events', path: '/events', icon: 'events', available: false },
+  { label: 'Events', path: '/events', icon: 'events', available: true },
   { label: 'Profile', path: '/profile', icon: 'profile', available: true },
 ] as const
 

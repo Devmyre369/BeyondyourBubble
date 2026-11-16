@@ -5,6 +5,9 @@ import { useAuth } from '../../context/AuthContext'
 type SidebarProps = {
   collapsed: boolean
   onToggle: () => void
+  onNavigate: () => void
+  mobile: boolean
+  mobileOpen: boolean
 }
 
 const navigationItems = [
@@ -15,7 +18,13 @@ const navigationItems = [
   { label: 'Saved', path: '/saved', icon: '\u2661', available: false },
 ]
 
-export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export default function Sidebar({
+  collapsed,
+  onToggle,
+  onNavigate,
+  mobile,
+  mobileOpen,
+}: SidebarProps) {
   const { user, profile, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -31,29 +40,35 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   }
 
   return (
-    <aside className={`byb-sidebar${collapsed ? ' collapsed' : ''}`} aria-label="Main sidebar">
+    <aside
+      id="byb-main-sidebar"
+      className={`byb-sidebar${collapsed ? ' collapsed' : ''}`}
+      aria-label="Main sidebar"
+      role={mobileOpen ? 'dialog' : undefined}
+      aria-modal={mobileOpen || undefined}
+    >
       <div className="byb-sidebar-top">
-        <NavLink
-          to="/home"
-          className="byb-brand"
-          title="BYB Home"
-          aria-label="BYB Home"
-        >
-          <span className="byb-brand-mark">B</span>
-          <span className="byb-brand-name">
-            BYB<span>.</span>
-          </span>
-        </NavLink>
-
         <button
           type="button"
           className="byb-sidebar-toggle"
           onClick={onToggle}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-expanded={!collapsed}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={
+            mobile
+              ? 'Close navigation menu'
+              : collapsed
+                ? 'Expand sidebar'
+                : 'Collapse sidebar'
+          }
+          aria-expanded={mobile ? mobileOpen : !collapsed}
+          title={
+            mobile
+              ? 'Close navigation menu'
+              : collapsed
+                ? 'Expand sidebar'
+                : 'Collapse sidebar'
+          }
         >
-          {collapsed ? '\u00BB' : '\u00AB'}
+          {mobile ? '\u00D7' : collapsed ? '\u00BB' : '\u00AB'}
         </button>
       </div>
 
@@ -72,6 +87,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   className={({ isActive }) =>
                     `byb-nav-item${isActive ? ' active' : ''}`
                   }
+                  onClick={onNavigate}
                 >
                   <span className="byb-nav-icon" aria-hidden="true">
                     {item.icon}
@@ -107,6 +123,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           className={({ isActive }) =>
             `byb-profile-link${isActive ? ' active' : ''}`
           }
+          onClick={onNavigate}
         >
           {profile?.profile_picture ? (
             <img
@@ -129,7 +146,10 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <button
           type="button"
           className="byb-logout-button"
-          onClick={handleLogout}
+          onClick={() => {
+            onNavigate()
+            handleLogout()
+          }}
           title="Log out"
           aria-label="Log out"
         >

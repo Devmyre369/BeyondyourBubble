@@ -1,5 +1,5 @@
 ﻿
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from './Sidebar'
@@ -74,10 +74,15 @@ function MobileNavigationIcon({
 export default function AppLayout() {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const [isMobile, setIsMobile] = useState(() =>
+    window.matchMedia('(max-width: 850px)').matches,
+  )
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
     window.matchMedia('(max-width: 850px)').matches,
   )
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [uploadMenuOpen, setUploadMenuOpen] = useState(false)
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
 
   const toggleSidebar = () => {
     setSidebarCollapsed((previous) => !previous)
@@ -86,12 +91,29 @@ export default function AppLayout() {
   useEffect(() => {
     const mobileQuery = window.matchMedia('(max-width: 850px)')
     const handleViewportChange = (event: MediaQueryListEvent) => {
+      setIsMobile(event.matches)
       setSidebarCollapsed(event.matches)
+      setMobileSidebarOpen(false)
     }
 
     mobileQuery.addEventListener('change', handleViewportChange)
     return () => mobileQuery.removeEventListener('change', handleViewportChange)
   }, [])
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return
+
+    const previousBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('.byb-sidebar-toggle')?.focus()
+    })
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      mobileMenuButtonRef.current?.focus()
+    }
+  }, [mobileSidebarOpen])
 
   useEffect(() => {
     if (!uploadMenuOpen) return
@@ -147,41 +169,94 @@ export default function AppLayout() {
 
   return (
     <div
-      className={`byb-app-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+      className={`byb-app-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}${mobileSidebarOpen ? ' mobile-sidebar-open' : ''}`}
     >
-      <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+      {mobileSidebarOpen && (
+        <button
+          type="button"
+          className="byb-mobile-sidebar-backdrop"
+          aria-label="Close navigation menu"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+      <Sidebar
+        collapsed={!isMobile && sidebarCollapsed}
+        mobile={isMobile}
+        mobileOpen={mobileSidebarOpen}
+        onToggle={() => {
+          if (isMobile) setMobileSidebarOpen(false)
+          else toggleSidebar()
+        }}
+        onNavigate={() => {
+          if (isMobile) setMobileSidebarOpen(false)
+        }}
+        mobileOpen={mobileSidebarOpen}
+      />
 
       <main className="byb-main-content">
-        <div className="byb-create-toolbar">
-          <div className="byb-create-menu">
-            <div
-              id="byb-create-options"
-              className="byb-create-options"
-              aria-label="Upload options"
-              hidden={!uploadMenuOpen}
+        <header className="byb-create-toolbar">
+          {isMobile ? (
+            <button
+              ref={mobileMenuButtonRef}
+              type="button"
+              className="byb-mobile-menu-button"
+              aria-label={mobileSidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-controls="byb-main-sidebar"
+              aria-expanded={mobileSidebarOpen}
+              onClick={() => setMobileSidebarOpen((previous) => !previous)}
             >
-              <button type="button" onClick={() => openComposer('vibe')}>
-                Upload a vibe
-              </button>
-              <button type="button" onClick={() => openComposer('moment')}>
-                Upload a moment
+              <span aria-hidden="true" />
+              <span aria-hidden="true" />
+              <span aria-hidden="true" />
+            </button>
+          ) : (
+            <span aria-hidden="true" />
+          )}
+
+          <NavLink
+            to="/home"
+            className="byb-header-brand"
+            aria-label="BYB Home"
+          >
+            <span className="byb-brand-mark">B</span>
+            <span className="byb-brand-name">
+              BYB<span>.</span>
+            </span>
+          </NavLink>
+
+          {isMobile ? (
+            <div className="byb-create-menu">
+              <div
+                id="byb-create-options"
+                className="byb-create-options"
+                aria-label="Upload options"
+                hidden={!uploadMenuOpen}
+              >
+                <button type="button" onClick={() => openComposer('vibe')}>
+                  Upload a vibe
+                </button>
+                <button type="button" onClick={() => openComposer('moment')}>
+                  Upload a moment
+                </button>
+              </div>
+              <button
+                type="button"
+                className={`byb-create-button${uploadMenuOpen ? ' active' : ''}`}
+                aria-label="Create a vibe or moment"
+                aria-controls="byb-create-options"
+                aria-expanded={uploadMenuOpen}
+                onClick={() => setUploadMenuOpen((previous) => !previous)}
+              >
+                <span className="byb-create-icon" aria-hidden="true">
+                  +
+                </span>
+                <span>Create</span>
               </button>
             </div>
-            <button
-              type="button"
-              className={`byb-create-button${uploadMenuOpen ? ' active' : ''}`}
-              aria-label="Create a vibe or moment"
-              aria-controls="byb-create-options"
-              aria-expanded={uploadMenuOpen}
-              onClick={() => setUploadMenuOpen((previous) => !previous)}
-            >
-              <span className="byb-create-icon" aria-hidden="true">
-                +
-              </span>
-              <span>Create</span>
-            </button>
-          </div>
-        </div>
+          ) : (
+            <span aria-hidden="true" />
+          )}
+        </header>
         <Outlet />
       </main>
 

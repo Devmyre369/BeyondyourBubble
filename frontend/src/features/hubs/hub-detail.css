@@ -7,17 +7,54 @@
   color: var(--byb-text);
 }
 
+.hub-detail-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
 .hub-detail-back-link {
   display: inline-flex;
   min-height: 38px;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
   color: var(--byb-text-secondary);
   font-size: 12px;
   font-weight: 650;
   text-decoration: none;
   transition: color var(--byb-transition-fast);
+}
+
+.hub-detail-edit-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 15px;
+  color: #fff;
+  background: var(--byb-crimson);
+  border: 1px solid var(--byb-crimson);
+  border-radius: var(--byb-radius-md);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    background var(--byb-transition-fast),
+    border-color var(--byb-transition-fast);
+}
+
+.hub-detail-edit-button:hover {
+  background: var(--byb-crimson-hover);
+  border-color: var(--byb-crimson-hover);
+}
+
+.hub-detail-edit-button:focus-visible {
+  outline: 2px solid var(--byb-crimson);
+  outline-offset: 3px;
 }
 
 .hub-detail-back-link svg {
@@ -362,6 +399,10 @@
   .hub-detail-page {
     padding-top: 20px;
     padding-bottom: 40px;
+  }
+
+  .hub-detail-toolbar {
+    gap: 10px;
   }
 
   .hub-detail-cover {

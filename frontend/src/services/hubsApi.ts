@@ -34,6 +34,22 @@ export interface HubListItem {
 export interface HubDetail extends HubListItem {
   description: string
   website: string
+  membership_policy: HubMembershipPolicy
+  can_edit: boolean
+  can_edit_membership_policy: boolean
+}
+
+export interface HubUpdateRequest {
+  name?: string
+  hub_type?: HubType
+  short_description?: string
+  description?: string
+  logo?: string
+  cover_image?: string
+  website?: string
+  city?: string
+  college_or_parent_organisation?: string
+  membership_policy?: HubMembershipPolicy
 }
 
 export interface HubCreateRequest {
@@ -75,6 +91,17 @@ export const hubsApi = {
 
   createHub: async (data: HubCreateRequest): Promise<HubDetail> => {
     const response = await api.post<HubDetail>('/hubs/', data)
+    return response.data
+  },
+
+  updateHub: async (
+    hubId: string,
+    data: HubUpdateRequest,
+  ): Promise<HubDetail> => {
+    const response = await api.patch<HubDetail>(
+      `/hubs/${encodeURIComponent(hubId)}/`,
+      data,
+    )
     return response.data
   },
 }

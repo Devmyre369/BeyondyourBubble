@@ -7,6 +7,7 @@ import {
   type HubDetail,
   type HubType,
 } from '../../services/hubsApi'
+import HubEditModal from './HubEditModal'
 import './hub-detail.css'
 
 const CATEGORY_LABELS: Record<HubType, string> = {
@@ -168,6 +169,7 @@ export default function HubDetailPage() {
   const { hubId } = useParams<{ hubId: string }>()
   const pendingRequests = useRef(new Map<string, Promise<HubDetail>>())
   const [retryCount, setRetryCount] = useState(0)
+  const [isEditOpen, setIsEditOpen] = useState(false)
   const [state, setState] = useState<HubDetailState>({
     status: 'loading',
     hubId,
@@ -221,24 +223,60 @@ export default function HubDetailPage() {
 
   const isCurrentState = state.hubId === hubId
 
+  const refreshHubAfterPermissionError = async () => {
+    if (!hubId) return
+    try {
+      const hub = await hubsApi.getHub(hubId)
+      setState((current) =>
+        current.hubId === hubId && current.status === 'success'
+          ? { status: 'success', hubId, hub }
+          : current,
+      )
+    } catch (requestError) {
+      if (axios.isAxiosError(requestError) && requestError.response?.status === 404) {
+        setState({ status: 'notFound', hubId })
+      } else {
+        console.error('Hub detail refresh failed:', requestError)
+      }
+    }
+  }
+
+  const handleHubUpdated = (hub: HubDetail) => {
+    setState({ status: 'success', hubId: hub.id, hub })
+    setIsEditOpen(false)
+  }
+
   return (
     <section
       className="hub-detail-page"
       aria-labelledby="hub-detail-title"
       aria-busy={!isCurrentState || state.status === 'loading'}
     >
-      <Link className="hub-detail-back-link" to="/hubs">
-        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <path
-            d="M15.5 10H4.5m0 0 5-5m-5 5 5 5"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <span>Back to Hubs</span>
-      </Link>
+      <div className="hub-detail-toolbar">
+        <Link className="hub-detail-back-link" to="/hubs">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M15.5 10H4.5m0 0 5-5m-5 5 5 5"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>Back to Hubs</span>
+        </Link>
+        {isCurrentState &&
+          state.status === 'success' &&
+          state.hub.can_edit && (
+            <button
+              className="hub-detail-edit-button"
+              type="button"
+              onClick={() => setIsEditOpen(true)}
+            >
+              Edit Hub
+            </button>
+          )}
+      </div>
 
       {(!isCurrentState || state.status === 'loading') && (
         <div className="hub-detail-state" role="status">
@@ -277,6 +315,17 @@ export default function HubDetailPage() {
       {isCurrentState && state.status === 'success' && (
         <HubDetailContent hub={state.hub} />
       )}
+      {isCurrentState &&
+        state.status === 'success' &&
+        isEditOpen && (
+          <HubEditModal
+            hub={state.hub}
+            canEdit={state.hub.can_edit}
+            onClose={() => setIsEditOpen(false)}
+            onUpdated={handleHubUpdated}
+            onPermissionError={() => void refreshHubAfterPermissionError()}
+          />
+        )}
     </section>
   )
 }

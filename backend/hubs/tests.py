@@ -1138,3 +1138,354 @@ class HubDiscoveryAPITests(APITestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_owner_can_update_profile_fields_without_changing_identity(self):
+        hub = self.create_hub()
+        owner_membership = HubMembership.objects.create(
+            hub=hub,
+            user=self.user,
+            role=HubMembership.Role.OWNER,
+            status=HubMembership.Status.APPROVED,
+        )
+        member = User.objects.create_user(
+            username="update_member",
+            email="update_member@example.com",
+            password="TestPassword123!",
+        )
+        member_membership = HubMembership.objects.create(
+            hub=hub,
+            user=member,
+            role=HubMembership.Role.MEMBER,
+            status=HubMembership.Status.APPROVED,
+        )
+        hub_id = hub.id
+        hub_slug = hub.slug
+
+        response = self.client.patch(
+            f"/api/hubs/{hub.id}/",
+            {
+                "name": "Updated Hub",
+                "hub_type": Hub.HubType.COLLEGE,
+                "short_description": "Updated short description.",
+                "description": "Updated full description.",
+                "logo": "https://example.com/updated-logo.png",
+                "cover_image": "https://example.com/updated-cover.png",
+                "website": "https://updated.example.com",
+                "city": "Delhi",
+                "college_or_parent_organisation": "Updated University",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        hub.refresh_from_db()
+        self.assertEqual(hub.name, "Updated Hub")
+        self.assertEqual(hub.hub_type, Hub.HubType.COLLEGE)
+        self.assertEqual(hub.short_description, "Updated short description.")
+        self.assertEqual(hub.description, "Updated full description.")
+        self.assertEqual(hub.logo, "https://example.com/updated-logo.png")
+        self.assertEqual(hub.cover_image, "https://example.com/updated-cover.png")
+        self.assertEqual(hub.website, "https://updated.example.com")
+        self.assertEqual(hub.city, "Delhi")
+        self.assertEqual(
+            hub.college_or_parent_organisation,
+            "Updated University",
+        )
+        self.assertEqual(hub.id, hub_id)
+        self.assertEqual(hub.slug, hub_slug)
+        self.assertEqual(hub.owner, self.user)
+        self.assertEqual(hub.created_by, self.user)
+        self.assertEqual(
+            list(
+                hub.memberships.order_by("user_id").values_list(
+                    "user_id", "role", "status"
+                )
+            ),
+            sorted([
+                (owner_membership.user_id, owner_membership.role, owner_membership.status),
+                (member_membership.user_id, member_membership.role, member_membership.status),
+            ]),
+        )
+        self.assertEqual(response.data["id"], str(hub_id))
+        self.assertEqual(response.data["slug"], hub_slug)
+        self.assertTrue(response.data["can_edit"])
+        self.assertTrue(response.data["can_edit_membership_policy"])
+
+    def test_approved_admin_can_update_profile_fields(self):
+        hub = self.create_hub()
+        admin = User.objects.create_user(
+            username="hub_admin",
+            email="hub_admin@example.com",
+            password="TestPassword123!",
+        )
+        HubMembership.objects.create(
+            hub=hub,
+            user=admin,
+            role=HubMembership.Role.ADMIN,
+            status=HubMembership.Status.APPROVED,
+        )
+        self.client.credentials(
+            HTTP_AUTHORIZATION=(
+                f"Bearer {RefreshToken.for_user(admin).access_token}"
+            )
+        )
+
+        response = self.client.patch(
+            f"/api/hubs/{hub.id}/",
+            {"name": "Admin Updated Hub"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        hub.refresh_from_db()
+        self.assertEqual(hub.name, "Admin Updated Hub")
+        self.assertTrue(response.data["can_edit"])
+        self.assertFalse(response.data["can_edit_membership_policy"])
+
+    def test_only_owner_can_change_membership_policy(self):
+        hub = self.create_hub()
+        admin = User.objects.create_user(
+            username="policy_admin",
+            email="policy_admin@example.com",
+            password="TestPassword123!",
+        )
+        HubMembership.objects.create(
+            hub=hub,
+            user=admin,
+            role=HubMembership.Role.ADMIN,
+            status=HubMembership.Status.APPROVED,
+        )
+        self.client.credentials(
+            HTTP_AUTHORIZATION=(
+                f"Bearer {RefreshToken.for_user(admin).access_token}"
+            )
+        )
+
+        admin_response = self.client.patch(
+            f"/api/hubs/{hub.id}/",
+            {"membership_policy": Hub.MembershipPolicy.OPEN},
+            format="json",
+        )
+
+        self.assertEqual(admin_response.status_code, 403)
+        hub.refresh_from_db()
+        self.assertEqual(
+            hub.membership_policy,
+            Hub.MembershipPolicy.APPROVAL_REQUIRED,
+        )
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=(
+                f"Bearer {RefreshToken.for_user(self.user).access_token}"
+            )
+        )
+        owner_response = self.client.patch(
+            f"/api/hubs/{hub.id}/",
+            {"membership_policy": Hub.MembershipPolicy.OPEN},
+            format="json",
+        )
+
+        self.assertEqual(owner_response.status_code, 200)
+        hub.refresh_from_db()
+        self.assertEqual(hub.membership_policy, Hub.MembershipPolicy.OPEN)
+        self.assertEqual(
+            owner_response.data["membership_policy"],
+            Hub.MembershipPolicy.OPEN,
+        )
+
+    def test_non_editors_cannot_update_hub(self):
+        hub = self.create_hub()
+        cases = [
+            ("editor", HubMembership.Role.EDITOR, HubMembership.Status.APPROVED),
+            ("member", HubMembership.Role.MEMBER, HubMembership.Status.APPROVED),
+            ("pending_admin", HubMembership.Role.ADMIN, HubMembership.Status.PENDING),
+            ("rejected_admin", HubMembership.Role.ADMIN, HubMembership.Status.REJECTED),
+        ]
+
+        for suffix, role, membership_status in cases:
+            with self.subTest(role=role, status=membership_status):
+                user = User.objects.create_user(
+                    username=f"not_editor_{suffix}",
+                    email=f"not_editor_{suffix}@example.com",
+                    password="TestPassword123!",
+                )
+                HubMembership.objects.create(
+                    hub=hub,
+                    user=user,
+                    role=role,
+                    status=membership_status,
+                )
+                self.client.credentials(
+                    HTTP_AUTHORIZATION=(
+                        f"Bearer {RefreshToken.for_user(user).access_token}"
+                    )
+                )
+                response = self.client.patch(
+                    f"/api/hubs/{hub.id}/",
+                    {"name": "Should Not Update"},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 403)
+                hub.refresh_from_db()
+                self.assertEqual(hub.name, "Test Hub 1")
+
+    def test_unrelated_and_unauthenticated_users_cannot_update_hub(self):
+        hub = self.create_hub()
+        unrelated = User.objects.create_user(
+            username="unrelated_hub_user",
+            email="unrelated_hub_user@example.com",
+            password="TestPassword123!",
+        )
+        self.client.credentials(
+            HTTP_AUTHORIZATION=(
+                f"Bearer {RefreshToken.for_user(unrelated).access_token}"
+            )
+        )
+        unrelated_response = self.client.patch(
+            f"/api/hubs/{hub.id}/",
+            {"name": "Unrelated Update"},
+            format="json",
+        )
+        self.assertEqual(unrelated_response.status_code, 403)
+
+        self.client.credentials()
+        unauthenticated_response = self.client.patch(
+            f"/api/hubs/{hub.id}/",
+            {"name": "Unauthenticated Update"},
+            format="json",
+        )
+        self.assertEqual(unauthenticated_response.status_code, 401)
+
+        hub.refresh_from_db()
+        self.assertEqual(hub.name, "Test Hub 1")
+
+    def test_created_by_does_not_grant_edit_permission(self):
+        actual_owner = User.objects.create_user(
+            username="different_hub_owner",
+            email="different_hub_owner@example.com",
+            password="TestPassword123!",
+        )
+        hub = self.create_hub(owner=actual_owner)
+
+        response = self.client.patch(
+            f"/api/hubs/{hub.id}/",
+            {"name": "Creator Must Not Edit"},
+            format="json",
+        )
+        detail_response = self.client.get(f"/api/hubs/{hub.id}/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertFalse(detail_response.data["can_edit"])
+        self.assertFalse(detail_response.data["can_edit_membership_policy"])
+        hub.refresh_from_db()
+        self.assertEqual(hub.name, "Test Hub 1")
+
+    def test_protected_fields_are_rejected(self):
+        hub = self.create_hub()
+        other_user = User.objects.create_user(
+            username="protected_field_user",
+            email="protected_field_user@example.com",
+            password="TestPassword123!",
+        )
+        protected_payload = {
+            "id": str(uuid_module.uuid4()),
+            "slug": "client-slug",
+            "owner": str(other_user.id),
+            "created_by": str(other_user.id),
+            "visibility": "private",
+            "is_verified": True,
+            "is_active": False,
+            "created_at": "2025-01-01T00:00:00Z",
+            "updated_at": "2025-01-01T00:00:00Z",
+            "memberships": [],
+            "contact_email": "private@example.com",
+        }
+
+        response = self.client.patch(
+            f"/api/hubs/{hub.id}/",
+            protected_payload,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        for field in protected_payload:
+            self.assertIn(field, response.data)
+        hub.refresh_from_db()
+        self.assertEqual(hub.slug, "test-hub-1")
+        self.assertEqual(hub.owner, self.user)
+        self.assertEqual(hub.created_by, self.user)
+        self.assertEqual(hub.visibility, Hub.Visibility.PUBLIC)
+        self.assertFalse(hub.is_verified)
+        self.assertTrue(hub.is_active)
+        self.assertEqual(hub.memberships.count(), 0)
+
+    def test_detail_capability_flags_match_owner_and_membership_state(self):
+        hub = self.create_hub()
+        self.assertEqual(
+            self.client.get(f"/api/hubs/{hub.id}/").data["can_edit"],
+            True,
+        )
+        self.assertTrue(
+            self.client.get(f"/api/hubs/{hub.id}/").data[
+                "can_edit_membership_policy"
+            ]
+        )
+
+        cases = [
+            ("approved_admin", HubMembership.Role.ADMIN, HubMembership.Status.APPROVED, True),
+            ("pending_admin", HubMembership.Role.ADMIN, HubMembership.Status.PENDING, False),
+            ("rejected_admin", HubMembership.Role.ADMIN, HubMembership.Status.REJECTED, False),
+            ("editor", HubMembership.Role.EDITOR, HubMembership.Status.APPROVED, False),
+            ("member", HubMembership.Role.MEMBER, HubMembership.Status.APPROVED, False),
+        ]
+        for suffix, role, membership_status, expected_can_edit in cases:
+            with self.subTest(role=role, status=membership_status):
+                user = User.objects.create_user(
+                    username=f"capability_{suffix}",
+                    email=f"capability_{suffix}@example.com",
+                    password="TestPassword123!",
+                )
+                HubMembership.objects.create(
+                    hub=hub,
+                    user=user,
+                    role=role,
+                    status=membership_status,
+                )
+                self.client.credentials(
+                    HTTP_AUTHORIZATION=(
+                        f"Bearer {RefreshToken.for_user(user).access_token}"
+                    )
+                )
+                response = self.client.get(f"/api/hubs/{hub.id}/")
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data["can_edit"], expected_can_edit)
+                self.assertFalse(response.data["can_edit_membership_policy"])
+
+    def test_update_returns_validation_errors_for_invalid_values(self):
+        hub = self.create_hub()
+        invalid_payloads = [
+            ({"name": ""}, "name"),
+            ({"name": "x" * 201}, "name"),
+            ({"hub_type": "invalid"}, "hub_type"),
+            ({"membership_policy": "invalid"}, "membership_policy"),
+            ({"website": "not-a-url"}, "website"),
+            ({"logo": "not-a-url"}, "logo"),
+            ({"city": "x" * 101}, "city"),
+        ]
+
+        for payload, field in invalid_payloads:
+            with self.subTest(field=field):
+                response = self.client.patch(
+                    f"/api/hubs/{hub.id}/",
+                    payload,
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(field, response.data)
+
+        hub.refresh_from_db()
+        self.assertEqual(hub.name, "Test Hub 1")
+

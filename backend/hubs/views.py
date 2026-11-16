@@ -6,11 +6,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Hub
+from .permissions import CanEditHub
 from .serializers import (
     HubCreateSerializer,
     HubDetailSerializer,
     HubDiscoveryQuerySerializer,
     HubListSerializer,
+    HubUpdateSerializer,
 )
 
 
@@ -97,9 +99,24 @@ class HubDiscoveryView(generics.ListCreateAPIView):
         return queryset.order_by("-created_at", "-id")
 
 
-class HubDetailView(generics.RetrieveAPIView):
+class HubDetailView(generics.RetrieveUpdateAPIView):
     queryset = Hub.objects.filter(is_active=True)
     serializer_class = HubDetailSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanEditHub]
+    http_method_names = ["get", "patch", "head", "options"]
     lookup_field = "id"
     lookup_url_kwarg = "hub_id"
+
+    def get_serializer_class(self):
+        if self.request.method == "PATCH":
+            return HubUpdateSerializer
+        return HubDetailSerializer
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        hub = self.get_object()
+        response.data = HubDetailSerializer(
+            hub,
+            context=self.get_serializer_context(),
+        ).data
+        return response

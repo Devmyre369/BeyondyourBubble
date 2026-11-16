@@ -1,5 +1,6 @@
 from django.db.models import Q
 from rest_framework import generics
+from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -16,19 +17,28 @@ class HubPagination(PageNumberPagination):
     page_size = 10
     page_query_param = "page"
 
+    def paginate_queryset(self, queryset, request, view=None):
+        page_number = request.query_params.get(self.page_query_param, "1")
+
+        try:
+            page_number = int(page_number)
+            if page_number < 1:
+                raise ValueError
+        except (TypeError, ValueError):
+            raise NotFound("Invalid page number.")
+
+        self.page_number = page_number
+        self.count = queryset.count()
+        start = (page_number - 1) * self.page_size
+        self.end = start + self.page_size
+
+        return list(queryset[start:self.end])
+
     def get_paginated_response(self, data):
         return Response({
-            "count": self.page.paginator.count,
-            "next": (
-                self.page.next_page_number()
-                if self.page.has_next()
-                else None
-            ),
-            "previous": (
-                self.page.previous_page_number()
-                if self.page.has_previous()
-                else None
-            ),
+            "count": self.count,
+            "next": self.page_number + 1 if self.end < self.count else None,
+            "previous": self.page_number - 1 if self.page_number > 1 else None,
             "results": data,
         })
 

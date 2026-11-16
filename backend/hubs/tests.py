@@ -795,6 +795,7 @@ class HubDiscoveryAPITests(APITestCase):
 
         first_page = self.client.get("/api/hubs/?page=1")
         second_page = self.client.get("/api/hubs/?page=2")
+        beyond_last_page = self.client.get("/api/hubs/?page=3")
 
         self.assertEqual(first_page.status_code, 200)
         self.assertEqual(first_page.data["count"], 11)
@@ -806,6 +807,23 @@ class HubDiscoveryAPITests(APITestCase):
         self.assertEqual(len(second_page.data["results"]), 1)
         self.assertIsNone(second_page.data["next"])
         self.assertEqual(second_page.data["previous"], 1)
+
+        self.assertEqual(beyond_last_page.status_code, 200)
+        self.assertEqual(beyond_last_page.data["count"], 11)
+        self.assertEqual(beyond_last_page.data["results"], [])
+        self.assertIsNone(beyond_last_page.data["next"])
+        self.assertEqual(beyond_last_page.data["previous"], 2)
+
+    def test_discovery_rejects_invalid_page_values_like_feed(self):
+        for page in ("invalid", "0", "-1"):
+            with self.subTest(page=page):
+                response = self.client.get(f"/api/hubs/?page={page}")
+
+                self.assertEqual(response.status_code, 404)
+                self.assertEqual(
+                    response.data,
+                    {"detail": "Invalid page number."},
+                )
 
     def test_invalid_hub_type_returns_bad_request(self):
         response = self.client.get("/api/hubs/?hub_type=invalid")

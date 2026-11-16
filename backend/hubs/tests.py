@@ -6,6 +6,8 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase
 
 from rest_framework.exceptions import ValidationError, PermissionDenied
+from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.contrib.auth import get_user_model
 
@@ -620,8 +622,8 @@ class HubVisibilityMigrationTests(TransactionTestCase):
                 hub_type="company",
                 visibility="private",
                 membership_policy="approval_required",
-                created_by=user,
-                owner=user,
+                created_by_id=user.pk,
+                owner_id=user.pk,
             ).pk
             for index in range(2)
         ]
@@ -648,4 +650,222 @@ class HubVisibilityMigrationTests(TransactionTestCase):
             set(hubs.values_list("membership_policy", flat=True)),
             {"approval_required"},
         )
+
+
+class HubDiscoveryAPITests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="hub_api_user",
+            email="hub_api_user@example.com",
+            password="TestPassword123!",
+        )
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}"
+        )
+        self.hub_counter = 0
+
+    def create_hub(self, **overrides):
+        self.hub_counter += 1
+        defaults = {
+            "name": f"Test Hub {self.hub_counter}",
+            "slug": f"test-hub-{self.hub_counter}",
+            "hub_type": Hub.HubType.COMPANY,
+            "short_description": "",
+            "description": "",
+            "logo": "",
+            "cover_image": "",
+            "website": "",
+            "city": "Lucknow",
+            "college_or_parent_organisation": "",
+            "contact_email": "",
+            "created_by": self.user,
+            "owner": self.user,
+        }
+        defaults.update(overrides)
+        return Hub.objects.create(**defaults)
+
+    def test_discovery_requires_authentication(self):
+        self.client.credentials()
+
+        response = self.client.get("/api/hubs/")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_detail_requires_authentication(self):
+        hub = self.create_hub()
+        self.client.credentials()
+
+        response = self.client.get(f"/api/hubs/{hub.id}/")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_discovery_returns_active_hubs_only(self):
+        active_hub = self.create_hub()
+        inactive_hub = self.create_hub(
+            name="Inactive Hub",
+            slug="inactive-hub",
+            is_active=False,
+        )
+
+        response = self.client.get("/api/hubs/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            [item["id"] for item in response.data["results"]],
+            [str(active_hub.id)],
+        )
+        self.assertNotIn(
+            str(inactive_hub.id),
+            [item["id"] for item in response.data["results"]],
+        )
+
+    def test_discovery_filters_by_type_and_city(self):
+        matching_hub = self.create_hub(
+            name="Lucknow Community",
+            slug="lucknow-community",
+            hub_type=Hub.HubType.COMMUNITY,
+            city="Lucknow",
+        )
+        self.create_hub(
+            name="Company in Lucknow",
+            slug="company-in-lucknow",
+            hub_type=Hub.HubType.COMPANY,
+            city="Lucknow",
+        )
+        self.create_hub(
+            name="Community in Delhi",
+            slug="community-in-delhi",
+            hub_type=Hub.HubType.COMMUNITY,
+            city="Delhi",
+        )
+
+        response = self.client.get(
+            "/api/hubs/?hub_type=community&city=lucknow"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            response.data["results"][0]["id"],
+            str(matching_hub.id),
+        )
+
+    def test_discovery_searches_name_and_descriptions(self):
+        name_match = self.create_hub(
+            name="Robotics Society",
+            slug="robotics-society",
+        )
+        description_match = self.create_hub(
+            name="Engineering Hub",
+            slug="engineering-hub",
+            description="A place for robotics projects.",
+        )
+        short_description_match = self.create_hub(
+            name="Student Makers",
+            slug="student-makers",
+            short_description="Robotics enthusiasts welcome.",
+        )
+        self.create_hub(
+            name="Art Circle",
+            slug="art-circle",
+            description="Painting and design.",
+        )
+
+        response = self.client.get("/api/hubs/?search=ROBOTICS")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(
+            {item["id"] for item in response.data["results"]},
+            {
+                str(name_match.id),
+                str(description_match.id),
+                str(short_description_match.id),
+            },
+        )
+
+    def test_discovery_uses_ten_item_page_number_pagination(self):
+        for index in range(11):
+            self.create_hub(
+                name=f"Paginated Hub {index}",
+                slug=f"paginated-hub-{index}",
+            )
+
+        first_page = self.client.get("/api/hubs/?page=1")
+        second_page = self.client.get("/api/hubs/?page=2")
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(first_page.data["count"], 11)
+        self.assertEqual(len(first_page.data["results"]), 10)
+        self.assertEqual(first_page.data["next"], 2)
+        self.assertIsNone(first_page.data["previous"])
+
+        self.assertEqual(second_page.status_code, 200)
+        self.assertEqual(len(second_page.data["results"]), 1)
+        self.assertIsNone(second_page.data["next"])
+        self.assertEqual(second_page.data["previous"], 1)
+
+    def test_invalid_hub_type_returns_bad_request(self):
+        response = self.client.get("/api/hubs/?hub_type=invalid")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("hub_type", response.data)
+
+    def test_detail_returns_public_fields_without_internal_fields(self):
+        hub = self.create_hub(
+            name="Detail Hub",
+            slug="detail-hub",
+            short_description="A short description.",
+            description="A full description.",
+            logo="https://example.com/logo.png",
+            cover_image="https://example.com/cover.png",
+            website="https://example.com",
+            city="Lucknow",
+            college_or_parent_organisation="BYB University",
+            contact_email="private@example.com",
+            is_verified=True,
+        )
+
+        response = self.client.get(f"/api/hubs/{hub.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], str(hub.id))
+        self.assertEqual(response.data["name"], "Detail Hub")
+        self.assertEqual(response.data["slug"], "detail-hub")
+        self.assertEqual(response.data["hub_type"], Hub.HubType.COMPANY)
+        self.assertEqual(response.data["short_description"], "A short description.")
+        self.assertEqual(response.data["description"], "A full description.")
+        self.assertEqual(response.data["logo"], "https://example.com/logo.png")
+        self.assertEqual(response.data["cover_image"], "https://example.com/cover.png")
+        self.assertEqual(response.data["website"], "https://example.com")
+        self.assertEqual(response.data["city"], "Lucknow")
+        self.assertEqual(
+            response.data["college_or_parent_organisation"],
+            "BYB University",
+        )
+        self.assertTrue(response.data["is_verified"])
+        self.assertTrue(response.data["created_at"])
+        self.assertNotIn("contact_email", response.data)
+        self.assertNotIn("owner", response.data)
+        self.assertNotIn("created_by", response.data)
+
+    def test_detail_returns_not_found_for_inactive_hub(self):
+        hub = self.create_hub(
+            name="Inactive Detail Hub",
+            slug="inactive-detail-hub",
+            is_active=False,
+        )
+
+        response = self.client.get(f"/api/hubs/{hub.id}/")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_detail_returns_not_found_for_nonexistent_hub(self):
+        response = self.client.get(
+            "/api/hubs/00000000-0000-0000-0000-000000000000/"
+        )
+
+        self.assertEqual(response.status_code, 404)
 

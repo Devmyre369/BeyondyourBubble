@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
+import HubCreateModal from './HubCreateModal'
 import {
   hubsApi,
   type HubDiscoveryResponse,
@@ -133,9 +134,11 @@ function HubCard({ hub }: { hub: HubListItem }) {
 }
 
 export default function HubDiscoverPage() {
+  const navigate = useNavigate()
   const pendingRequests = useRef(
     new Map<string, Promise<HubDiscoveryResponse>>(),
   )
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [query, setQuery] = useState<DiscoveryQuery>({
     search: '',
@@ -245,6 +248,21 @@ export default function HubDiscoverPage() {
             Discover the colleges, clubs, organisations, and communities
             shaping what comes next.
           </p>
+          <button
+            className="hub-create-trigger"
+            type="button"
+            onClick={() => setIsCreateModalOpen(true)}
+          >
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path
+                d="M10 4v12M4 10h12"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+            Create Hub
+          </button>
         </div>
         <div className="hub-discover-header-art" aria-hidden="true">
           <span className="hub-discover-orbit hub-discover-orbit-outer" />
@@ -426,6 +444,16 @@ export default function HubDiscoverPage() {
           )}
         </div>
       </section>
+
+      {isCreateModalOpen && (
+        <HubCreateModal
+          onClose={() => setIsCreateModalOpen(false)}
+          onCreated={(hub) => {
+            setIsCreateModalOpen(false)
+            navigate(`/hubs/${hub.id}`)
+          }}
+        />
+      )}
     </section>
   )
 }

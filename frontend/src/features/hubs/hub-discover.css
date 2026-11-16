@@ -50,6 +50,42 @@
   line-height: 1.75;
 }
 
+.hub-create-trigger {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 15px 0 12px;
+  margin-top: 17px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--byb-crimson-dark), var(--byb-crimson));
+  border: 1px solid var(--byb-crimson-border);
+  border-radius: var(--byb-radius-md);
+  box-shadow: 0 8px 22px rgba(229, 57, 79, 0.18);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    box-shadow var(--byb-transition-fast),
+    transform var(--byb-transition-fast);
+}
+
+.hub-create-trigger svg {
+  width: 18px;
+  height: 18px;
+}
+
+.hub-create-trigger:hover {
+  box-shadow: 0 10px 28px rgba(229, 57, 79, 0.28);
+  transform: translateY(-1px);
+}
+
+.hub-create-trigger:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
 .hub-discover-header-art {
   position: relative;
   display: grid;

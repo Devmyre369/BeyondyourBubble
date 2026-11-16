@@ -8,6 +8,8 @@ export type HubType =
   | 'company'
   | 'community'
 
+export type HubMembershipPolicy = 'open' | 'approval_required'
+
 export interface HubDiscoveryParams {
   hub_type?: HubType
   city?: string
@@ -34,6 +36,21 @@ export interface HubDetail extends HubListItem {
   website: string
 }
 
+export interface HubCreateRequest {
+  name: string
+  hub_type: HubType
+  visibility?: 'public'
+  membership_policy?: HubMembershipPolicy
+  short_description?: string
+  description?: string
+  logo?: string
+  cover_image?: string
+  website?: string
+  contact_email?: string
+  city?: string
+  college_or_parent_organisation?: string
+}
+
 export interface HubDiscoveryResponse {
   count: number
   next: number | null
@@ -53,6 +70,11 @@ export const hubsApi = {
     const response = await api.get<HubDetail>(
       `/hubs/${encodeURIComponent(hubId)}/`,
     )
+    return response.data
+  },
+
+  createHub: async (data: HubCreateRequest): Promise<HubDetail> => {
+    const response = await api.post<HubDetail>('/hubs/', data)
     return response.data
   },
 }

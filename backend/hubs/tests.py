@@ -12,6 +12,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 
 from .models import Hub, HubMembership, HubApplication
+from .serializers import HubDetailSerializer
 
 User = get_user_model()
 
@@ -699,6 +700,256 @@ class HubDiscoveryAPITests(APITestCase):
         response = self.client.get(f"/api/hubs/{hub.id}/")
 
         self.assertEqual(response.status_code, 401)
+
+    def test_create_requires_authentication(self):
+        self.client.credentials()
+
+        response = self.client.post(
+            "/api/hubs/",
+            {
+                "name": "Unauthenticated Hub",
+                "hub_type": Hub.HubType.COMMUNITY,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(Hub.objects.count(), 0)
+
+    def test_create_returns_safe_detail_representation(self):
+        response = self.client.post(
+            "/api/hubs/",
+            {
+                "name": "Robotics Society",
+                "hub_type": Hub.HubType.COLLEGE_CLUB,
+                "description": "A campus robotics community.",
+                "contact_email": "private@example.com",
+                "city": "Lucknow",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["name"], "Robotics Society")
+        self.assertEqual(response.data["slug"], "robotics-society")
+        self.assertEqual(response.data["hub_type"], Hub.HubType.COLLEGE_CLUB)
+        self.assertEqual(
+            response.data["description"],
+            "A campus robotics community.",
+        )
+        self.assertEqual(response.data["city"], "Lucknow")
+        self.assertFalse(response.data["is_verified"])
+        self.assertTrue(response.data["created_at"])
+        self.assertNotIn("contact_email", response.data)
+        self.assertNotIn("owner", response.data)
+        self.assertNotIn("created_by", response.data)
+        self.assertNotIn("is_active", response.data)
+
+        self.assertEqual(
+            set(response.data),
+            set(HubDetailSerializer.Meta.fields),
+        )
+
+    def test_create_supports_all_hub_categories(self):
+        for hub_type, _ in Hub.HubType.choices:
+            with self.subTest(hub_type=hub_type):
+                response = self.client.post(
+                    "/api/hubs/",
+                    {
+                        "name": f"Hub for {hub_type}",
+                        "hub_type": hub_type,
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 201)
+                self.assertEqual(response.data["hub_type"], hub_type)
+
+    def test_create_supports_both_membership_policies_and_default(self):
+        for index, policy in enumerate(Hub.MembershipPolicy.values):
+            with self.subTest(policy=policy):
+                response = self.client.post(
+                    "/api/hubs/",
+                    {
+                        "name": f"Policy Hub {index}",
+                        "hub_type": Hub.HubType.COMMUNITY,
+                        "membership_policy": policy,
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 201)
+                hub = Hub.objects.get(id=response.data["id"])
+                self.assertEqual(hub.membership_policy, policy)
+
+        default_response = self.client.post(
+            "/api/hubs/",
+            {
+                "name": "Default Policy Hub",
+                "hub_type": Hub.HubType.COMMUNITY,
+            },
+            format="json",
+        )
+
+        self.assertEqual(default_response.status_code, 201)
+        default_hub = Hub.objects.get(id=default_response.data["id"])
+        self.assertEqual(
+            default_hub.membership_policy,
+            Hub.MembershipPolicy.APPROVAL_REQUIRED,
+        )
+
+    def test_create_generates_unique_slugs_for_duplicate_names(self):
+        first_response = self.client.post(
+            "/api/hubs/",
+            {"name": "Community Hub", "hub_type": Hub.HubType.COMMUNITY},
+            format="json",
+        )
+        second_response = self.client.post(
+            "/api/hubs/",
+            {"name": "Community Hub", "hub_type": Hub.HubType.COMMUNITY},
+            format="json",
+        )
+
+        self.assertEqual(first_response.status_code, 201)
+        self.assertEqual(second_response.status_code, 201)
+        self.assertEqual(first_response.data["slug"], "community-hub")
+        self.assertEqual(second_response.data["slug"], "community-hub-2")
+        self.assertEqual(
+            Hub.objects.filter(name="Community Hub").count(),
+            2,
+        )
+
+    def test_create_assigns_owner_creator_and_approved_owner_membership(self):
+        response = self.client.post(
+            "/api/hubs/",
+            {"name": "Owned Hub", "hub_type": Hub.HubType.ORGANISATION},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        hub = Hub.objects.get(id=response.data["id"])
+        self.assertEqual(hub.owner, self.user)
+        self.assertEqual(hub.created_by, self.user)
+
+        membership = HubMembership.objects.get(hub=hub, user=self.user)
+        self.assertEqual(membership.role, HubMembership.Role.OWNER)
+        self.assertEqual(membership.status, HubMembership.Status.APPROVED)
+        self.assertIsNotNone(membership.joined_at)
+
+    def test_create_rejects_private_visibility(self):
+        response = self.client.post(
+            "/api/hubs/",
+            {
+                "name": "Private Hub",
+                "hub_type": Hub.HubType.COMMUNITY,
+                "visibility": "private",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("visibility", response.data)
+        self.assertEqual(Hub.objects.count(), 0)
+
+    def test_create_ignores_attempts_to_override_protected_fields(self):
+        other_user = User.objects.create_user(
+            username="hub_attacker",
+            email="hub_attacker@example.com",
+            password="TestPassword123!",
+        )
+        response = self.client.post(
+            "/api/hubs/",
+            {
+                "name": "Protected Fields Hub",
+                "hub_type": Hub.HubType.COMPANY,
+                "slug": "client-chosen-slug",
+                "owner": str(other_user.id),
+                "created_by": str(other_user.id),
+                "is_active": False,
+                "is_verified": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        hub = Hub.objects.get(id=response.data["id"])
+        self.assertEqual(hub.slug, "protected-fields-hub")
+        self.assertEqual(hub.owner, self.user)
+        self.assertEqual(hub.created_by, self.user)
+        self.assertTrue(hub.is_active)
+        self.assertFalse(hub.is_verified)
+
+    def test_create_rejects_missing_and_invalid_fields(self):
+        invalid_payloads = [
+            ({"hub_type": Hub.HubType.COMMUNITY}, "name"),
+            ({"name": "Missing type"}, "hub_type"),
+            (
+                {"name": "Invalid type", "hub_type": "invalid"},
+                "hub_type",
+            ),
+            (
+                {
+                    "name": "Invalid policy",
+                    "hub_type": Hub.HubType.COMMUNITY,
+                    "membership_policy": "invalid",
+                },
+                "membership_policy",
+            ),
+            (
+                {
+                    "name": "Invalid website",
+                    "hub_type": Hub.HubType.COMMUNITY,
+                    "website": "not-a-url",
+                },
+                "website",
+            ),
+            (
+                {
+                    "name": "Invalid email",
+                    "hub_type": Hub.HubType.COMMUNITY,
+                    "contact_email": "not-an-email",
+                },
+                "contact_email",
+            ),
+            (
+                {
+                    "name": "Invalid description",
+                    "hub_type": Hub.HubType.COMMUNITY,
+                    "short_description": "x" * 301,
+                },
+                "short_description",
+            ),
+        ]
+
+        for payload, field in invalid_payloads:
+            with self.subTest(field=field):
+                response = self.client.post(
+                    "/api/hubs/",
+                    payload,
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(field, response.data)
+
+        self.assertEqual(Hub.objects.count(), 0)
+
+    def test_create_rolls_back_hub_when_owner_membership_fails(self):
+        with patch(
+            "hubs.services.hub_creation_service.HubMembership.objects.create",
+            side_effect=IntegrityError("membership creation failed"),
+        ):
+            with self.assertRaises(IntegrityError):
+                self.client.post(
+                    "/api/hubs/",
+                    {
+                        "name": "Atomic Hub",
+                        "hub_type": Hub.HubType.COMMUNITY,
+                    },
+                    format="json",
+                )
+
+        self.assertFalse(Hub.objects.filter(name="Atomic Hub").exists())
 
     def test_discovery_returns_active_hubs_only(self):
         active_hub = self.create_hub()

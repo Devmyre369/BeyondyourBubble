@@ -1,5 +1,5 @@
 from django.db.models import Q
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from .models import Hub
 from .serializers import (
+    HubCreateSerializer,
     HubDetailSerializer,
     HubDiscoveryQuerySerializer,
     HubListSerializer,
@@ -43,10 +44,30 @@ class HubPagination(PageNumberPagination):
         })
 
 
-class HubDiscoveryView(generics.ListAPIView):
+class HubDiscoveryView(generics.ListCreateAPIView):
     serializer_class = HubListSerializer
     pagination_class = HubPagination
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return HubCreateSerializer
+        return HubListSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        hub = serializer.save()
+        response_data = HubDetailSerializer(
+            hub,
+            context=self.get_serializer_context(),
+        ).data
+        headers = self.get_success_headers(response_data)
+        return Response(
+            response_data,
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
 
     def get_queryset(self):
         query_serializer = HubDiscoveryQuerySerializer(

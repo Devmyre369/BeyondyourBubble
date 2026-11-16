@@ -316,6 +316,95 @@
   background: var(--byb-bg);
 }
 
+.byb-create-toolbar {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-start;
+  padding: 12px clamp(16px, 3vw, 40px) 0;
+}
+
+.byb-create-menu {
+  position: relative;
+}
+
+.byb-create-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 15px 5px 6px;
+  color: var(--byb-text);
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-full);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--byb-transition-fast),
+    border-color var(--byb-transition-fast);
+}
+
+.byb-create-button:hover,
+.byb-create-button.active {
+  background: var(--byb-surface-light);
+  border-color: var(--byb-crimson-border);
+}
+
+.byb-create-button:focus-visible,
+.byb-create-options button:focus-visible {
+  outline: 2px solid var(--byb-crimson);
+  outline-offset: 3px;
+}
+
+.byb-create-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: #fff;
+  background: var(--byb-crimson);
+  border-radius: 50%;
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.byb-create-options {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 10px);
+  left: 0;
+  display: grid;
+  gap: 4px;
+  width: min(220px, calc(100vw - 32px));
+  padding: 7px;
+  background: var(--byb-bg-secondary);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-md);
+  box-shadow: var(--byb-shadow-lg);
+}
+
+.byb-create-options[hidden] {
+  display: none;
+}
+
+.byb-create-options button {
+  padding: 11px 12px;
+  color: var(--byb-text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--byb-radius-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.byb-create-options button:hover {
+  background: var(--byb-surface);
+}
+
 /* ========================================
    RIGHT SIDEBAR
 ======================================== */
@@ -521,7 +610,7 @@
     bottom: 0;
     left: 0;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     min-height: 68px;
     padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
     background: rgba(17, 17, 23, 0.96);
@@ -572,60 +661,6 @@
     object-fit: cover;
   }
 
-  .byb-mobile-create {
-    position: relative;
-    display: flex;
-    min-width: 0;
-  }
-
-  .byb-mobile-create-button {
-    width: 100%;
-  }
-
-  .byb-mobile-create-icon {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    color: #fff;
-    background: var(--byb-crimson);
-    border-radius: 50%;
-    font-size: 25px;
-    font-weight: 400;
-    line-height: 1;
-  }
-
-  .byb-mobile-create-options {
-    position: absolute;
-    right: 0;
-    bottom: calc(100% + 10px);
-    display: grid;
-    gap: 4px;
-    width: min(220px, calc(100vw - 100px));
-    padding: 7px;
-    background: var(--byb-bg-secondary);
-    border: 1px solid var(--byb-border);
-    border-radius: var(--byb-radius-md);
-    box-shadow: var(--byb-shadow-lg);
-  }
-
-  .byb-mobile-create-options[hidden] {
-    display: none;
-  }
-
-  .byb-mobile-create-options button {
-    padding: 11px 12px;
-    color: var(--byb-text);
-    background: transparent;
-    border: 0;
-    border-radius: var(--byb-radius-sm);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .byb-mobile-create-options button:hover {
-    background: var(--byb-surface);
-  }
 }
 
 @media (max-width: 380px) {

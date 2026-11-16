@@ -152,44 +152,43 @@ export default function AppLayout() {
       <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
 
       <main className="byb-main-content">
+        <div className="byb-create-toolbar">
+          <div className="byb-create-menu">
+            <div
+              id="byb-create-options"
+              className="byb-create-options"
+              aria-label="Upload options"
+              hidden={!uploadMenuOpen}
+            >
+              <button type="button" onClick={() => openComposer('vibe')}>
+                Upload a vibe
+              </button>
+              <button type="button" onClick={() => openComposer('moment')}>
+                Upload a moment
+              </button>
+            </div>
+            <button
+              type="button"
+              className={`byb-create-button${uploadMenuOpen ? ' active' : ''}`}
+              aria-label="Create a vibe or moment"
+              aria-controls="byb-create-options"
+              aria-expanded={uploadMenuOpen}
+              onClick={() => setUploadMenuOpen((previous) => !previous)}
+            >
+              <span className="byb-create-icon" aria-hidden="true">
+                +
+              </span>
+              <span>Create</span>
+            </button>
+          </div>
+        </div>
         <Outlet />
       </main>
 
       <RightSidebar />
 
       <nav className="byb-mobile-navigation" aria-label="Mobile navigation">
-        {mobileNavigation.slice(0, 2).map(renderNavigationItem)}
-
-        <div className="byb-mobile-create">
-          <div
-            id="byb-mobile-create-options"
-            className="byb-mobile-create-options"
-            aria-label="Upload options"
-            hidden={!uploadMenuOpen}
-          >
-            <button type="button" onClick={() => openComposer('vibe')}>
-              Upload a vibe
-            </button>
-            <button type="button" onClick={() => openComposer('moment')}>
-              Upload a moment
-            </button>
-          </div>
-          <button
-            type="button"
-            className={`byb-mobile-nav-item byb-mobile-create-button${uploadMenuOpen ? ' active' : ''}`}
-            aria-label="Create a vibe or moment"
-            aria-controls="byb-mobile-create-options"
-            aria-expanded={uploadMenuOpen}
-            onClick={() => setUploadMenuOpen((previous) => !previous)}
-          >
-            <span className="byb-mobile-create-icon" aria-hidden="true">
-              +
-            </span>
-            <span>Create</span>
-          </button>
-        </div>
-
-        {mobileNavigation.slice(2).map(renderNavigationItem)}
+        {mobileNavigation.map(renderNavigationItem)}
       </nav>
     </div>
   )

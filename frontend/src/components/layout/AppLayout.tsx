@@ -104,14 +104,49 @@ export default function AppLayout() {
     if (!mobileSidebarOpen) return
 
     const previousBodyOverflow = document.body.style.overflow
+    const menuButton = mobileMenuButtonRef.current
     document.body.style.overflow = 'hidden'
-    window.requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>('.byb-sidebar-toggle')?.focus()
+    const focusFrame = window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>('#byb-main-sidebar .byb-sidebar-toggle')
+        ?.focus()
     })
+    const handleSidebarKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileSidebarOpen(false)
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const sidebar = document.getElementById('byb-main-sidebar')
+      if (!sidebar) return
+      const focusableElements = Array.from(
+        sidebar.querySelectorAll<HTMLElement>(
+          'a[href], button:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.offsetParent !== null)
+      const firstElement = focusableElements[0]
+      const lastElement = focusableElements[focusableElements.length - 1]
+      if (!firstElement || !lastElement) return
+
+      if (!sidebar.contains(document.activeElement)) {
+        event.preventDefault()
+        firstElement.focus()
+      } else if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault()
+        lastElement.focus()
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault()
+        firstElement.focus()
+      }
+    }
+    window.addEventListener('keydown', handleSidebarKeyDown)
 
     return () => {
+      window.removeEventListener('keydown', handleSidebarKeyDown)
+      window.cancelAnimationFrame(focusFrame)
       document.body.style.overflow = previousBodyOverflow
-      mobileMenuButtonRef.current?.focus()
+      if (menuButton?.isConnected) menuButton.focus()
     }
   }, [mobileSidebarOpen])
 
@@ -190,7 +225,6 @@ export default function AppLayout() {
         onNavigate={() => {
           if (isMobile) setMobileSidebarOpen(false)
         }}
-        mobileOpen={mobileSidebarOpen}
       />
 
       <main className="byb-main-content">
@@ -203,14 +237,20 @@ export default function AppLayout() {
               aria-label={mobileSidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
               aria-controls="byb-main-sidebar"
               aria-expanded={mobileSidebarOpen}
-              onClick={() => setMobileSidebarOpen((previous) => !previous)}
+              onClick={() => {
+                setUploadMenuOpen(false)
+                setMobileSidebarOpen((previous) => !previous)
+              }}
             >
               <span aria-hidden="true" />
               <span aria-hidden="true" />
               <span aria-hidden="true" />
             </button>
           ) : (
-            <span aria-hidden="true" />
+            <span
+              className="byb-header-spacer byb-header-spacer-left"
+              aria-hidden="true"
+            />
           )}
 
           <NavLink
@@ -254,7 +294,10 @@ export default function AppLayout() {
               </button>
             </div>
           ) : (
-            <span aria-hidden="true" />
+            <span
+              className="byb-header-spacer byb-header-spacer-right"
+              aria-hidden="true"
+            />
           )}
         </header>
         <Outlet />

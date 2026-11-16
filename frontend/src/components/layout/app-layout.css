@@ -34,7 +34,7 @@
 .byb-sidebar-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   flex-shrink: 0;
   min-height: 42px;
   margin-bottom: 34px;
@@ -317,15 +317,61 @@
 }
 
 .byb-create-toolbar {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(40px, 1fr) auto minmax(40px, 1fr);
+  align-items: center;
+  min-height: 66px;
+  padding: 8px clamp(16px, 3vw, 40px);
+  background: rgba(13, 13, 18, 0.9);
+  border-bottom: 1px solid var(--byb-border-subtle);
+  backdrop-filter: blur(16px);
+}
+
+.byb-header-brand {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  transform: translate(-50%, -50%);
+  text-decoration: none;
+}
+
+.byb-header-spacer-left {
+  grid-column: 1;
+}
+
+.byb-header-spacer-right {
+  grid-column: 3;
+}
+
+.byb-header-brand .byb-brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 19px;
+}
+
+.byb-header-brand .byb-brand-name {
+  font-size: 22px;
+}
+
+.byb-mobile-menu-button {
   display: none;
-  justify-content: flex-start;
-  padding: 12px clamp(16px, 3vw, 40px) 0;
+}
+
+.byb-mobile-sidebar-backdrop {
+  display: none;
 }
 
 .byb-create-menu {
   position: relative;
+  justify-self: end;
 }
 
 .byb-create-button {
@@ -592,12 +638,122 @@
   }
 
   .byb-create-toolbar {
+    grid-template-columns: minmax(40px, 1fr) auto minmax(40px, 1fr);
+    min-height: 62px;
+    padding: 7px 12px;
+  }
+
+  .byb-create-options {
+    right: 0;
+    left: auto;
+  }
+
+  .byb-create-menu {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .byb-mobile-menu-button {
+    grid-column: 1;
+    grid-row: 1;
     display: flex;
+    width: 40px;
+    height: 40px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 0;
+    color: var(--byb-text-secondary);
+    background: var(--byb-surface);
+    border: 1px solid var(--byb-border);
+    border-radius: var(--byb-radius-md);
+    cursor: pointer;
+  }
+
+  .byb-mobile-menu-button span {
+    width: 17px;
+    height: 2px;
+    background: currentColor;
+    border-radius: 2px;
+  }
+
+  .byb-mobile-menu-button:hover {
+    color: #fff;
+    border-color: var(--byb-crimson-border);
+  }
+
+  .byb-mobile-menu-button:focus-visible {
+    outline: 2px solid var(--byb-crimson);
+    outline-offset: 3px;
   }
 
   .byb-sidebar,
   .byb-sidebar.collapsed {
-    display: none;
+    position: fixed;
+    z-index: 220;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    width: min(300px, calc(100vw - 56px));
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--byb-bg-secondary);
+    box-shadow: var(--byb-shadow-lg);
+    transform: translateX(-105%);
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform var(--byb-transition-normal),
+      visibility 0s linear var(--byb-transition-normal);
+  }
+
+  .byb-app-layout.mobile-sidebar-open .byb-sidebar,
+  .byb-app-layout.mobile-sidebar-open .byb-sidebar.collapsed {
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+    transition-delay: 0s;
+  }
+
+  .byb-sidebar-top,
+  .byb-sidebar.collapsed .byb-sidebar-top {
+    width: 100%;
+    min-height: 38px;
+    justify-content: flex-end;
+    margin-bottom: 22px;
+  }
+
+  .byb-sidebar-scroll,
+  .byb-sidebar.collapsed .byb-sidebar-scroll {
+    width: 100%;
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .byb-sidebar-bottom,
+  .byb-sidebar.collapsed .byb-sidebar-bottom {
+    width: 100%;
+    flex-shrink: 0;
+  }
+
+  .byb-mobile-sidebar-backdrop {
+    position: fixed;
+    z-index: 210;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    background: rgba(5, 5, 9, 0.72);
+    border: 0;
+    backdrop-filter: blur(3px);
   }
 
   .byb-main-content {
@@ -675,5 +831,18 @@
 
   .byb-mobile-nav-item {
     font-size: 9px;
+  }
+
+  .byb-create-toolbar {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .byb-header-brand {
+    gap: 6px;
+  }
+
+  .byb-header-brand .byb-brand-name {
+    font-size: 20px;
   }
 }

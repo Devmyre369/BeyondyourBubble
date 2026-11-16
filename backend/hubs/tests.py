@@ -65,12 +65,48 @@ class HubModelTests(TestCase):
         self.assertIsNotNone(hub.updated_at)
 
     def test_all_supported_hub_types(self):
+        self.assertEqual(
+            {hub_type for hub_type, _ in Hub.HubType.choices},
+            {
+                "college",
+                "college_club",
+                "college_department",
+                "organisation",
+                "company",
+                "community",
+            },
+        )
+
         for hub_type, _ in Hub.HubType.choices:
             hub = self.create_hub(
                 slug=f"hub-{hub_type}",
                 hub_type=hub_type,
             )
             self.assertEqual(hub.hub_type, hub_type)
+
+    def test_all_supported_visibility_values(self):
+        for visibility, _ in Hub.Visibility.choices:
+            hub = self.create_hub(
+                slug=f"hub-visibility-{visibility}",
+                visibility=visibility,
+            )
+            self.assertEqual(hub.visibility, visibility)
+
+    def test_all_supported_membership_policies(self):
+        for policy, _ in Hub.MembershipPolicy.choices:
+            hub = self.create_hub(
+                slug=f"hub-membership-{policy.replace('_', '-')}",
+                membership_policy=policy,
+            )
+            self.assertEqual(hub.membership_policy, policy)
+
+    def test_safe_policy_defaults(self):
+        hub = self.create_hub()
+        self.assertEqual(hub.visibility, Hub.Visibility.PRIVATE)
+        self.assertEqual(
+            hub.membership_policy,
+            Hub.MembershipPolicy.APPROVAL_REQUIRED,
+        )
 
     def test_slug_must_be_unique(self):
         self.create_hub(slug="unique-slug")
@@ -366,6 +402,14 @@ class HubApplicationServiceTests(TestCase):
         self.assertEqual(result["hub"].owner, self.applicant)
         self.assertFalse(result["hub"].is_verified)
         self.assertTrue(result["hub"].is_active)
+        self.assertEqual(
+            result["hub"].visibility,
+            Hub.Visibility.PRIVATE,
+        )
+        self.assertEqual(
+            result["hub"].membership_policy,
+            Hub.MembershipPolicy.APPROVAL_REQUIRED,
+        )
 
         application.refresh_from_db()
         self.assertEqual(application.status, HubApplication.Status.APPROVED)

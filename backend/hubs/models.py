@@ -9,10 +9,20 @@ from django.db.models import Q
 class Hub(models.Model):
 
     class HubType(models.TextChoices):
-        COMPANY = "company", "Company"
-        ORGANISATION = "organisation", "Organisation"
+        COLLEGE = "college", "College"
         COLLEGE_CLUB = "college_club", "College club"
         COLLEGE_DEPARTMENT = "college_department", "College department"
+        ORGANISATION = "organisation", "Organisation"
+        COMPANY = "company", "Company"
+        COMMUNITY = "community", "Community"
+
+    class Visibility(models.TextChoices):
+        PUBLIC = "public", "Public"
+        PRIVATE = "private", "Private"
+
+    class MembershipPolicy(models.TextChoices):
+        OPEN = "open", "Open"
+        APPROVAL_REQUIRED = "approval_required", "Approval required"
 
     id = models.UUIDField(
         primary_key=True,
@@ -30,6 +40,18 @@ class Hub(models.Model):
     hub_type = models.CharField(
         max_length=30,
         choices=HubType.choices,
+    )
+
+    visibility = models.CharField(
+        max_length=10,
+        choices=Visibility.choices,
+        default=Visibility.PRIVATE,
+    )
+
+    membership_policy = models.CharField(
+        max_length=20,
+        choices=MembershipPolicy.choices,
+        default=MembershipPolicy.APPROVAL_REQUIRED,
     )
 
     short_description = models.CharField(

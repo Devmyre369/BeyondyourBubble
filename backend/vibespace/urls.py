@@ -8,7 +8,7 @@ from .views import (
     MomentDetailView,
 )
 
-from .feed_views import FeedView
+from .feed_views import FeedView, ProfilePostsView
 
 from .interaction_views import (
     ContentCommentListCreateView,
@@ -23,6 +23,11 @@ from .interaction_views import (
 urlpatterns = [
     # Feed
     path("feed/", FeedView.as_view(), name="vibespace-feed"),
+    path(
+        "profiles/<str:username>/posts/",
+        ProfilePostsView.as_view(),
+        name="profile-posts",
+    ),
 
     # Vibes
     path("vibes/", VibeListCreateView.as_view(), name="vibe-list-create"),

@@ -1,7 +1,15 @@
 
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../../../context/AuthContext'
+import {
+  profileApi,
+  type ProfileStatistics,
+} from '../../../services/profileApi'
 import VibeSpaceContent from '../components/VibeSpaceContent'
+import ProfileConnectionsList from '../components/ProfileConnectionsList'
+import ProfileSections from '../components/ProfileSections'
+import { resolveProfileSection } from '../components/profileSectionUtils'
 
 import './vibespace.css'
 
@@ -53,6 +61,25 @@ function TagList({
 
 export default function ProfilePage() {
   const { user, profile } = useAuth()
+  const { section: sectionParam } = useParams()
+  const section = resolveProfileSection(sectionParam)
+  const [statistics, setStatistics] = useState<ProfileStatistics | null>(null)
+  const [statisticsError, setStatisticsError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    void profileApi.getMyProfileOverview()
+      .then((overview) => {
+        if (active) setStatistics(overview.statistics)
+      })
+      .catch((error: unknown) => {
+        console.error('Unable to load profile statistics:', error)
+        if (active) setStatisticsError('Unable to load profile statistics.')
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   if (!profile) {
     return null
@@ -139,11 +166,24 @@ export default function ProfilePage() {
           )}
         </section>
 
+        {statisticsError && (
+          <p className="profile-list-error" role="alert">{statisticsError}</p>
+        )}
+        {statistics && (
+          <ProfileSections
+            basePath="/profile"
+            statistics={statistics}
+            activeSection={section}
+          />
+        )}
+
         {/* PROFILE CONTENT */}
 
         <div className="vibespace-content-grid">
           <div className="vibespace-main-column">
 
+            {section !== 'followers' && section !== 'following' && (
+            <>
             {/* ABOUT ME */}
 
             <section className="vibespace-section">
@@ -207,8 +247,18 @@ export default function ProfilePage() {
             <VibeSpaceContent
               key={user?.username || 'anonymous'}
               username={profile.username || user?.username || ''}
+              section={section}
             />
+            </>
+            )}
 
+            {(section === 'followers' || section === 'following') && (
+              <ProfileConnectionsList
+                key={`${profile.username}:${section}`}
+                username={profile.username || user?.username || ''}
+                relationship={section}
+              />
+            )}
           </div>
 
           {/* PROFILE SIDEBAR */}

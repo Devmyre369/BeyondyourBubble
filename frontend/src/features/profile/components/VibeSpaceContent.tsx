@@ -14,12 +14,15 @@ import vibespaceApi, {
   type PostCounts,
   type Revibe,
   type SavedContent,
+  type ProfilePost,
   type Vibe,
 } from '../../../services/vibespaceApi'
 import PostActionIcon from '../../vibespace/components/PostActionIcon'
+import type { ProfileSection } from './profileSectionUtils'
 
 interface VibeSpaceContentProps {
   username: string
+  section?: Extract<ProfileSection, 'posts' | 'vibes' | 'moments'>
 }
 
 type ContentType = 'vibe' | 'moment'
@@ -32,6 +35,7 @@ type SavedState = Record<string, string>
 
 export default function VibeSpaceContent({
   username,
+  section = 'posts',
 }: VibeSpaceContentProps) {
   const { user, isAuthenticated } = useAuth()
 
@@ -42,6 +46,8 @@ export default function VibeSpaceContent({
   const [moments, setMoments] = useState<Moment[]>([])
 
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [nextPage, setNextPage] = useState<number | null>(null)
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -120,16 +126,54 @@ export default function VibeSpaceContent({
     let active = true
 
     const loadContent = async () => {
+      setLoading(true)
+      setError('')
+      setVibes([])
+      setMoments([])
+      setNextPage(null)
+
       try {
-        const [vibeData, momentData] = await Promise.all([
-          vibespaceApi.getVibes(username),
-          vibespaceApi.getMoments(username),
-        ])
+        let vibeData: Vibe[] = []
+        let momentData: Moment[] = []
+        let pageResponse:
+          | Awaited<ReturnType<typeof vibespaceApi.getProfilePosts>>
+          | Awaited<ReturnType<typeof vibespaceApi.getProfileVibes>>
+          | Awaited<ReturnType<typeof vibespaceApi.getProfileMoments>>
+
+        if (section === 'posts') {
+          pageResponse = await vibespaceApi.getProfilePosts(username, 1)
+          const posts = pageResponse.results as ProfilePost[]
+          vibeData = posts
+            .filter((post) => post.content_type === 'vibe')
+            .map((post) => ({
+              ...post,
+              author_username: post.author_username,
+              event: post.event_id,
+              text: post.content_text,
+              updated_at: post.created_at,
+            }))
+          momentData = posts
+            .filter((post) => post.content_type === 'moment')
+            .map((post) => ({
+              ...post,
+              author_username: post.author_username,
+              event: post.event_id,
+              image_url: post.image_url,
+              caption: post.content_text,
+              updated_at: post.created_at,
+            }))
+        } else if (section === 'vibes') {
+          pageResponse = await vibespaceApi.getProfileVibes(username, 1)
+          vibeData = pageResponse.results
+        } else {
+          pageResponse = await vibespaceApi.getProfileMoments(username, 1)
+          momentData = pageResponse.results
+        }
 
         if (!active) return
-        setError('')
         setVibes(vibeData)
         setMoments(momentData)
+        setNextPage(pageResponse.next)
         setCounts(
           Object.fromEntries([
             ...vibeData.map((item) => [getKey('vibe', item.id), item]),
@@ -150,7 +194,69 @@ export default function VibeSpaceContent({
     return () => {
       active = false
     }
-  }, [username])
+  }, [section, username])
+
+  const loadMore = async () => {
+    if (nextPage === null) return
+    setLoadingMore(true)
+    setError('')
+
+    try {
+      if (section === 'posts') {
+        const page = await vibespaceApi.getProfilePosts(username, nextPage)
+        const newVibes: Vibe[] = page.results
+          .filter((post) => post.content_type === 'vibe')
+          .map((post) => ({
+            ...post,
+            event: post.event_id,
+            text: post.content_text,
+            updated_at: post.created_at,
+          }))
+        const newMoments: Moment[] = page.results
+          .filter((post) => post.content_type === 'moment')
+          .map((post) => ({
+            ...post,
+            event: post.event_id,
+            caption: post.content_text,
+            updated_at: post.created_at,
+          }))
+        setVibes((previous) => [...previous, ...newVibes])
+        setMoments((previous) => [...previous, ...newMoments])
+        setCounts((previous) => ({
+          ...previous,
+          ...Object.fromEntries([
+            ...newVibes.map((item) => [getKey('vibe', item.id), item]),
+            ...newMoments.map((item) => [getKey('moment', item.id), item]),
+          ]),
+        }))
+        setNextPage(page.next)
+      } else if (section === 'vibes') {
+        const page = await vibespaceApi.getProfileVibes(username, nextPage)
+        setVibes((previous) => [...previous, ...page.results])
+        setCounts((previous) => ({
+          ...previous,
+          ...Object.fromEntries(
+            page.results.map((item) => [getKey('vibe', item.id), item]),
+          ),
+        }))
+        setNextPage(page.next)
+      } else {
+        const page = await vibespaceApi.getProfileMoments(username, nextPage)
+        setMoments((previous) => [...previous, ...page.results])
+        setCounts((previous) => ({
+          ...previous,
+          ...Object.fromEntries(
+            page.results.map((item) => [getKey('moment', item.id), item]),
+          ),
+        }))
+        setNextPage(page.next)
+      }
+    } catch {
+      setError('Unable to load more posts. Please try again.')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   // Load the current user's saved content and Revibes
 
@@ -979,6 +1085,18 @@ export default function VibeSpaceContent({
     )
   }
 
+  const posts = [
+    ...vibes.map((item) => ({ type: 'vibe' as const, item })),
+    ...moments.map((item) => ({ type: 'moment' as const, item })),
+  ].sort(
+    (left, right) => (
+      new Date(right.item.created_at).getTime() -
+        new Date(left.item.created_at).getTime() ||
+      right.item.id.localeCompare(left.item.id) ||
+      left.type.localeCompare(right.type)
+    ),
+  )
+
   return (
     <div className="vibespace-content">
       {error && (
@@ -999,12 +1117,73 @@ export default function VibeSpaceContent({
         </div>
       )}
 
-      {/* VIBES */}
+      {section === 'posts' && (
+        <section className="vibespace-section vibespace-post-section">
+          <div className="vibespace-section-heading">
+            <div>
+              <h2>Posts</h2>
+              <p>Vibes and Moments, together in one timeline.</p>
+            </div>
+            <span className="vibespace-count">{posts.length}</span>
+          </div>
+          <div className="vibespace-post-list">
+            {loading ? (
+              <p className="vibespace-empty-state">Loading posts...</p>
+            ) : posts.length === 0 ? (
+              <div className="vibespace-empty-state">
+                <h3>Your story starts here.</h3>
+                <p>No posts have been published here yet.</p>
+              </div>
+            ) : posts.map(({ type, item }) => (
+              <article
+                className="vibespace-post"
+                key={`${type}:${item.id}`}
+              >
+                <div className="vibespace-post-meta">
+                  <span>{type === 'vibe' ? 'Vibe' : 'Moment'}</span>
+                  <span>{formatDate(item.created_at)}</span>
+                  {item.event_title && (
+                    <span className="vibespace-event-tag">
+                      {item.event_title}
+                    </span>
+                  )}
+                </div>
+                {type === 'vibe' ? (
+                  <p className="vibespace-post-text">
+                    {(item as Vibe).text}
+                  </p>
+                ) : (
+                  <div className="vibespace-profile-moment">
+                    <img
+                      src={(item as Moment).image_url}
+                      alt={(item as Moment).caption || 'VibeSpace Moment'}
+                      loading="lazy"
+                    />
+                    {(item as Moment).caption && (
+                      <p>{(item as Moment).caption}</p>
+                    )}
+                  </div>
+                )}
+                {renderActions(
+                  type,
+                  item.id,
+                  isOwnProfile && item.author_username === currentUsername
+                    ? () => type === 'vibe'
+                      ? void handleDeleteVibe(item.id)
+                      : void handleDeleteMoment(item.id)
+                    : undefined,
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
+      {section === 'vibes' && (
       <section className="vibespace-section vibespace-post-section">
         <div className="vibespace-section-heading">
           <div>
-            <h2>Your Vibes</h2>
+            <h2>Vibes</h2>
             <p>Share your thoughts and experiences.</p>
           </div>
           <span className="vibespace-count">{vibes.length}</span>
@@ -1047,13 +1226,13 @@ export default function VibeSpaceContent({
           )}
         </div>
       </section>
+      )}
 
-      {/* MOMENTS */}
-
+      {section === 'moments' && (
       <section className="vibespace-section vibespace-post-section">
         <div className="vibespace-section-heading">
           <div>
-            <h2>Captured Moments</h2>
+            <h2>Moments</h2>
             <p>Share photographs from experiences worth remembering.</p>
           </div>
           <span className="vibespace-count">{moments.length}</span>
@@ -1101,6 +1280,18 @@ export default function VibeSpaceContent({
           )}
         </div>
       </section>
+      )}
+
+      {!loading && nextPage !== null && (
+        <button
+          className="profile-load-more"
+          type="button"
+          onClick={() => void loadMore()}
+          disabled={loadingMore}
+        >
+          {loadingMore ? 'Loading...' : 'Load more'}
+        </button>
+      )}
     </div>
   )
 }

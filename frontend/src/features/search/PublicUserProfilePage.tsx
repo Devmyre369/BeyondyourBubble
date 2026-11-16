@@ -3,25 +3,35 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { useAuth } from '../../context/AuthContext'
-import { profileApi, type UserProfile } from '../../services/profileApi'
+import { useFollowState } from '../../context/useFollowState'
+import {
+  profileApi,
+  type ProfileOverview,
+} from '../../services/profileApi'
 import VibeSpaceContent from '../profile/components/VibeSpaceContent'
+import FollowButton from '../profile/components/FollowButton'
+import ProfileConnectionsList from '../profile/components/ProfileConnectionsList'
+import ProfileSections from '../profile/components/ProfileSections'
+import { resolveProfileSection } from '../profile/components/profileSectionUtils'
+import '../profile/pages/vibespace.css'
 import './search-page.css'
 
 type ProfileLoadState =
-  | { username: string; status: 'loaded'; profile: UserProfile }
+  | { username: string; status: 'loaded'; overview: ProfileOverview }
   | { username: string; status: 'not-found' | 'private' | 'error' }
 
 export default function PublicUserProfilePage() {
-  const { username = '' } = useParams()
+  const { username = '', section: sectionParam } = useParams()
   const { user } = useAuth()
+  const section = resolveProfileSection(sectionParam)
   const [state, setState] = useState<ProfileLoadState | null>(null)
 
   useEffect(() => {
     let active = true
     void profileApi
-      .getPublicProfile(username)
-      .then((profile) => {
-        if (active) setState({ username, status: 'loaded', profile })
+      .getPublicProfileOverview(username)
+      .then((overview) => {
+        if (active) setState({ username, status: 'loaded', overview })
       })
       .catch((error: unknown) => {
         if (!active) return
@@ -49,6 +59,13 @@ export default function PublicUserProfilePage() {
 
   const currentState =
     state?.username === username ? state : null
+  const loadedOverview =
+    currentState?.status === 'loaded' ? currentState.overview : null
+  const { state: followState } = useFollowState(
+    loadedOverview?.profile.username || username,
+    loadedOverview?.is_following ?? false,
+    loadedOverview?.statistics.followers_count,
+  )
 
   if (!currentState) {
     return (
@@ -83,7 +100,7 @@ export default function PublicUserProfilePage() {
     )
   }
 
-  const { profile } = currentState
+  const { profile, statistics } = currentState.overview
   const isOwnProfile = user?.username === profile.username
   if (profile.visibility === 'private' && !isOwnProfile) {
     return (
@@ -137,6 +154,12 @@ export default function PublicUserProfilePage() {
               {profile.profile_type && ` · ${profile.profile_type}`}
             </p>
           </div>
+          <FollowButton
+            username={profile.username}
+            initialFollowing={currentState.overview.is_following}
+            initialFollowersCount={statistics.followers_count}
+            className="public-profile-follow"
+          />
         </div>
         <div className="public-profile-body">
           {profile.byb_signature && (
@@ -148,9 +171,42 @@ export default function PublicUserProfilePage() {
           )}
         </div>
       </article>
-      <div className="public-profile-content">
-        <VibeSpaceContent username={profile.username} />
+      <div className="public-profile-statistics" aria-label="Profile statistics">
+        <Link to={`/users/${encodeURIComponent(profile.username)}/posts`}>
+          <strong>{statistics.posts_count}</strong><span>Posts</span>
+        </Link>
+        <Link to={`/users/${encodeURIComponent(profile.username)}/followers`}>
+          <strong>{followState?.followersCount ?? statistics.followers_count}</strong>
+          <span>Followers</span>
+        </Link>
+        <Link to={`/users/${encodeURIComponent(profile.username)}/following`}>
+          <strong>{statistics.following_count}</strong><span>Following</span>
+        </Link>
       </div>
+      <ProfileSections
+        basePath={`/users/${encodeURIComponent(profile.username)}`}
+        statistics={{
+          ...statistics,
+          followers_count:
+            followState?.followersCount ?? statistics.followers_count,
+        }}
+        activeSection={section}
+      />
+      {section === 'followers' || section === 'following' ? (
+        <ProfileConnectionsList
+          key={`${profile.username}:${section}`}
+          username={profile.username}
+          relationship={section}
+        />
+      ) : (
+        <div className="public-profile-content">
+          <VibeSpaceContent
+            key={`${profile.username}:${section}`}
+            username={profile.username}
+            section={section}
+          />
+        </div>
+      )}
     </main>
   )
 }

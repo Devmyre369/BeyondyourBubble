@@ -8,6 +8,7 @@ import {
   type SearchResponse,
 } from '../../services/searchApi'
 import GlobalSearchBox from './GlobalSearchBox'
+import FollowButton from '../profile/components/FollowButton'
 import './search-page.css'
 
 type ResultCategory = Exclude<SearchCategory, 'all'>
@@ -247,6 +248,11 @@ export default function SearchPage() {
                                 <time dateTime={post.created_at}>
                                   {formatDate(post.created_at)}
                                 </time>
+                                <FollowButton
+                                  username={post.author_username}
+                                  initialFollowing={post.is_following}
+                                  className="search-post-follow"
+                                />
                               </div>
                               {post.image_url && (
                                 <img

@@ -25,6 +25,11 @@ export interface EventChoice {
 export interface Vibe extends PostCounts {
   id: string
   author_username: string
+  author_first_name: string
+  author_last_name: string
+  author_profile_picture: string
+  author_byb_signature: string | null
+  is_following: boolean
   event: string | null
   event_title: string | null
   text: string
@@ -35,12 +40,40 @@ export interface Vibe extends PostCounts {
 export interface Moment extends PostCounts {
   id: string
   author_username: string
+  author_first_name: string
+  author_last_name: string
+  author_profile_picture: string
+  author_byb_signature: string | null
+  is_following: boolean
   event: string | null
   event_title: string | null
   image_url: string
   caption: string
   created_at: string
   updated_at: string
+}
+
+export interface ProfilePost extends PostCounts {
+  id: string
+  content_type: 'vibe' | 'moment'
+  author_username: string
+  author_first_name: string
+  author_last_name: string
+  author_profile_picture: string
+  author_byb_signature: string | null
+  is_following: boolean
+  event_id: string | null
+  event_title: string | null
+  content_text: string
+  image_url: string
+  created_at: string
+}
+
+export interface VibeSpacePage<T> {
+  count: number
+  next: number | null
+  previous: number | null
+  results: T[]
 }
 
 export interface Comment {
@@ -123,6 +156,16 @@ export const vibespaceApi = {
     return response.data
   },
 
+  getProfileVibes: async (
+    username: string,
+    page = 1,
+  ): Promise<VibeSpacePage<Vibe>> => {
+    const response = await api.get<VibeSpacePage<Vibe>>('/vibespace/vibes/', {
+      params: { username, page },
+    })
+    return response.data
+  },
+
   createVibe: async (data: {
     text: string
     event?: string | null
@@ -157,6 +200,27 @@ export const vibespaceApi = {
       params: username ? { username } : {},
     })
 
+    return response.data
+  },
+
+  getProfileMoments: async (
+    username: string,
+    page = 1,
+  ): Promise<VibeSpacePage<Moment>> => {
+    const response = await api.get<VibeSpacePage<Moment>>('/vibespace/moments/', {
+      params: { username, page },
+    })
+    return response.data
+  },
+
+  getProfilePosts: async (
+    username: string,
+    page = 1,
+  ): Promise<VibeSpacePage<ProfilePost>> => {
+    const response = await api.get<VibeSpacePage<ProfilePost>>(
+      `/vibespace/profiles/${encodeURIComponent(username)}/posts/`,
+      { params: { page } },
+    )
     return response.data
   },
 

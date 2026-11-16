@@ -180,6 +180,52 @@ class Profile(models.Model):
         return f"{self.user.username}'s VibeSpace"
 
 
+class Follow(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    follower = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="following_relationships",
+    )
+    following = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="follower_relationships",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["follower", "following"],
+                name="accounts_unique_follow_pair",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(follower=models.F("following")),
+                name="accounts_no_self_follow",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["follower", "created_at"],
+                name="accounts_follow_out_idx",
+            ),
+            models.Index(
+                fields=["following", "created_at"],
+                name="accounts_follow_in_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.follower.username} follows {self.following.username}"
+
+
 # ==================================================
 # PENDING SIGNUP
 # ==================================================

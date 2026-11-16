@@ -2,10 +2,12 @@
 from django.db.models import Count, Q
 from rest_framework import generics, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.models import Profile
+from accounts.services.follow_service import annotate_content_follow_state
 
 from .models import Vibe, Moment
 from .serializers import VibeSerializer, MomentSerializer
@@ -15,6 +17,28 @@ from .service.moment_image_service import (
     upload_moment_image,
     delete_moment_image,
 )
+
+
+class ProfileContentPagination(PageNumberPagination):
+    page_size = 10
+    page_query_param = "page"
+    max_page_size = 10
+
+    def get_paginated_response(self, data):
+        return Response({
+            "count": self.page.paginator.count,
+            "next": (
+                self.page.next_page_number()
+                if self.page.has_next()
+                else None
+            ),
+            "previous": (
+                self.page.previous_page_number()
+                if self.page.has_previous()
+                else None
+            ),
+            "results": data,
+        })
 
 
 # ==================================================
@@ -49,13 +73,14 @@ class VibeSpaceVisibilityMixin:
                 author__username__iexact=username
             )
 
+        queryset = annotate_content_follow_state(queryset, user)
         return queryset.annotate(
             like_count=Count("likes", distinct=True),
             comment_count=Count("comments", distinct=True),
             revibe_count=Count("revibes", distinct=True),
             save_count=Count("saved_by", distinct=True),
             share_count=Count("shares", distinct=True),
-        )
+        ).order_by("-created_at", "-id")
 
 
 # ==================================================
@@ -70,6 +95,7 @@ class VibeListCreateView(
     serializer_class = VibeSerializer
     queryset = Vibe.objects.all()
     parser_classes = [JSONParser]
+    pagination_class = ProfileContentPagination
 
     def get_permissions(self):
         if self.request.method == "POST":
@@ -81,6 +107,16 @@ class VibeListCreateView(
         return self.get_visible_queryset(
             Vibe.objects.all()
         )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if "page" not in request.query_params:
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -117,6 +153,7 @@ class MomentListCreateView(
 
     serializer_class = MomentSerializer
     queryset = Moment.objects.all()
+    pagination_class = ProfileContentPagination
 
     parser_classes = [
         MultiPartParser,
@@ -134,6 +171,16 @@ class MomentListCreateView(
         return self.get_visible_queryset(
             Moment.objects.all()
         )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if "page" not in request.query_params:
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

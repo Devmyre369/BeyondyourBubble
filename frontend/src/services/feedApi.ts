@@ -6,7 +6,11 @@ export interface FeedEntry extends PostCounts {
   id: string
   content_type: 'vibe' | 'moment'
   author_username: string
+  author_first_name: string
+  author_last_name: string
   author_profile_picture: string
+  author_byb_signature: string | null
+  is_following: boolean
   event_id: string | null
   event_title: string | null
   content_text: string

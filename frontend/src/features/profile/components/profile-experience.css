@@ -1,0 +1,337 @@
+.profile-section-tabs {
+  display: flex;
+  gap: 7px;
+  margin: 26px 0 20px;
+  padding: 0 0 10px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--byb-border);
+  scrollbar-width: thin;
+}
+
+.profile-section-tabs a {
+  display: inline-flex;
+  min-height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  color: var(--byb-muted);
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    color var(--byb-transition-fast),
+    border-color var(--byb-transition-fast),
+    background var(--byb-transition-fast);
+}
+
+.profile-section-tabs a:hover,
+.profile-section-tabs a.active {
+  color: #fff;
+  background: var(--byb-crimson);
+  border-color: var(--byb-crimson);
+}
+
+.profile-section-tabs a span {
+  min-width: 18px;
+  padding: 2px 5px;
+  color: currentColor;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: var(--byb-radius-full);
+  font-size: 9px;
+  text-align: center;
+}
+
+.follow-control {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.follow-button {
+  min-height: 32px;
+  padding: 0 12px;
+  color: #fff;
+  background: var(--byb-crimson);
+  border: 1px solid var(--byb-crimson);
+  border-radius: var(--byb-radius-full);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    background var(--byb-transition-fast),
+    border-color var(--byb-transition-fast),
+    color var(--byb-transition-fast);
+}
+
+.follow-button:hover:not(:disabled) {
+  background: var(--byb-crimson-hover);
+  border-color: var(--byb-crimson-hover);
+}
+
+.follow-button.is-following {
+  color: var(--byb-text-secondary);
+  background: transparent;
+  border-color: var(--byb-border-light);
+}
+
+.follow-button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.follow-button:focus-visible,
+.profile-section-tabs a:focus-visible,
+.profile-load-more:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.follow-count {
+  color: var(--byb-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.follow-error {
+  max-width: 175px;
+  color: var(--byb-danger);
+  font-size: 9px;
+}
+
+.feed-author-follow {
+  margin-left: 2px;
+}
+
+.feed-author-follow .follow-button {
+  min-height: 29px;
+  padding-inline: 9px;
+}
+
+.feed-author-info a {
+  overflow: hidden;
+  color: #f5f5f7;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-author-info a:hover {
+  color: var(--byb-crimson-hover);
+}
+
+.search-post-follow {
+  margin-left: 0;
+}
+
+.search-post-follow .follow-button {
+  min-height: 26px;
+  padding: 0 9px;
+  font-size: 9px;
+}
+
+.public-profile-follow {
+  margin-left: auto;
+  padding-bottom: 5px;
+}
+
+.public-profile-statistics {
+  display: flex;
+  gap: 25px;
+  padding: 17px 22px;
+  border: 1px solid var(--byb-border);
+  border-top: 0;
+  background: var(--byb-bg-secondary);
+}
+
+.public-profile-statistics a {
+  display: grid;
+  gap: 3px;
+  color: var(--byb-muted);
+  font-size: 10px;
+  text-decoration: none;
+}
+
+.public-profile-statistics a:hover span {
+  color: var(--byb-text);
+}
+
+.public-profile-statistics strong {
+  color: var(--byb-text);
+  font-size: 15px;
+}
+
+.profile-connection-list {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-connection-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  background: var(--byb-bg-secondary);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-md);
+}
+
+.profile-connection-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+  color: var(--byb-text);
+  text-decoration: none;
+}
+
+.profile-connection-identity img,
+.profile-connection-avatar {
+  display: grid;
+  width: 43px;
+  height: 43px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-connection-avatar {
+  color: var(--byb-crimson-hover);
+  background: var(--byb-crimson-soft);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.profile-connection-identity > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.profile-connection-identity strong,
+.profile-connection-identity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-connection-identity strong {
+  font-size: 11px;
+}
+
+.profile-connection-identity small {
+  color: var(--byb-muted);
+  font-size: 9px;
+}
+
+.profile-list-state {
+  padding: 30px 18px;
+  color: var(--byb-muted);
+  background: var(--byb-bg-secondary);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-lg);
+  font-size: 12px;
+  text-align: center;
+}
+
+.profile-list-state h3 {
+  margin: 0 0 6px;
+  color: var(--byb-text);
+}
+
+.profile-list-state p {
+  margin: 0;
+}
+
+.profile-list-error {
+  color: var(--byb-danger);
+}
+
+.profile-load-more {
+  display: block;
+  min-height: 38px;
+  margin: 16px auto 0;
+  padding: 0 16px;
+  color: var(--byb-text);
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border-light);
+  border-radius: var(--byb-radius-full);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-load-more:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.vibespace-profile-moment img {
+  display: block;
+  width: min(100%, 560px);
+  max-height: 520px;
+  margin: 10px 0;
+  object-fit: cover;
+  border-radius: var(--byb-radius-md);
+}
+
+.vibespace-profile-moment p {
+  margin: 0 0 12px;
+  color: var(--byb-text-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+@media (max-width: 620px) {
+  .profile-section-tabs {
+    margin-top: 19px;
+  }
+
+  .profile-connection-card {
+    padding: 11px;
+  }
+
+  .profile-connection-identity img,
+  .profile-connection-avatar {
+    width: 38px;
+    height: 38px;
+  }
+
+  .follow-error {
+    max-width: 120px;
+  }
+
+  .public-profile-statistics {
+    justify-content: space-between;
+    padding-inline: 16px;
+  }
+
+  .public-profile-follow {
+    padding-bottom: 0;
+  }
+}
+
+@media (max-width: 460px) {
+  .search-post-heading {
+    flex-wrap: wrap;
+  }
+
+  .search-post-heading time {
+    margin-left: 0;
+  }
+
+  .feed-content-type {
+    display: none;
+  }
+}

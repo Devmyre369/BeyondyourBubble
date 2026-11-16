@@ -1,6 +1,7 @@
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import status
@@ -34,6 +35,10 @@ from accounts.services.profile_image_service import (
     ProfileImageError,
     upload_profile_image,
     delete_profile_image,
+)
+from accounts.services.follow_service import (
+    get_profile_statistics,
+    is_following,
 )
 from accounts.services.profile_image_service import (
     ProfileImageError,
@@ -250,6 +255,8 @@ class MyProfileView(APIView):
             {
                 "success": True,
                 "profile": serializer.data,
+                "statistics": get_profile_statistics(request.user),
+                "is_following": False,
             },
             status=status.HTTP_200_OK,
         )
@@ -445,7 +452,6 @@ class ProfileImageView(APIView):
 
 class PublicProfileView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []
 
     def get(self, request, username):
         user = get_object_or_404(
@@ -459,8 +465,16 @@ class PublicProfileView(APIView):
         profile = get_object_or_404(
             Profile.objects.select_related("user"),
             user=user,
-            visibility=Profile.Visibility.PUBLIC,
         )
+        is_owner = (
+            request.user.is_authenticated
+            and request.user.pk == user.pk
+        )
+        if (
+            profile.visibility != Profile.Visibility.PUBLIC
+            and not is_owner
+        ):
+            raise Http404
 
         serializer = ProfileSerializer(profile)
 
@@ -468,6 +482,8 @@ class PublicProfileView(APIView):
             {
                 "success": True,
                 "profile": serializer.data,
+                "statistics": get_profile_statistics(user),
+                "is_following": is_following(request.user, user),
             },
             status=status.HTTP_200_OK,
         )

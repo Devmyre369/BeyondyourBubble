@@ -15,11 +15,20 @@ class FeedEntrySerializer(serializers.Serializer):
     )
 
     author_username = serializers.CharField(read_only=True)
+    author_first_name = serializers.CharField(read_only=True)
+    author_last_name = serializers.CharField(read_only=True)
 
     author_profile_picture = serializers.CharField(
         read_only=True,
         allow_blank=True,
     )
+
+    author_byb_signature = serializers.CharField(
+        read_only=True,
+        allow_null=True,
+    )
+
+    is_following = serializers.BooleanField(read_only=True)
 
     event_id = serializers.UUIDField(
         read_only=True,

@@ -1,6 +1,6 @@
 
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 
 import AuthLayout from '../components/AuthLayout'
@@ -9,6 +9,7 @@ import authApi from '../../../services/authApi'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { completeAuthentication } = useAuth()
 
   const [username, setUsername] = useState('')
@@ -25,7 +26,12 @@ export default function LoginPage() {
       const response = await authApi.login(username.trim(), password)
 
       completeAuthentication(response)
-      navigate('/home', { replace: true })
+      const requestedPath = searchParams.get('next')
+      const returnPath =
+        requestedPath?.startsWith('/') && !requestedPath.startsWith('//')
+          ? requestedPath
+          : '/home'
+      navigate(returnPath, { replace: true })
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const data = err.response?.data as {

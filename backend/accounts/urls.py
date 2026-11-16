@@ -12,6 +12,10 @@ from accounts.views import (
     MyProfileView,
     PublicProfileView,
 )
+from accounts.social_views import (
+    FollowRelationshipView,
+    ProfileConnectionsView,
+)
 
 
 urlpatterns = [
@@ -49,6 +53,26 @@ urlpatterns = [
         "profile/",
         MyProfileView.as_view(),
         name="my-profile",
+    ),
+
+    path(
+        "profile/<str:username>/follow/",
+        FollowRelationshipView.as_view(),
+        name="profile-follow",
+    ),
+
+    path(
+        "profile/<str:username>/followers/",
+        ProfileConnectionsView.as_view(),
+        {"relationship": "followers"},
+        name="profile-followers",
+    ),
+
+    path(
+        "profile/<str:username>/following/",
+        ProfileConnectionsView.as_view(),
+        {"relationship": "following"},
+        name="profile-following",
     ),
 
     path(

@@ -1,5 +1,5 @@
 
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 
 import WelcomePage from './features/auth/pages/WelcomePage'
 import LoginPage from './features/auth/pages/LoginPage'
@@ -23,9 +23,18 @@ import HubDetailPage from './features/hubs/HubDetailPage'
 import SearchPage from './features/search/SearchPage'
 import PublicUserProfilePage from './features/search/PublicUserProfilePage'
 import AppLayout from './components/layout/AppLayout'
+import { useAuth } from './context/AuthContext'
+import { FollowProvider } from './context/FollowProvider'
+import './features/profile/components/profile-experience.css'
+
+function PublicProfileLayout() {
+  const { isAuthenticated } = useAuth()
+  return isAuthenticated ? <AppLayout /> : <Outlet />
+}
 
 export default function App() {
   return (
+    <FollowProvider>
     <Routes>
       <Route path="/" element={<WelcomePage />} />
       <Route path="/login" element={<LoginPage />} />
@@ -46,6 +55,13 @@ export default function App() {
         element={<ResetPasswordPage />}
       />
 
+      <Route element={<PublicProfileLayout />}>
+        <Route
+          path="/users/:username/:section?"
+          element={<PublicUserProfilePage />}
+        />
+      </Route>
+
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route
@@ -65,10 +81,9 @@ export default function App() {
             />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/search" element={<SearchPage />} />
-            <Route path="/users/:username" element={<PublicUserProfilePage />} />
             <Route path="/hubs" element={<HubDiscoverPage />} />
             <Route path="/hubs/:hubId" element={<HubDetailPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/profile/:section?" element={<ProfilePage />} />
             <Route path="/edit-profile" element={<ProfileEditPage />} />
           </Route>
         </Route>
@@ -76,5 +91,6 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </FollowProvider>
   )
 }

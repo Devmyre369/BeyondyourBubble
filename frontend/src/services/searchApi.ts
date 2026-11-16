@@ -7,7 +7,11 @@ export interface SearchPost {
   id: string
   content_type: 'vibe' | 'moment'
   author_username: string
+  author_first_name: string
+  author_last_name: string
   author_profile_picture: string
+  author_byb_signature: string | null
+  is_following: boolean
   content_text: string
   image_url: string
   event_title: string | null

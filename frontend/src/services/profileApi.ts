@@ -44,6 +44,51 @@ export interface UserProfile {
   updated_at: string
 }
 
+export interface ProfileStatistics {
+  posts_count: number
+  vibes_count: number
+  moments_count: number
+  followers_count: number
+  following_count: number
+}
+
+export interface ProfileOverview {
+  profile: UserProfile
+  statistics: ProfileStatistics
+  is_following: boolean
+}
+
+export interface FollowMutationResponse {
+  target_username: string
+  is_following: boolean
+  followers_count: number
+  viewer_username: string
+  viewer_following_count: number
+}
+
+export interface PublicConnectionUser {
+  id: string
+  username: string
+  first_name: string
+  last_name: string
+  profile_picture: string
+  byb_signature: string | null
+  profile_type: ProfileType | null
+  bio: string
+  city: string
+  institution: string
+  current_organization: string
+  job_title: string
+  is_following: boolean
+}
+
+export interface PaginatedResponse<T> {
+  count: number
+  next: number | null
+  previous: number | null
+  results: T[]
+}
+
 export type CreateProfileData = Omit<
   UserProfile,
   | 'id'
@@ -60,6 +105,14 @@ interface ProfileResponse {
   success: boolean
   message?: string
   profile: UserProfile
+  statistics?: ProfileStatistics
+  is_following?: boolean
+}
+
+interface ProfileOverviewResponse {
+  profile: UserProfile
+  statistics: ProfileStatistics
+  is_following: boolean
 }
 
 interface ProfileImageResponse {
@@ -77,6 +130,15 @@ export const profileApi = {
     )
 
     return response.data.profile
+  },
+
+  getMyProfileOverview: async (): Promise<ProfileOverview> => {
+    const response = await api.get<ProfileOverviewResponse>('/accounts/profile/')
+    return {
+      profile: response.data.profile,
+      statistics: response.data.statistics,
+      is_following: response.data.is_following,
+    }
   },
 
   createProfile: async (
@@ -109,6 +171,45 @@ export const profileApi = {
     )
 
     return response.data.profile
+  },
+
+  getPublicProfileOverview: async (
+    username: string
+  ): Promise<ProfileOverview> => {
+    const response = await api.get<ProfileOverviewResponse>(
+      `/accounts/profile/${encodeURIComponent(username)}/`
+    )
+    return {
+      profile: response.data.profile,
+      statistics: response.data.statistics,
+      is_following: response.data.is_following,
+    }
+  },
+
+  followUser: async (username: string): Promise<FollowMutationResponse> => {
+    const response = await api.post<FollowMutationResponse>(
+      `/accounts/profile/${encodeURIComponent(username)}/follow/`
+    )
+    return response.data
+  },
+
+  unfollowUser: async (username: string): Promise<FollowMutationResponse> => {
+    const response = await api.delete<FollowMutationResponse>(
+      `/accounts/profile/${encodeURIComponent(username)}/follow/`
+    )
+    return response.data
+  },
+
+  getProfileConnections: async (
+    username: string,
+    relationship: 'followers' | 'following',
+    page = 1,
+  ): Promise<PaginatedResponse<PublicConnectionUser>> => {
+    const response = await api.get<PaginatedResponse<PublicConnectionUser>>(
+      `/accounts/profile/${encodeURIComponent(username)}/${relationship}/`,
+      { params: { page } },
+    )
+    return response.data
   },
 
   uploadProfileImage: async (

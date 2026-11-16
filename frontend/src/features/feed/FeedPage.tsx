@@ -5,7 +5,7 @@ import {
   useState,
   type FormEvent,
 } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { feedApi, type FeedEntry } from '../../services/feedApi'
 import GlobalSearchBox from '../search/GlobalSearchBox'
@@ -16,6 +16,7 @@ import vibespaceApi, {
   type Revibe,
 } from '../../services/vibespaceApi'
 import PostActionIcon from '../vibespace/components/PostActionIcon'
+import FollowButton from '../profile/components/FollowButton'
 import './feed.css'
 
 const getKey = (entry: FeedEntry) =>
@@ -519,13 +520,27 @@ export default function FeedPage() {
                 )}
 
                 <div className="feed-author-info">
-                  <strong>{entry.author_username}</strong>
+                  <Link
+                    to={
+                      entry.author_username === user?.username
+                        ? '/profile'
+                        : `/users/${encodeURIComponent(entry.author_username)}`
+                    }
+                  >
+                    {`${entry.author_first_name} ${entry.author_last_name}`.trim() ||
+                      entry.author_username}
+                  </Link>
                   <span>{formatDate(entry.created_at)}</span>
                 </div>
 
                 <span className="feed-content-type">
                   {entry.content_type === 'vibe' ? 'VIBE' : 'MOMENT'}
                 </span>
+                <FollowButton
+                  username={entry.author_username}
+                  initialFollowing={entry.is_following}
+                  className="feed-author-follow"
+                />
               </div>
 
               {entry.event_title && (

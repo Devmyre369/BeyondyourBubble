@@ -56,11 +56,37 @@ class EventAssociationValidationMixin:
         return event
 
 
+class AuthorProfileSerializerMixin:
+    def get_author_profile_picture(self, obj):
+        profile = getattr(obj.author, "profile", None)
+        return profile.profile_picture if profile else ""
+
+    def get_author_byb_signature(self, obj):
+        profile = getattr(obj.author, "profile", None)
+        return profile.byb_signature if profile else None
+
+
 class VibeSerializer(
     EventAssociationValidationMixin,
     InteractionCountSerializerMixin,
+    AuthorProfileSerializerMixin,
     serializers.ModelSerializer
 ):
+    author_first_name = serializers.CharField(
+        source="author.first_name",
+        read_only=True,
+    )
+    author_last_name = serializers.CharField(
+        source="author.last_name",
+        read_only=True,
+    )
+    author_profile_picture = serializers.SerializerMethodField()
+    author_byb_signature = serializers.SerializerMethodField()
+    is_following = serializers.BooleanField(
+        source="viewer_follows_author",
+        read_only=True,
+        default=False,
+    )
     like_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     revibe_count = serializers.SerializerMethodField()
@@ -100,6 +126,11 @@ class VibeSerializer(
         fields = [
             "id",
             "author_username",
+            "author_first_name",
+            "author_last_name",
+            "author_profile_picture",
+            "author_byb_signature",
+            "is_following",
             "event",
             "event_title",
             "text",
@@ -114,6 +145,11 @@ class VibeSerializer(
         read_only_fields = [
             "id",
             "author_username",
+            "author_first_name",
+            "author_last_name",
+            "author_profile_picture",
+            "author_byb_signature",
+            "is_following",
             "event_title",
             "like_count",
             "comment_count",
@@ -128,8 +164,24 @@ class VibeSerializer(
 class MomentSerializer(
     EventAssociationValidationMixin,
     InteractionCountSerializerMixin,
+    AuthorProfileSerializerMixin,
     serializers.ModelSerializer
 ):
+    author_first_name = serializers.CharField(
+        source="author.first_name",
+        read_only=True,
+    )
+    author_last_name = serializers.CharField(
+        source="author.last_name",
+        read_only=True,
+    )
+    author_profile_picture = serializers.SerializerMethodField()
+    author_byb_signature = serializers.SerializerMethodField()
+    is_following = serializers.BooleanField(
+        source="viewer_follows_author",
+        read_only=True,
+        default=False,
+    )
     like_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     revibe_count = serializers.SerializerMethodField()
@@ -172,6 +224,11 @@ class MomentSerializer(
         fields = [
             "id",
             "author_username",
+            "author_first_name",
+            "author_last_name",
+            "author_profile_picture",
+            "author_byb_signature",
+            "is_following",
             "event",
             "event_title",
             "image_url",
@@ -187,6 +244,11 @@ class MomentSerializer(
         read_only_fields = [
             "id",
             "author_username",
+            "author_first_name",
+            "author_last_name",
+            "author_profile_picture",
+            "author_byb_signature",
+            "is_following",
             "event_title",
             "image_url",
             "like_count",

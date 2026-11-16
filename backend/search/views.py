@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Profile
+from accounts.services.follow_service import annotate_content_follow_state
 from events.models import Event
 from hubs.models import Hub
 from vibespace.models import Moment, Vibe
@@ -56,7 +57,7 @@ class GlobalSearchView(APIView):
             Q(author__profile__visibility=Profile.Visibility.PUBLIC)
             | Q(author=request.user)
         )
-        vibes = (
+        vibes = annotate_content_follow_state(
             Vibe.objects.filter(visible_content)
             .filter(
                 Q(text__icontains=query)
@@ -64,9 +65,10 @@ class GlobalSearchView(APIView):
                 | Q(event__title__icontains=query)
             )
             .select_related("author", "author__profile", "event")
-            .order_by("-created_at", "-id")
+            .order_by("-created_at", "-id"),
+            request.user,
         )
-        moments = (
+        moments = annotate_content_follow_state(
             Moment.objects.filter(visible_content)
             .filter(
                 Q(caption__icontains=query)
@@ -74,7 +76,8 @@ class GlobalSearchView(APIView):
                 | Q(event__title__icontains=query)
             )
             .select_related("author", "author__profile", "event")
-            .order_by("-created_at", "-id")
+            .order_by("-created_at", "-id"),
+            request.user,
         )
 
         users = (
@@ -155,11 +158,15 @@ class GlobalSearchView(APIView):
                     "id": str(vibe.id),
                     "content_type": "vibe",
                     "author_username": vibe.author.username,
+                    "author_first_name": vibe.author.first_name,
+                    "author_last_name": vibe.author.last_name,
                     "author_profile_picture": (
                         profile.profile_picture
                         if profile and profile.profile_picture
                         else ""
                     ),
+                    "author_byb_signature": profile.byb_signature if profile else None,
+                    "is_following": vibe.viewer_follows_author,
                     "content_text": vibe.text,
                     "image_url": "",
                     "event_title": vibe.event.title if vibe.event else None,
@@ -171,11 +178,15 @@ class GlobalSearchView(APIView):
                     "id": str(moment.id),
                     "content_type": "moment",
                     "author_username": moment.author.username,
+                    "author_first_name": moment.author.first_name,
+                    "author_last_name": moment.author.last_name,
                     "author_profile_picture": (
                         profile.profile_picture
                         if profile and profile.profile_picture
                         else ""
                     ),
+                    "author_byb_signature": profile.byb_signature if profile else None,
+                    "is_following": moment.viewer_follows_author,
                     "content_text": moment.caption,
                     "image_url": moment.image_url,
                     "event_title": moment.event.title if moment.event else None,

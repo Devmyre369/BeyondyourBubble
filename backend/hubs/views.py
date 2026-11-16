@@ -1,18 +1,34 @@
 from django.db.models import Q
 from rest_framework import generics, status
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import Hub
+from .models import Hub, HubMembership
 from .permissions import CanEditHub
 from .serializers import (
     HubCreateSerializer,
     HubDetailSerializer,
     HubDiscoveryQuerySerializer,
     HubListSerializer,
+    HubInviteSerializer,
+    HubMemberRoleSerializer,
+    HubMemberSerializer,
+    HubMembershipStateSerializer,
+    StrictMembershipInputSerializer,
     HubUpdateSerializer,
+)
+from .services.membership_service import (
+    can_manage_hub_members,
+    change_member_role,
+    get_active_hub,
+    invite_member,
+    join_hub,
+    leave_hub,
+    remove_member,
+    review_membership_request,
 )
 
 
@@ -120,3 +136,178 @@ class HubDetailView(generics.RetrieveUpdateAPIView):
             context=self.get_serializer_context(),
         ).data
         return response
+
+
+def _membership_state(hub, user, membership):
+    can_manage = can_manage_hub_members(user, hub)
+    can_leave = bool(
+        membership
+        and membership.status == HubMembership.Status.APPROVED
+        and membership.user_id != hub.owner_id
+        and membership.role
+        in (
+            HubMembership.Role.ADMIN,
+            HubMembership.Role.EDITOR,
+            HubMembership.Role.MEMBER,
+        )
+    )
+    return {
+        "membership": (
+            HubMembershipStateSerializer(membership).data
+            if membership
+            else None
+        ),
+        "membership_policy": hub.membership_policy,
+        "can_leave": can_leave,
+        "can_manage_members": can_manage,
+        "pending_request_count": (
+            hub.memberships.filter(status=HubMembership.Status.PENDING).count()
+            if can_manage
+            else None
+        ),
+    }
+
+
+class HubMembershipView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, hub_id):
+        hub = get_active_hub(hub_id)
+        membership = HubMembership.objects.filter(
+            hub=hub,
+            user=request.user,
+        ).first()
+        return Response(_membership_state(hub, request.user, membership))
+
+    def post(self, request, hub_id):
+        serializer = StrictMembershipInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        hub, membership = join_hub(hub_id, request.user)
+        return Response(
+            _membership_state(hub, request.user, membership),
+            status=status.HTTP_201_CREATED,
+        )
+
+    def delete(self, request, hub_id):
+        serializer = StrictMembershipInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        leave_hub(hub_id, request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class HubMembersView(APIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = HubPagination
+
+    def get(self, request, hub_id):
+        hub = get_active_hub(hub_id)
+        members = (
+            HubMembership.objects.filter(
+                hub=hub,
+                status=HubMembership.Status.APPROVED,
+            )
+            .select_related("user", "user__profile")
+            .order_by("created_at", "id")
+        )
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(members, request, view=self)
+        data = HubMemberSerializer(page, many=True).data
+        return paginator.get_paginated_response(data)
+
+
+class HubPendingRequestsView(APIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = HubPagination
+
+    def get(self, request, hub_id):
+        hub = get_active_hub(hub_id)
+        if not can_manage_hub_members(request.user, hub):
+            raise PermissionDenied(
+                "Only the Hub owner or an approved administrator can view requests."
+            )
+
+        requests = (
+            HubMembership.objects.filter(
+                hub=hub,
+                status=HubMembership.Status.PENDING,
+            )
+            .select_related("user", "user__profile")
+            .order_by("created_at", "id")
+        )
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(requests, request, view=self)
+        data = HubMemberSerializer(page, many=True).data
+        return paginator.get_paginated_response(data)
+
+
+class HubMembershipRequestReviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, hub_id, membership_id, decision):
+        serializer = StrictMembershipInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership = review_membership_request(
+            hub_id,
+            membership_id,
+            request.user,
+            decision,
+        )
+        membership = (
+            HubMembership.objects.select_related("user", "user__profile")
+            .get(pk=membership.pk)
+        )
+        return Response(HubMemberSerializer(membership).data)
+
+
+class HubMemberInviteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, hub_id):
+        serializer = HubInviteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership, created = invite_member(
+            hub_id,
+            request.user,
+            serializer.validated_data["username"],
+        )
+        membership = (
+            HubMembership.objects.select_related("user", "user__profile")
+            .get(pk=membership.pk)
+        )
+        return Response(
+            HubMemberSerializer(membership).data,
+            status=(
+                status.HTTP_201_CREATED
+                if created
+                else status.HTTP_200_OK
+            ),
+        )
+
+
+class HubMemberRemoveView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, hub_id, membership_id):
+        serializer = StrictMembershipInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        remove_member(hub_id, membership_id, request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class HubMemberRoleView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, hub_id, membership_id):
+        serializer = HubMemberRoleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership = change_member_role(
+            hub_id,
+            membership_id,
+            request.user,
+            serializer.validated_data["role"],
+        )
+        membership = (
+            HubMembership.objects.select_related("user", "user__profile")
+            .get(pk=membership.pk)
+        )
+        return Response(HubMemberSerializer(membership).data)

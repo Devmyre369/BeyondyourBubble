@@ -9,6 +9,8 @@ export type HubType =
   | 'community'
 
 export type HubMembershipPolicy = 'open' | 'approval_required'
+export type HubMembershipRole = 'owner' | 'admin' | 'editor' | 'member'
+export type HubMembershipStatus = 'pending' | 'approved' | 'rejected'
 
 export interface HubDiscoveryParams {
   hub_type?: HubType
@@ -50,6 +52,39 @@ export interface HubUpdateRequest {
   city?: string
   college_or_parent_organisation?: string
   membership_policy?: HubMembershipPolicy
+}
+
+export interface HubMembership {
+  id: string
+  role: HubMembershipRole
+  status: HubMembershipStatus
+  joined_at: string | null
+}
+
+export interface HubMembershipState {
+  membership: HubMembership | null
+  membership_policy: HubMembershipPolicy
+  can_leave: boolean
+  can_manage_members: boolean
+  pending_request_count: number | null
+}
+
+export interface HubMember {
+  id: string
+  username: string | null
+  first_name: string
+  last_name: string
+  profile_picture: string
+  role: HubMembershipRole
+  status: HubMembershipStatus
+  joined_at: string | null
+}
+
+export interface HubMemberListResponse {
+  count: number
+  next: number | null
+  previous: number | null
+  results: HubMember[]
 }
 
 export interface HubCreateRequest {
@@ -101,6 +136,103 @@ export const hubsApi = {
     const response = await api.patch<HubDetail>(
       `/hubs/${encodeURIComponent(hubId)}/`,
       data,
+    )
+    return response.data
+  },
+
+  getMembership: async (hubId: string): Promise<HubMembershipState> => {
+    const response = await api.get<HubMembershipState>(
+      `/hubs/${encodeURIComponent(hubId)}/membership/`,
+    )
+    return response.data
+  },
+
+  joinHub: async (hubId: string): Promise<HubMembershipState> => {
+    const response = await api.post<HubMembershipState>(
+      `/hubs/${encodeURIComponent(hubId)}/membership/`,
+      {},
+    )
+    return response.data
+  },
+
+  leaveHub: async (hubId: string): Promise<void> => {
+    await api.delete<void>(
+      `/hubs/${encodeURIComponent(hubId)}/membership/`,
+    )
+  },
+
+  getMembers: async (
+    hubId: string,
+    page = 1,
+  ): Promise<HubMemberListResponse> => {
+    const response = await api.get<HubMemberListResponse>(
+      `/hubs/${encodeURIComponent(hubId)}/members/`,
+      { params: { page } },
+    )
+    return response.data
+  },
+
+  getPendingRequests: async (
+    hubId: string,
+    page = 1,
+  ): Promise<HubMemberListResponse> => {
+    const response = await api.get<HubMemberListResponse>(
+      `/hubs/${encodeURIComponent(hubId)}/members/requests/`,
+      { params: { page } },
+    )
+    return response.data
+  },
+
+  approveMembershipRequest: async (
+    hubId: string,
+    membershipId: string,
+  ): Promise<HubMember> => {
+    const response = await api.post<HubMember>(
+      `/hubs/${encodeURIComponent(hubId)}/members/requests/${encodeURIComponent(membershipId)}/approve/`,
+      {},
+    )
+    return response.data
+  },
+
+  rejectMembershipRequest: async (
+    hubId: string,
+    membershipId: string,
+  ): Promise<HubMember> => {
+    const response = await api.post<HubMember>(
+      `/hubs/${encodeURIComponent(hubId)}/members/requests/${encodeURIComponent(membershipId)}/reject/`,
+      {},
+    )
+    return response.data
+  },
+
+  inviteMember: async (
+    hubId: string,
+    username: string,
+  ): Promise<HubMember> => {
+    const response = await api.post<HubMember>(
+      `/hubs/${encodeURIComponent(hubId)}/members/invitations/`,
+      { username },
+    )
+    return response.data
+  },
+
+  removeMember: async (
+    hubId: string,
+    membershipId: string,
+  ): Promise<void> => {
+    await api.delete<void>(
+      `/hubs/${encodeURIComponent(hubId)}/members/${encodeURIComponent(membershipId)}/`,
+    )
+  },
+
+  updateMemberRole: async (
+    hubId: string,
+    membershipId: string,
+    role: Exclude<HubMembershipRole, 'owner'>,
+  ): Promise<HubMember> => {
+    const response = await api.patch<HubMember>(
+      `/hubs/${encodeURIComponent(hubId)}/members/${encodeURIComponent(membershipId)}/role/`,
+      { role },
     )
     return response.data
   },

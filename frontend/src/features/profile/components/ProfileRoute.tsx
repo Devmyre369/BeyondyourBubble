@@ -13,14 +13,11 @@ export default function ProfileRoute() {
     setProfile,
   } = useAuth()
 
-  const [checking, setChecking] = useState(!profileLoaded)
+  const [checkComplete, setCheckComplete] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (profileLoaded) {
-      setChecking(false)
-      return
-    }
+    if (profileLoaded) return
 
     let active = true
 
@@ -41,7 +38,7 @@ export default function ProfileRoute() {
         }
       } finally {
         if (active) {
-          setChecking(false)
+          setCheckComplete(true)
         }
       }
     }
@@ -52,6 +49,8 @@ export default function ProfileRoute() {
       active = false
     }
   }, [profileLoaded, setProfile])
+
+  const checking = !profileLoaded && !checkComplete
 
   if (checking) {
     return <div className="profile-loading">Loading your BYB profile...</div>

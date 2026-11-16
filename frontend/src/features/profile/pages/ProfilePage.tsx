@@ -205,6 +205,7 @@ export default function ProfilePage() {
             {/* VIBESPACE CONTENT */}
 
             <VibeSpaceContent
+              key={user?.username || 'anonymous'}
               username={profile.username || user?.username || ''}
             />
 

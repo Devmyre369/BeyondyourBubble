@@ -8,6 +8,7 @@ import {
   type HubType,
 } from '../../services/hubsApi'
 import HubEditModal from './HubEditModal'
+import HubMembershipPanel from './HubMembershipPanel'
 import './hub-detail.css'
 
 const CATEGORY_LABELS: Record<HubType, string> = {
@@ -313,7 +314,10 @@ export default function HubDetailPage() {
       )}
 
       {isCurrentState && state.status === 'success' && (
-        <HubDetailContent hub={state.hub} />
+        <>
+          <HubDetailContent hub={state.hub} />
+          <HubMembershipPanel key={state.hub.id} hubId={state.hub.id} />
+        </>
       )}
       {isCurrentState &&
         state.status === 'success' &&

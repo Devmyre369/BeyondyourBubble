@@ -57,6 +57,21 @@ export default function FeedPage() {
   const [actionError, setActionError] = useState('')
   const [counts, setCounts] = useState<Record<string, PostCounts>>({})
 
+  const applyFeedResponse = useCallback((
+    response: Awaited<ReturnType<typeof feedApi.getFeed>>,
+    append = false,
+  ) => {
+    setEntries((previous) =>
+      append ? [...previous, ...response.results] : response.results
+    )
+    setCounts((previous) =>
+      append
+        ? { ...previous, ...createCountsMap(response.results) }
+        : createCountsMap(response.results),
+    )
+    setNextPage(response.next)
+  }, [])
+
   const loadFeed = useCallback(async (page: number, append = false) => {
     try {
       if (append) {
@@ -69,16 +84,7 @@ export default function FeedPage() {
 
       const response = await feedApi.getFeed(page)
 
-      setEntries((previous) =>
-        append ? [...previous, ...response.results] : response.results
-      )
-      setCounts((previous) =>
-        append
-          ? { ...previous, ...createCountsMap(response.results) }
-          : createCountsMap(response.results),
-      )
-
-      setNextPage(response.next)
+      applyFeedResponse(response, append)
     } catch (err) {
       console.error('Feed loading failed:', err)
       setError('Unable to load your feed. Please try again.')
@@ -86,11 +92,31 @@ export default function FeedPage() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [])
+  }, [applyFeedResponse])
 
   useEffect(() => {
-    loadFeed(1)
-  }, [loadFeed])
+    let active = true
+
+    const loadInitialFeed = async () => {
+      try {
+        const response = await feedApi.getFeed(1)
+        if (!active) return
+        applyFeedResponse(response)
+      } catch (err) {
+        if (!active) return
+        console.error('Feed loading failed:', err)
+        setError('Unable to load your feed. Please try again.')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadInitialFeed()
+
+    return () => {
+      active = false
+    }
+  }, [applyFeedResponse])
 
   useEffect(() => {
     if (!isAuthenticated || entries.length === 0) return

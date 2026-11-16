@@ -1,0 +1,596 @@
+.hub-membership-panel {
+  display: grid;
+  gap: 18px;
+  margin-top: 25px;
+  padding: clamp(17px, 3vw, 28px);
+  background:
+    radial-gradient(ellipse at 92% 0, var(--byb-crimson-soft), transparent 34%),
+    var(--byb-bg-secondary);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-xl);
+  box-shadow: var(--byb-shadow-md);
+}
+
+.hub-membership-header,
+.hub-members-section-heading,
+.hub-requests-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.hub-membership-eyebrow {
+  display: block;
+  color: var(--byb-crimson);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+}
+
+.hub-membership-header h2 {
+  margin: 5px 0 4px;
+  font-size: clamp(19px, 3vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.hub-membership-header p {
+  margin: 0;
+  color: var(--byb-muted);
+  font-size: 11px;
+}
+
+.hub-members-count,
+.hub-requests-count {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  color: var(--byb-text-secondary);
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hub-requests-count {
+  min-width: 27px;
+  color: #fff;
+  background: var(--byb-crimson-dark);
+  border-color: var(--byb-crimson-dark);
+}
+
+.hub-membership-status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: rgba(23, 23, 30, 0.82);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-lg);
+}
+
+.hub-membership-status > p {
+  margin: 0;
+  color: var(--byb-muted);
+  font-size: 11px;
+}
+
+.hub-membership-status-copy {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+}
+
+.hub-membership-status-icon {
+  display: grid;
+  width: 35px;
+  height: 35px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--byb-crimson-hover);
+  background: var(--byb-crimson-soft);
+  border: 1px solid var(--byb-crimson-border);
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.hub-membership-status-copy > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.hub-membership-status-copy strong {
+  color: var(--byb-text);
+  font-size: 12px;
+}
+
+.hub-membership-status-copy span:not(.hub-membership-status-icon) {
+  color: var(--byb-muted);
+  font-size: 10px;
+}
+
+.hub-membership-status-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.hub-membership-primary-button,
+.hub-membership-secondary-button,
+.hub-member-actions button,
+.hub-request-actions button,
+.hub-invite-controls button,
+.hub-members-pagination button,
+.hub-membership-inline-error button,
+.hub-membership-list-state button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: var(--byb-radius-sm);
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    background var(--byb-transition-fast),
+    border-color var(--byb-transition-fast),
+    color var(--byb-transition-fast);
+}
+
+.hub-membership-primary-button,
+.hub-invite-controls button,
+.hub-request-actions button:first-child {
+  color: #fff;
+  background: var(--byb-crimson);
+  border: 1px solid var(--byb-crimson);
+}
+
+.hub-membership-primary-button:hover,
+.hub-invite-controls button:hover,
+.hub-request-actions button:first-child:hover {
+  background: var(--byb-crimson-hover);
+  border-color: var(--byb-crimson-hover);
+}
+
+.hub-membership-secondary-button,
+.hub-member-actions button,
+.hub-request-actions button,
+.hub-members-pagination button,
+.hub-membership-inline-error button,
+.hub-membership-list-state button {
+  color: var(--byb-text-secondary);
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border-light);
+}
+
+.hub-membership-secondary-button:hover,
+.hub-member-actions button:hover,
+.hub-request-actions button:hover,
+.hub-members-pagination button:not(:disabled):hover,
+.hub-membership-inline-error button:hover,
+.hub-membership-list-state button:hover {
+  color: #fff;
+  background: var(--byb-surface-hover);
+  border-color: var(--byb-muted-dark);
+}
+
+.hub-membership-primary-button:disabled,
+.hub-membership-secondary-button:disabled,
+.hub-member-actions button:disabled,
+.hub-request-actions button:disabled,
+.hub-invite-controls button:disabled,
+.hub-members-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hub-membership-pending-badge {
+  display: inline-flex;
+  min-height: 33px;
+  align-items: center;
+  padding: 0 11px;
+  color: var(--byb-warning);
+  background: rgba(240, 180, 91, 0.08);
+  border: 1px solid rgba(240, 180, 91, 0.2);
+  border-radius: var(--byb-radius-sm);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.hub-membership-inline-error {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--byb-danger);
+  font-size: 10px;
+}
+
+.hub-membership-inline-error button {
+  flex: 0 0 auto;
+}
+
+.hub-membership-feedback {
+  padding: 10px 12px;
+  border: 1px solid;
+  border-radius: var(--byb-radius-sm);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.hub-membership-feedback.is-error {
+  color: var(--byb-danger);
+  background: rgba(255, 100, 117, 0.07);
+  border-color: rgba(255, 100, 117, 0.22);
+}
+
+.hub-membership-feedback.is-success {
+  color: var(--byb-success);
+  background: rgba(69, 201, 138, 0.07);
+  border-color: rgba(69, 201, 138, 0.2);
+}
+
+.hub-community-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 15px;
+}
+
+.hub-community-grid.has-management {
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  align-items: start;
+}
+
+.hub-members-section,
+.hub-management-card {
+  min-width: 0;
+  padding: 17px;
+  background: rgba(23, 23, 30, 0.82);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-lg);
+}
+
+.hub-members-section-heading {
+  margin-bottom: 12px;
+}
+
+.hub-members-section-heading h3,
+.hub-management-card h3 {
+  margin: 5px 0 0;
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.hub-member-list,
+.hub-request-list,
+.hub-member-management {
+  display: grid;
+  gap: 9px;
+}
+
+.hub-member-row,
+.hub-request-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-md);
+}
+
+.hub-member-avatar {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--byb-crimson-hover);
+  background: var(--byb-crimson-soft);
+  border: 1px solid var(--byb-crimson-border);
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 800;
+  object-fit: cover;
+}
+
+.hub-member-identity {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.hub-member-identity a,
+.hub-member-identity strong {
+  overflow: hidden;
+  color: var(--byb-text);
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-member-identity a:hover {
+  color: var(--byb-crimson-hover);
+}
+
+.hub-member-identity span {
+  overflow: hidden;
+  color: var(--byb-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-role-badge {
+  display: inline-flex;
+  min-height: 22px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 7px;
+  color: var(--byb-muted);
+  background: var(--byb-surface-light);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-full);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.hub-role-badge.role-owner,
+.hub-role-badge.role-admin {
+  color: #ffd5da;
+  background: var(--byb-crimson-soft);
+  border-color: var(--byb-crimson-border);
+}
+
+.hub-role-badge.role-editor {
+  color: var(--byb-info);
+  background: rgba(105, 169, 255, 0.08);
+  border-color: rgba(105, 169, 255, 0.2);
+}
+
+.hub-member-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+}
+
+.hub-member-actions select {
+  min-width: 76px;
+  min-height: 31px;
+  padding: 0 6px;
+  color: var(--byb-text-secondary);
+  background: var(--byb-bg-secondary);
+  border: 1px solid var(--byb-border-light);
+  border-radius: var(--byb-radius-sm);
+  font-size: 9px;
+}
+
+.hub-member-actions button {
+  min-height: 31px;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+.hub-member-actions .hub-member-remove-button,
+.hub-request-actions .hub-request-reject {
+  color: var(--byb-danger);
+  background: rgba(255, 100, 117, 0.06);
+  border-color: rgba(255, 100, 117, 0.2);
+}
+
+.hub-member-actions .hub-member-remove-button:hover,
+.hub-request-actions .hub-request-reject:hover {
+  background: rgba(255, 100, 117, 0.13);
+  border-color: rgba(255, 100, 117, 0.4);
+}
+
+.hub-member-management {
+  align-content: start;
+}
+
+.hub-management-card > p {
+  margin: 6px 0 13px;
+  color: var(--byb-muted);
+  font-size: 10px;
+}
+
+.hub-management-card form {
+  display: grid;
+  gap: 6px;
+}
+
+.hub-management-card form > label {
+  color: var(--byb-text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.hub-invite-controls {
+  display: flex;
+  gap: 7px;
+}
+
+.hub-invite-controls input {
+  width: 100%;
+  min-width: 0;
+  min-height: 35px;
+  padding: 0 10px;
+  color: var(--byb-text);
+  background: var(--byb-bg-secondary);
+  border: 1px solid var(--byb-border-light);
+  border-radius: var(--byb-radius-sm);
+  font-size: 10px;
+}
+
+.hub-invite-controls input::placeholder {
+  color: var(--byb-muted-dark);
+}
+
+.hub-invite-controls button {
+  flex: 0 0 auto;
+  min-height: 35px;
+}
+
+.hub-invite-error {
+  color: var(--byb-danger);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.hub-requests-heading {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.hub-request-row {
+  flex-wrap: wrap;
+}
+
+.hub-request-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.hub-request-actions button {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+.hub-membership-list-state {
+  padding: 17px 10px;
+  margin: 0;
+  color: var(--byb-muted);
+  background: var(--byb-surface);
+  border: 1px dashed var(--byb-border-light);
+  border-radius: var(--byb-radius-md);
+  font-size: 10px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.hub-membership-list-state p {
+  margin: 0 0 8px;
+}
+
+.hub-membership-list-state.is-error {
+  color: var(--byb-danger);
+  border-style: solid;
+}
+
+.hub-membership-list-state button {
+  min-height: 29px;
+  margin-top: 8px;
+}
+
+.hub-members-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 11px;
+  color: var(--byb-muted);
+  font-size: 9px;
+}
+
+.hub-members-pagination button {
+  min-height: 29px;
+  padding: 0 9px;
+  font-size: 9px;
+}
+
+.hub-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 900px) {
+  .hub-community-grid.has-management {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 580px) {
+  .hub-membership-panel {
+    gap: 13px;
+    padding: 14px;
+    margin-top: 16px;
+  }
+
+  .hub-membership-status {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .hub-membership-status-actions {
+    justify-content: flex-start;
+  }
+
+  .hub-membership-header {
+    align-items: flex-start;
+  }
+
+  .hub-members-section,
+  .hub-management-card {
+    padding: 12px;
+  }
+
+  .hub-member-row {
+    flex-wrap: wrap;
+  }
+
+  .hub-member-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 5px;
+    border-top: 1px solid var(--byb-border);
+  }
+
+  .hub-member-actions select {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-membership-primary-button,
+  .hub-membership-secondary-button,
+  .hub-member-actions button,
+  .hub-request-actions button,
+  .hub-invite-controls button,
+  .hub-members-pagination button,
+  .hub-membership-inline-error button,
+  .hub-membership-list-state button {
+    transition: none;
+  }
+}

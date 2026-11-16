@@ -1,6 +1,5 @@
 
 import {
-  useCallback,
   useEffect,
   useState,
   type FormEvent,
@@ -117,41 +116,46 @@ export default function VibeSpaceContent({
 
   // Load VibeSpace content
 
-  const loadContent = useCallback(async () => {
-    setLoading(true)
-    setError('')
+  useEffect(() => {
+    let active = true
 
-    try {
-      const [vibeData, momentData] = await Promise.all([
-        vibespaceApi.getVibes(username),
-        vibespaceApi.getMoments(username),
-      ])
+    const loadContent = async () => {
+      try {
+        const [vibeData, momentData] = await Promise.all([
+          vibespaceApi.getVibes(username),
+          vibespaceApi.getMoments(username),
+        ])
 
-      setVibes(vibeData)
-      setMoments(momentData)
-      setCounts(
-        Object.fromEntries([
-          ...vibeData.map((item) => [getKey('vibe', item.id), item]),
-          ...momentData.map((item) => [getKey('moment', item.id), item]),
-        ]),
-      )
-    } catch {
-      setError('Unable to load VibeSpace content. Please try again.')
-    } finally {
-      setLoading(false)
+        if (!active) return
+        setError('')
+        setVibes(vibeData)
+        setMoments(momentData)
+        setCounts(
+          Object.fromEntries([
+            ...vibeData.map((item) => [getKey('vibe', item.id), item]),
+            ...momentData.map((item) => [getKey('moment', item.id), item]),
+          ]),
+        )
+      } catch {
+        if (active) {
+          setError('Unable to load VibeSpace content. Please try again.')
+        }
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadContent()
+
+    return () => {
+      active = false
     }
   }, [username])
-
-  useEffect(() => {
-    void loadContent()
-  }, [loadContent])
 
   // Load the current user's saved content and Revibes
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setSavedItems({})
-      setRevibes({})
       return
     }
 

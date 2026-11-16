@@ -4,12 +4,14 @@ from unittest.mock import patch
 from django.db import IntegrityError, connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase
+from django.utils import timezone
 
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.contrib.auth import get_user_model
+from accounts.models import Profile
 
 from .models import Hub, HubMembership, HubApplication
 from .serializers import HubDetailSerializer
@@ -1329,6 +1331,7 @@ class HubDiscoveryAPITests(APITestCase):
                 hub.refresh_from_db()
                 self.assertEqual(hub.name, "Test Hub 1")
 
+
     def test_unrelated_and_unauthenticated_users_cannot_update_hub(self):
         hub = self.create_hub()
         unrelated = User.objects.create_user(
@@ -1489,3 +1492,750 @@ class HubDiscoveryAPITests(APITestCase):
         hub.refresh_from_db()
         self.assertEqual(hub.name, "Test Hub 1")
 
+
+class HubMembershipAPITests(APITestCase):
+    def setUp(self):
+        self.owner = self.create_user("membership_owner")
+        self.user = self.create_user("membership_user")
+        self.hub = Hub.objects.create(
+            name="Membership Hub",
+            slug="membership-hub",
+            hub_type=Hub.HubType.COMMUNITY,
+            membership_policy=Hub.MembershipPolicy.APPROVAL_REQUIRED,
+            created_by=self.owner,
+            owner=self.owner,
+        )
+        self.owner_membership = self.add_membership(
+            self.owner,
+            role=HubMembership.Role.OWNER,
+        )
+        self.authenticate_as(self.user)
+
+    def create_user(self, username, **kwargs):
+        return User.objects.create_user(
+            username=username,
+            email=f"{username}@example.com",
+            password="TestPassword123!",
+            email_verified=True,
+            **kwargs,
+        )
+
+    def authenticate_as(self, user):
+        refresh = RefreshToken.for_user(user)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}"
+        )
+
+    def add_membership(
+        self,
+        user,
+        *,
+        hub=None,
+        role=HubMembership.Role.MEMBER,
+        membership_status=HubMembership.Status.APPROVED,
+    ):
+        return HubMembership.objects.create(
+            hub=hub or self.hub,
+            user=user,
+            role=role,
+            status=membership_status,
+            joined_at=(
+                timezone.now()
+                if membership_status == HubMembership.Status.APPROVED
+                else None
+            ),
+        )
+
+    def membership_url(self, hub=None):
+        return f"/api/hubs/{(hub or self.hub).id}/membership/"
+
+    def members_url(self, hub=None):
+        return f"/api/hubs/{(hub or self.hub).id}/members/"
+
+    def requests_url(self, hub=None):
+        return f"/api/hubs/{(hub or self.hub).id}/members/requests/"
+
+    def review_url(self, membership, decision, hub=None):
+        return (
+            f"{self.requests_url(hub)}{membership.id}/{decision}/"
+        )
+
+    def test_membership_status_is_personal_and_reports_manager_capabilities(self):
+        response = self.client.get(self.membership_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data["membership"])
+        self.assertEqual(
+            response.data["membership_policy"],
+            Hub.MembershipPolicy.APPROVAL_REQUIRED,
+        )
+        self.assertFalse(response.data["can_leave"])
+        self.assertFalse(response.data["can_manage_members"])
+        self.assertIsNone(response.data["pending_request_count"])
+
+        self.authenticate_as(self.owner)
+        owner_response = self.client.get(self.membership_url())
+        self.assertEqual(owner_response.status_code, 200)
+        self.assertEqual(
+            owner_response.data["membership"]["role"],
+            HubMembership.Role.OWNER,
+        )
+        self.assertTrue(owner_response.data["can_manage_members"])
+        self.assertEqual(owner_response.data["pending_request_count"], 0)
+
+    def test_open_join_approves_member_immediately(self):
+        self.hub.membership_policy = Hub.MembershipPolicy.OPEN
+        self.hub.save(update_fields=["membership_policy"])
+
+        response = self.client.post(
+            self.membership_url(),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            response.data["membership"]["status"],
+            HubMembership.Status.APPROVED,
+        )
+        self.assertEqual(
+            response.data["membership"]["role"],
+            HubMembership.Role.MEMBER,
+        )
+        self.assertTrue(response.data["membership"]["joined_at"])
+        self.assertTrue(response.data["can_leave"])
+        self.assertFalse(response.data["can_manage_members"])
+
+    def test_approval_required_join_creates_pending_request(self):
+        response = self.client.post(
+            self.membership_url(),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            response.data["membership"]["status"],
+            HubMembership.Status.PENDING,
+        )
+        self.assertEqual(
+            response.data["membership"]["role"],
+            HubMembership.Role.MEMBER,
+        )
+        self.assertIsNone(response.data["membership"]["joined_at"])
+        self.assertFalse(response.data["can_leave"])
+
+    def test_duplicate_approved_and_pending_joins_are_rejected(self):
+        cases = [
+            (
+                Hub.MembershipPolicy.OPEN,
+                HubMembership.Status.APPROVED,
+                "approved hub member",
+            ),
+            (
+                Hub.MembershipPolicy.APPROVAL_REQUIRED,
+                HubMembership.Status.PENDING,
+                "already pending",
+            ),
+        ]
+        for index, (policy, expected_status, message) in enumerate(cases):
+            with self.subTest(status=expected_status):
+                user = self.create_user(f"duplicate_join_{index}")
+                self.authenticate_as(user)
+                self.hub.membership_policy = policy
+                self.hub.save(update_fields=["membership_policy"])
+                response = self.client.post(
+                    self.membership_url(),
+                    {},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 201)
+                duplicate = self.client.post(
+                    self.membership_url(),
+                    {},
+                    format="json",
+                )
+                self.assertEqual(duplicate.status_code, 400)
+                self.assertIn(message, str(duplicate.data).lower())
+
+    def test_rejected_user_can_submit_a_fresh_request(self):
+        rejected = self.add_membership(
+            self.user,
+            membership_status=HubMembership.Status.REJECTED,
+        )
+
+        response = self.client.post(
+            self.membership_url(),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        rejected.refresh_from_db()
+        self.assertEqual(response.data["membership"]["id"], str(rejected.id))
+        self.assertEqual(rejected.status, HubMembership.Status.PENDING)
+        self.assertEqual(rejected.role, HubMembership.Role.MEMBER)
+        self.assertIsNone(rejected.joined_at)
+
+    def test_inactive_hub_and_unauthenticated_join_are_rejected(self):
+        inactive = Hub.objects.create(
+            name="Inactive Membership Hub",
+            slug="inactive-membership-hub",
+            hub_type=Hub.HubType.COMMUNITY,
+            created_by=self.owner,
+            owner=self.owner,
+            is_active=False,
+        )
+        inactive_response = self.client.post(
+            self.membership_url(inactive),
+            {},
+            format="json",
+        )
+        self.assertEqual(inactive_response.status_code, 404)
+
+        self.client.credentials()
+        unauthenticated = self.client.post(
+            self.membership_url(),
+            {},
+            format="json",
+        )
+        self.assertEqual(unauthenticated.status_code, 401)
+
+    def test_join_rejects_protected_membership_fields(self):
+        response = self.client.post(
+            self.membership_url(),
+            {
+                "role": HubMembership.Role.ADMIN,
+                "status": HubMembership.Status.APPROVED,
+                "joined_at": timezone.now().isoformat(),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("role", response.data)
+        self.assertIn("status", response.data)
+        self.assertFalse(
+            HubMembership.objects.filter(hub=self.hub, user=self.user).exists()
+        )
+
+    def test_member_editor_and_admin_can_leave_but_owner_cannot(self):
+        for index, role in enumerate(
+            (
+                HubMembership.Role.MEMBER,
+                HubMembership.Role.EDITOR,
+                HubMembership.Role.ADMIN,
+            )
+        ):
+            with self.subTest(role=role):
+                user = self.create_user(f"leave_user_{index}")
+                membership = self.add_membership(user, role=role)
+                self.authenticate_as(user)
+                response = self.client.delete(self.membership_url())
+                self.assertEqual(response.status_code, 204)
+                self.assertFalse(
+                    HubMembership.objects.filter(pk=membership.pk).exists()
+                )
+                self.assertTrue(Hub.objects.filter(pk=self.hub.pk).exists())
+
+        self.authenticate_as(self.owner)
+        owner_response = self.client.delete(self.membership_url())
+        self.assertEqual(owner_response.status_code, 403)
+        self.assertTrue(
+            HubMembership.objects.filter(pk=self.owner_membership.pk).exists()
+        )
+
+    def test_pending_user_cannot_leave_without_a_cancellation_workflow(self):
+        pending = self.add_membership(
+            self.user,
+            membership_status=HubMembership.Status.PENDING,
+        )
+
+        response = self.client.delete(self.membership_url())
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(HubMembership.objects.filter(pk=pending.pk).exists())
+
+    def test_directory_lists_approved_members_only_and_hides_private_profile_data(self):
+        public_user = self.create_user(
+            "directory_public",
+            first_name="Public",
+            last_name="Member",
+        )
+        Profile.objects.create(
+            user=public_user,
+            profile_type=Profile.ProfileType.STUDENT,
+            visibility=Profile.Visibility.PUBLIC,
+            profile_picture="https://example.com/public.png",
+        )
+        private_user = self.create_user(
+            "directory_private",
+            first_name="Private",
+            last_name="Person",
+        )
+        Profile.objects.create(
+            user=private_user,
+            profile_type=Profile.ProfileType.STUDENT,
+            visibility=Profile.Visibility.PRIVATE,
+            profile_picture="https://example.com/private.png",
+        )
+        no_profile_user = self.create_user("directory_no_profile")
+        pending_user = self.create_user("directory_pending")
+        rejected_user = self.create_user("directory_rejected")
+        public_membership = self.add_membership(public_user)
+        private_membership = self.add_membership(private_user)
+        self.add_membership(no_profile_user)
+        self.add_membership(
+            pending_user,
+            membership_status=HubMembership.Status.PENDING,
+        )
+        self.add_membership(
+            rejected_user,
+            membership_status=HubMembership.Status.REJECTED,
+        )
+
+        response = self.client.get(self.members_url())
+
+        self.assertEqual(response.status_code, 200)
+        by_id = {entry["id"]: entry for entry in response.data["results"]}
+        self.assertIn(str(public_membership.id), by_id)
+        self.assertIn(str(private_membership.id), by_id)
+        self.assertEqual(
+            by_id[str(public_membership.id)]["username"],
+            "directory_public",
+        )
+        self.assertEqual(
+            by_id[str(public_membership.id)]["profile_picture"],
+            "https://example.com/public.png",
+        )
+        self.assertIsNone(by_id[str(private_membership.id)]["username"])
+        self.assertEqual(by_id[str(private_membership.id)]["first_name"], "")
+        self.assertEqual(by_id[str(private_membership.id)]["profile_picture"], "")
+        self.assertTrue(
+            all(
+                entry["status"] == HubMembership.Status.APPROVED
+                for entry in response.data["results"]
+            )
+        )
+        self.assertNotIn("email", by_id[str(public_membership.id)])
+        self.assertNotIn("user", by_id[str(public_membership.id)])
+        self.assertEqual(response.data["count"], 4)
+
+    def test_directory_is_paginated(self):
+        for index in range(11):
+            user = self.create_user(f"page_member_{index}")
+            self.add_membership(user)
+
+        first_page = self.client.get(self.members_url())
+        second_page = self.client.get(f"{self.members_url()}?page=2")
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(first_page.data["count"], 12)
+        self.assertEqual(len(first_page.data["results"]), 10)
+        self.assertEqual(first_page.data["next"], 2)
+        self.assertEqual(second_page.status_code, 200)
+        self.assertEqual(len(second_page.data["results"]), 2)
+        self.assertEqual(second_page.data["previous"], 1)
+
+    def test_only_owner_and_approved_admin_can_list_pending_requests(self):
+        pending_user = self.create_user("pending_list_user")
+        pending = self.add_membership(
+            pending_user,
+            membership_status=HubMembership.Status.PENDING,
+        )
+
+        unauthorized = self.client.get(self.requests_url())
+        self.assertEqual(unauthorized.status_code, 403)
+
+        self.authenticate_as(self.owner)
+        owner_response = self.client.get(self.requests_url())
+        self.assertEqual(owner_response.status_code, 200)
+        self.assertEqual(owner_response.data["count"], 1)
+        self.assertEqual(
+            owner_response.data["results"][0]["id"],
+            str(pending.id),
+        )
+        self.assertEqual(
+            owner_response.data["results"][0]["status"],
+            HubMembership.Status.PENDING,
+        )
+
+        admin = self.create_user("pending_list_admin")
+        self.add_membership(admin, role=HubMembership.Role.ADMIN)
+        self.authenticate_as(admin)
+        admin_response = self.client.get(self.requests_url())
+        self.assertEqual(admin_response.status_code, 200)
+        self.assertEqual(admin_response.data["count"], 1)
+
+    def test_member_and_editor_cannot_manage_pending_requests(self):
+        for role in (HubMembership.Role.MEMBER, HubMembership.Role.EDITOR):
+            user = self.create_user(f"cannot_manage_{role}")
+            self.add_membership(user, role=role)
+            self.authenticate_as(user)
+            response = self.client.get(self.requests_url())
+            self.assertEqual(response.status_code, 403)
+
+    def test_owner_and_admin_can_approve_or_reject_pending_requests(self):
+        for actor_role in ("owner", "admin"):
+            for decision in ("approve", "reject"):
+                with self.subTest(actor=actor_role, decision=decision):
+                    applicant = self.create_user(
+                        f"review_{actor_role}_{decision}"
+                    )
+                    pending = self.add_membership(
+                        applicant,
+                        membership_status=HubMembership.Status.PENDING,
+                    )
+                    actor = self.owner
+                    if actor_role == "admin":
+                        actor = self.create_user(f"review_manager_{decision}")
+                        self.add_membership(actor, role=HubMembership.Role.ADMIN)
+                    self.authenticate_as(actor)
+
+                    response = self.client.post(
+                        self.review_url(pending, decision),
+                        {},
+                        format="json",
+                    )
+
+                    expected_status = (
+                        HubMembership.Status.APPROVED
+                        if decision == "approve"
+                        else HubMembership.Status.REJECTED
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    pending.refresh_from_db()
+                    self.assertEqual(pending.status, expected_status)
+                    self.assertEqual(response.data["status"], expected_status)
+                    self.assertEqual(pending.role, HubMembership.Role.MEMBER)
+                    self.assertEqual(
+                        bool(pending.joined_at),
+                        decision == "approve",
+                    )
+
+    def test_only_pending_requests_can_be_processed_and_own_request_is_forbidden(self):
+        approved_user = self.create_user("already_approved")
+        approved = self.add_membership(approved_user)
+        self.authenticate_as(self.owner)
+
+        repeated = self.client.post(
+            self.review_url(approved, "approve"),
+            {},
+            format="json",
+        )
+        self.assertEqual(repeated.status_code, 400)
+
+        self.owner_membership.status = HubMembership.Status.PENDING
+        self.owner_membership.joined_at = None
+        self.owner_membership.save(update_fields=["status", "joined_at"])
+        self_review = self.client.post(
+            self.review_url(self.owner_membership, "approve"),
+            {},
+            format="json",
+        )
+        self.assertEqual(self_review.status_code, 403)
+
+    def test_cross_hub_request_review_is_not_found(self):
+        another_hub = Hub.objects.create(
+            name="Another Membership Hub",
+            slug="another-membership-hub",
+            hub_type=Hub.HubType.COMMUNITY,
+            created_by=self.owner,
+            owner=self.owner,
+        )
+        applicant = self.create_user("cross_hub_applicant")
+        request = self.add_membership(
+            applicant,
+            hub=another_hub,
+            membership_status=HubMembership.Status.PENDING,
+        )
+        self.authenticate_as(self.owner)
+
+        response = self.client.post(
+            self.review_url(request, "approve"),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        request.refresh_from_db()
+        self.assertEqual(request.status, HubMembership.Status.PENDING)
+
+    def test_owner_and_admin_can_invite_existing_users(self):
+        for actor_role in ("owner", "admin"):
+            invitee = self.create_user(f"invited_{actor_role}")
+            actor = self.owner
+            if actor_role == "admin":
+                actor = self.create_user("invite_admin")
+                self.add_membership(actor, role=HubMembership.Role.ADMIN)
+            self.authenticate_as(actor)
+
+            response = self.client.post(
+                f"/api/hubs/{self.hub.id}/members/invitations/",
+                {"username": invitee.username},
+                format="json",
+            )
+
+            self.assertEqual(response.status_code, 201)
+            self.assertEqual(response.data["role"], HubMembership.Role.MEMBER)
+            self.assertEqual(
+                response.data["status"],
+                HubMembership.Status.APPROVED,
+            )
+            self.assertNotIn("email", response.data)
+            self.assertTrue(
+                HubMembership.objects.filter(
+                    hub=self.hub,
+                    user=invitee,
+                    status=HubMembership.Status.APPROVED,
+                ).exists()
+            )
+
+    def test_invite_rejects_owner_duplicate_pending_and_ineligible_users(self):
+        approved = self.create_user("invite_approved")
+        pending = self.create_user("invite_pending")
+        unverified = User.objects.create_user(
+            username="invite_unverified",
+            email="invite_unverified@example.com",
+            password="TestPassword123!",
+            email_verified=False,
+        )
+        self.add_membership(approved)
+        self.add_membership(
+            pending,
+            membership_status=HubMembership.Status.PENDING,
+        )
+
+        base_url = f"/api/hubs/{self.hub.id}/members/invitations/"
+        cases = (
+            (self.owner.username, "owner"),
+            (approved.username, "approved"),
+            (pending.username, "pending"),
+            (unverified.username, "unverified"),
+            ("missing_user", "missing"),
+        )
+        self.authenticate_as(self.owner)
+        for username, label in cases:
+            with self.subTest(username=label):
+                response = self.client.post(
+                    base_url,
+                    {"username": username},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+
+    def test_rejected_membership_can_be_reactivated_by_invitation(self):
+        invitee = self.create_user("reinvited_user")
+        rejected = self.add_membership(
+            invitee,
+            membership_status=HubMembership.Status.REJECTED,
+        )
+        self.authenticate_as(self.owner)
+
+        response = self.client.post(
+            f"/api/hubs/{self.hub.id}/members/invitations/",
+            {"username": invitee.username},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        rejected.refresh_from_db()
+        self.assertEqual(response.data["id"], str(rejected.id))
+        self.assertEqual(rejected.status, HubMembership.Status.APPROVED)
+        self.assertEqual(rejected.role, HubMembership.Role.MEMBER)
+        self.assertTrue(rejected.joined_at)
+
+    def test_member_and_editor_cannot_invite(self):
+        target = self.create_user("invite_denied_target")
+        for role in (HubMembership.Role.MEMBER, HubMembership.Role.EDITOR):
+            actor = self.create_user(f"invite_denied_{role}")
+            self.add_membership(actor, role=role)
+            self.authenticate_as(actor)
+            response = self.client.post(
+                f"/api/hubs/{self.hub.id}/members/invitations/",
+                {"username": target.username},
+                format="json",
+            )
+            self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            HubMembership.objects.filter(hub=self.hub, user=target).exists()
+        )
+
+    def test_owner_assigns_roles_and_admin_can_only_manage_members_and_editors(self):
+        target = self.create_user("role_target")
+        membership = self.add_membership(target)
+        role_url = (
+            f"/api/hubs/{self.hub.id}/members/{membership.id}/role/"
+        )
+        self.authenticate_as(self.owner)
+
+        for role in (
+            HubMembership.Role.ADMIN,
+            HubMembership.Role.EDITOR,
+            HubMembership.Role.MEMBER,
+        ):
+            response = self.client.patch(
+                role_url,
+                {"role": role},
+                format="json",
+            )
+            self.assertEqual(response.status_code, 200)
+            membership.refresh_from_db()
+            self.assertEqual(membership.role, role)
+
+        admin = self.create_user("role_manager_admin")
+        self.add_membership(admin, role=HubMembership.Role.ADMIN)
+        self.authenticate_as(admin)
+        editor_response = self.client.patch(
+            role_url,
+            {"role": HubMembership.Role.EDITOR},
+            format="json",
+        )
+        self.assertEqual(editor_response.status_code, 200)
+        member_response = self.client.patch(
+            role_url,
+            {"role": HubMembership.Role.MEMBER},
+            format="json",
+        )
+        self.assertEqual(member_response.status_code, 200)
+
+        promote_admin = self.client.patch(
+            role_url,
+            {"role": HubMembership.Role.ADMIN},
+            format="json",
+        )
+        self.assertEqual(promote_admin.status_code, 403)
+
+        another_admin = self.create_user("protected_admin_target")
+        another_admin_membership = self.add_membership(
+            another_admin,
+            role=HubMembership.Role.ADMIN,
+        )
+        admin_target_url = (
+            f"/api/hubs/{self.hub.id}/members/"
+            f"{another_admin_membership.id}/role/"
+        )
+        demote_admin = self.client.patch(
+            admin_target_url,
+            {"role": HubMembership.Role.MEMBER},
+            format="json",
+        )
+        remove_admin = self.client.delete(
+            f"/api/hubs/{self.hub.id}/members/"
+            f"{another_admin_membership.id}/"
+        )
+        self.assertEqual(demote_admin.status_code, 403)
+        self.assertEqual(remove_admin.status_code, 403)
+
+    def test_owner_membership_cannot_be_removed_or_demoted(self):
+        self.authenticate_as(self.owner)
+        role_response = self.client.patch(
+            f"/api/hubs/{self.hub.id}/members/"
+            f"{self.owner_membership.id}/role/",
+            {"role": HubMembership.Role.MEMBER},
+            format="json",
+        )
+        remove_response = self.client.delete(
+            f"/api/hubs/{self.hub.id}/members/"
+            f"{self.owner_membership.id}/"
+        )
+
+        self.assertEqual(role_response.status_code, 403)
+        self.assertEqual(remove_response.status_code, 400)
+        self.owner_membership.refresh_from_db()
+        self.assertEqual(
+            self.owner_membership.role,
+            HubMembership.Role.OWNER,
+        )
+        self.assertEqual(
+            self.owner_membership.status,
+            HubMembership.Status.APPROVED,
+        )
+
+    def test_owner_can_remove_members_and_admin_cannot_remove_admins(self):
+        member = self.create_user("removable_member")
+        membership = self.add_membership(member)
+        self.authenticate_as(self.owner)
+        removed = self.client.delete(
+            f"/api/hubs/{self.hub.id}/members/{membership.id}/"
+        )
+        self.assertEqual(removed.status_code, 204)
+        self.assertFalse(HubMembership.objects.filter(pk=membership.pk).exists())
+
+        admin = self.create_user("remove_admin")
+        self.add_membership(admin, role=HubMembership.Role.ADMIN)
+        editor = self.create_user("admin_removable_editor")
+        editor_membership = self.add_membership(editor, role=HubMembership.Role.EDITOR)
+        self.authenticate_as(admin)
+        editor_removed = self.client.delete(
+            f"/api/hubs/{self.hub.id}/members/{editor_membership.id}/"
+        )
+        self.assertEqual(editor_removed.status_code, 204)
+
+    def test_members_cannot_submit_protected_role_or_status_fields(self):
+        target = self.create_user("protected_role_target")
+        membership = self.add_membership(target)
+        role_url = (
+            f"/api/hubs/{self.hub.id}/members/{membership.id}/role/"
+        )
+        self.authenticate_as(self.owner)
+
+        role_response = self.client.patch(
+            role_url,
+            {
+                "role": HubMembership.Role.ADMIN,
+                "status": HubMembership.Status.APPROVED,
+                "user": str(self.owner.id),
+            },
+            format="json",
+        )
+        invite_response = self.client.post(
+            f"/api/hubs/{self.hub.id}/members/invitations/",
+            {
+                "username": target.username,
+                "role": HubMembership.Role.ADMIN,
+                "status": HubMembership.Status.APPROVED,
+            },
+            format="json",
+        )
+        invalid_role = self.client.patch(
+            role_url,
+            {"role": HubMembership.Role.OWNER},
+            format="json",
+        )
+
+        self.assertEqual(role_response.status_code, 400)
+        self.assertIn("status", role_response.data)
+        self.assertIn("user", role_response.data)
+        self.assertEqual(invite_response.status_code, 400)
+        self.assertIn("role", invite_response.data)
+        self.assertEqual(invalid_role.status_code, 400)
+
+        membership.refresh_from_db()
+        self.assertEqual(membership.role, HubMembership.Role.MEMBER)
+
+    def test_admin_member_and_editor_cannot_change_roles(self):
+        target = self.create_user("role_permission_target")
+        membership = self.add_membership(target)
+        for role in (
+            HubMembership.Role.MEMBER,
+            HubMembership.Role.EDITOR,
+        ):
+            actor = self.create_user(f"role_permission_{role}")
+            self.add_membership(actor, role=role)
+            self.authenticate_as(actor)
+            response = self.client.patch(
+                f"/api/hubs/{self.hub.id}/members/{membership.id}/role/",
+                {"role": HubMembership.Role.EDITOR},
+                format="json",
+            )
+            self.assertEqual(response.status_code, 403)
+
+    def test_unauthenticated_membership_operations_are_rejected(self):
+        self.client.credentials()
+        responses = [
+            self.client.get(self.membership_url()),
+            self.client.get(self.members_url()),
+            self.client.post(self.membership_url(), {}, format="json"),
+        ]
+        self.assertEqual([response.status_code for response in responses], [401] * 3)

@@ -2,7 +2,9 @@ from collections.abc import Mapping
 
 from rest_framework import serializers
 
-from .models import Hub
+from accounts.models import Profile
+
+from .models import Hub, HubMembership
 from .permissions import can_edit_hub
 from .services.hub_creation_service import create_hub
 
@@ -141,3 +143,90 @@ class HubUpdateSerializer(serializers.ModelSerializer):
                     for field in sorted(unknown_fields)
                 })
         return super().to_internal_value(data)
+
+
+class HubMembershipStateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HubMembership
+        fields = ["id", "role", "status", "joined_at"]
+        read_only_fields = fields
+
+
+class HubMemberSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HubMembership
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "profile_picture",
+            "role",
+            "status",
+            "joined_at",
+        ]
+        read_only_fields = fields
+
+    def _public_profile(self, obj):
+        user = obj.user
+        if not user.is_active or not user.email_verified:
+            return None
+        profile = getattr(user, "profile", None)
+        if profile is None:
+            return None
+        if profile.visibility != Profile.Visibility.PUBLIC:
+            return None
+        return profile
+
+    def get_username(self, obj):
+        if self._public_profile(obj):
+            return obj.user.username
+        return None
+
+    def get_first_name(self, obj):
+        if self._public_profile(obj):
+            return obj.user.first_name
+        return ""
+
+    def get_last_name(self, obj):
+        if self._public_profile(obj):
+            return obj.user.last_name
+        return ""
+
+    def get_profile_picture(self, obj):
+        profile = self._public_profile(obj)
+        return profile.profile_picture if profile else ""
+
+
+class StrictMembershipInputSerializer(serializers.Serializer):
+    def to_internal_value(self, data):
+        if isinstance(data, Mapping):
+            unknown_fields = set(data.keys()) - set(self.fields.keys())
+            if unknown_fields:
+                raise serializers.ValidationError({
+                    field: ["This field may not be modified."]
+                    for field in sorted(unknown_fields)
+                })
+        return super().to_internal_value(data)
+
+
+class HubInviteSerializer(StrictMembershipInputSerializer):
+    username = serializers.CharField(
+        max_length=150,
+        trim_whitespace=True,
+    )
+
+
+class HubMemberRoleSerializer(StrictMembershipInputSerializer):
+    role = serializers.ChoiceField(
+        choices=[
+            HubMembership.Role.ADMIN,
+            HubMembership.Role.EDITOR,
+            HubMembership.Role.MEMBER,
+        ],
+    )

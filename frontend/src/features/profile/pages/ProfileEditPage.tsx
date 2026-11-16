@@ -6,6 +6,7 @@ import { useAuth } from '../../../context/AuthContext'
 import profileApi, {
   type CreateProfileData,
   type ProfileImageType,
+  type UserProfile,
 } from '../../../services/profileApi'
 
 import './profile.css'
@@ -37,13 +38,97 @@ const initialForm: CreateProfileData = {
 
 const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
 
+function profileToForm(profile: UserProfile): CreateProfileData {
+  return {
+    first_name: profile.first_name || '',
+    last_name: profile.last_name || '',
+    profile_type: profile.profile_type,
+    byb_signature: profile.byb_signature || '',
+    bio: profile.bio || '',
+    city: profile.city || '',
+    institution: profile.institution || '',
+    course: profile.course || '',
+    field_of_study: profile.field_of_study || '',
+    academic_year: profile.academic_year || '',
+    graduation_year: profile.graduation_year,
+    current_organization: profile.current_organization || '',
+    job_title: profile.job_title || '',
+    industry: profile.industry || '',
+    experience_years: profile.experience_years,
+    interests: profile.interests || [],
+    skills: profile.skills || [],
+    linkedin_url: profile.linkedin_url || '',
+    github_url: profile.github_url || '',
+    website_url: profile.website_url || '',
+    visibility: profile.visibility || 'public',
+  }
+}
+
+interface ImagePreviewProps {
+  title: string
+  image: string
+  preview: string
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void
+  onRemove: () => void
+  isRemoved: boolean
+}
+
+function ImagePreview({
+  title,
+  image,
+  preview,
+  onChange,
+  onRemove,
+  isRemoved,
+}: ImagePreviewProps) {
+  return (
+    <div className="profile-edit-image-field">
+      <label>{title}</label>
+
+      {(preview || (image && !isRemoved)) && (
+        <div className="profile-edit-image-preview">
+          <img
+            src={preview || image}
+            alt={`${title} preview`}
+          />
+        </div>
+      )}
+
+      {isRemoved && !preview && (
+        <p className="vibespace-empty-note">Image will be removed when you save.</p>
+      )}
+
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        onChange={onChange}
+      />
+
+      <button
+        type="button"
+        className="profile-edit-remove-button"
+        onClick={onRemove}
+        disabled={isRemoved || (!image && !preview)}
+      >
+        Remove image
+      </button>
+    </div>
+  )
+}
+
 export default function ProfileEditPage() {
   const navigate = useNavigate()
   const { profile, setProfile } = useAuth()
 
-  const [form, setForm] = useState<CreateProfileData>(initialForm)
-  const [interestsText, setInterestsText] = useState('')
-  const [skillsText, setSkillsText] = useState('')
+  const [form, setForm] = useState<CreateProfileData>(
+    () => profile ? profileToForm(profile) : initialForm
+  )
+  const [interestsText, setInterestsText] = useState(
+    () => profile?.interests?.join(', ') || ''
+  )
+  const [skillsText, setSkillsText] = useState(
+    () => profile?.skills?.join(', ') || ''
+  )
 
   const [profilePicture, setProfilePicture] = useState<File | null>(null)
   const [coverImage, setCoverImage] = useState<File | null>(null)
@@ -57,37 +142,6 @@ export default function ProfileEditPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-
-  useEffect(() => {
-    if (!profile) return
-
-    setForm({
-      first_name: profile.first_name || '',
-      last_name: profile.last_name || '',
-      profile_type: profile.profile_type,
-      byb_signature: profile.byb_signature || '',
-      bio: profile.bio || '',
-      city: profile.city || '',
-      institution: profile.institution || '',
-      course: profile.course || '',
-      field_of_study: profile.field_of_study || '',
-      academic_year: profile.academic_year || '',
-      graduation_year: profile.graduation_year,
-      current_organization: profile.current_organization || '',
-      job_title: profile.job_title || '',
-      industry: profile.industry || '',
-      experience_years: profile.experience_years,
-      interests: profile.interests || [],
-      skills: profile.skills || [],
-      linkedin_url: profile.linkedin_url || '',
-      github_url: profile.github_url || '',
-      website_url: profile.website_url || '',
-      visibility: profile.visibility || 'public',
-    })
-
-    setInterestsText((profile.interests || []).join(', '))
-    setSkillsText((profile.skills || []).join(', '))
-  }, [profile])
 
   useEffect(() => {
     return () => {
@@ -210,54 +264,6 @@ export default function ProfileEditPage() {
       setSaving(false)
     }
   }
-
-  const ImagePreview = ({
-    title,
-    image,
-    preview,
-    onChange,
-    onRemove,
-    isRemoved,
-  }: {
-    title: string
-    image: string
-    preview: string
-    onChange: (event: ChangeEvent<HTMLInputElement>) => void
-    onRemove: () => void
-    isRemoved: boolean
-  }) => (
-    <div className="profile-edit-image-field">
-      <label>{title}</label>
-
-      {(preview || (image && !isRemoved)) && (
-        <div className="profile-edit-image-preview">
-          <img
-            src={preview || image}
-            alt={`${title} preview`}
-          />
-        </div>
-      )}
-
-      {isRemoved && !preview && (
-        <p className="vibespace-empty-note">Image will be removed when you save.</p>
-      )}
-
-      <input
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        onChange={onChange}
-      />
-
-      <button
-        type="button"
-        className="profile-edit-remove-button"
-        onClick={onRemove}
-        disabled={isRemoved || (!image && !preview)}
-      >
-        Remove image
-      </button>
-    </div>
-  )
 
   return (
     <main className="profile-edit-page">

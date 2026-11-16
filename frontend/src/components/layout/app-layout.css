@@ -319,7 +319,7 @@
 .byb-create-toolbar {
   position: relative;
   z-index: 30;
-  display: flex;
+  display: none;
   justify-content: flex-start;
   padding: 12px clamp(16px, 3vw, 40px) 0;
 }
@@ -589,6 +589,10 @@
     align-items: start;
     min-height: 100vh;
     padding-bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+
+  .byb-create-toolbar {
+    display: flex;
   }
 
   .byb-sidebar,

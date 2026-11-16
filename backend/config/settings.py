@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     # BYB applications
     "accounts",
     "hubs",
+    "search",
     # BYB applications
 
     "events",

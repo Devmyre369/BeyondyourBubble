@@ -47,4 +47,9 @@ urlpatterns = [
         "api/hubs/",
         include("hubs.urls"),
     ),
+
+    path(
+        "api/search/",
+        include("search.urls"),
+    ),
 ]

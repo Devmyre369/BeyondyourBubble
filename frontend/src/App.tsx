@@ -20,6 +20,8 @@ import CreatePostPage from './features/feed/CreatePostPage'
 import EventsPage from './features/events/EventsPage'
 import HubDiscoverPage from './features/hubs/HubDiscoverPage'
 import HubDetailPage from './features/hubs/HubDetailPage'
+import SearchPage from './features/search/SearchPage'
+import PublicUserProfilePage from './features/search/PublicUserProfilePage'
 import AppLayout from './components/layout/AppLayout'
 
 export default function App() {
@@ -62,6 +64,8 @@ export default function App() {
               element={<CreatePostPage type="moment" />}
             />
             <Route path="/events" element={<EventsPage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/users/:username" element={<PublicUserProfilePage />} />
             <Route path="/hubs" element={<HubDiscoverPage />} />
             <Route path="/hubs/:hubId" element={<HubDetailPage />} />
             <Route path="/profile" element={<ProfilePage />} />

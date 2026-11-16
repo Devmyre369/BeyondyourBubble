@@ -18,7 +18,6 @@ class Hub(models.Model):
 
     class Visibility(models.TextChoices):
         PUBLIC = "public", "Public"
-        PRIVATE = "private", "Private"
 
     class MembershipPolicy(models.TextChoices):
         OPEN = "open", "Open"
@@ -45,7 +44,7 @@ class Hub(models.Model):
     visibility = models.CharField(
         max_length=10,
         choices=Visibility.choices,
-        default=Visibility.PRIVATE,
+        default=Visibility.PUBLIC,
     )
 
     membership_policy = models.CharField(

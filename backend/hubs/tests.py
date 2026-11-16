@@ -1,8 +1,9 @@
 import uuid as uuid_module
 from unittest.mock import patch
 
-from django.test import TestCase
-from django.db import IntegrityError
+from django.db import IntegrityError, connection
+from django.db.migrations.executor import MigrationExecutor
+from django.test import TestCase, TransactionTestCase
 
 from rest_framework.exceptions import ValidationError, PermissionDenied
 
@@ -85,12 +86,16 @@ class HubModelTests(TestCase):
             self.assertEqual(hub.hub_type, hub_type)
 
     def test_all_supported_visibility_values(self):
-        for visibility, _ in Hub.Visibility.choices:
-            hub = self.create_hub(
-                slug=f"hub-visibility-{visibility}",
-                visibility=visibility,
-            )
-            self.assertEqual(hub.visibility, visibility)
+        self.assertEqual(
+            {visibility for visibility, _ in Hub.Visibility.choices},
+            {"public"},
+        )
+
+        hub = self.create_hub(
+            slug="hub-visibility-public",
+            visibility=Hub.Visibility.PUBLIC,
+        )
+        self.assertEqual(hub.visibility, Hub.Visibility.PUBLIC)
 
     def test_all_supported_membership_policies(self):
         for policy, _ in Hub.MembershipPolicy.choices:
@@ -102,7 +107,7 @@ class HubModelTests(TestCase):
 
     def test_safe_policy_defaults(self):
         hub = self.create_hub()
-        self.assertEqual(hub.visibility, Hub.Visibility.PRIVATE)
+        self.assertEqual(hub.visibility, Hub.Visibility.PUBLIC)
         self.assertEqual(
             hub.membership_policy,
             Hub.MembershipPolicy.APPROVAL_REQUIRED,
@@ -404,7 +409,7 @@ class HubApplicationServiceTests(TestCase):
         self.assertTrue(result["hub"].is_active)
         self.assertEqual(
             result["hub"].visibility,
-            Hub.Visibility.PRIVATE,
+            Hub.Visibility.PUBLIC,
         )
         self.assertEqual(
             result["hub"].membership_policy,
@@ -590,4 +595,57 @@ class HubApplicationServiceTests(TestCase):
     def test_uuid_primary_key(self):
         application = self.create_application()
         uuid_module.UUID(str(application.id))
+
+
+class HubVisibilityMigrationTests(TransactionTestCase):
+    migrate_from = [("hubs", "0003_add_hub_policies")]
+    migrate_to = [("hubs", "0004_public_hub_visibility")]
+
+    def setUp(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        Hub = old_apps.get_model("hubs", "Hub")
+
+        user = User.objects.create(
+            username="visibility-migration-user",
+            email="visibility-migration@example.com",
+            onboarding_completed=False,
+        )
+        self.hub_ids = [
+            Hub.objects.create(
+                name=f"Existing Hub {index}",
+                slug=f"existing-visibility-hub-{index}",
+                hub_type="company",
+                visibility="private",
+                membership_policy="approval_required",
+                created_by=user,
+                owner=user,
+            ).pk
+            for index in range(2)
+        ]
+
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        self.apps = executor.loader.project_state(self.migrate_to).apps
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def test_existing_hubs_are_migrated_to_public(self):
+        Hub = self.apps.get_model("hubs", "Hub")
+        hubs = Hub.objects.filter(pk__in=self.hub_ids)
+
+        self.assertEqual(hubs.count(), 2)
+        self.assertEqual(
+            set(hubs.values_list("visibility", flat=True)),
+            {"public"},
+        )
+        self.assertEqual(
+            set(hubs.values_list("membership_policy", flat=True)),
+            {"approval_required"},
+        )
 

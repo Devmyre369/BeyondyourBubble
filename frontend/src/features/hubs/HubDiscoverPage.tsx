@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import {
   hubsApi,
@@ -40,96 +41,101 @@ function HubCard({ hub }: { hub: HubListItem }) {
   const titleId = `hub-title-${hub.id}`
 
   return (
-    <article className="hub-card" aria-labelledby={titleId}>
-      <div className="hub-card-cover">
-        {hub.cover_image && (
-          <img
-            className="hub-card-cover-image"
-            src={hub.cover_image}
-            alt=""
-            loading="lazy"
-            onError={(event) => {
-              event.currentTarget.style.visibility = 'hidden'
-            }}
-          />
-        )}
-        <div className="hub-card-cover-shade" />
-        <span className="hub-card-category">
-          {CATEGORY_LABELS[hub.hub_type]}
-        </span>
-        <span className="hub-card-cover-mark" aria-hidden="true">
-          BYB
-        </span>
-      </div>
-
-      <div className="hub-card-content">
-        <div className="hub-card-heading">
-          <div className="hub-card-logo" aria-hidden="true">
-            {hub.logo && (
-              <img
-                src={hub.logo}
-                alt=""
-                loading="lazy"
-                onError={(event) => {
-                  event.currentTarget.style.visibility = 'hidden'
-                }}
-              />
-            )}
-            <span>{hub.name.trim().charAt(0).toUpperCase() || 'H'}</span>
-          </div>
-
-          <div className="hub-card-title-group">
-            <div className="hub-card-title-line">
-              <h3 id={titleId}>{hub.name}</h3>
-              {hub.is_verified && (
-                <span
-                  className="hub-card-verified"
-                  role="img"
-                  aria-label="Verified Hub"
-                  title="Verified Hub"
-                >
-                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                    <path
-                      d="m5 10 3.2 3.2L15.5 6"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
-              )}
-            </div>
-
-            <p className="hub-card-location">
-              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path
-                  d="M16 8.3c0 4.1-6 9.2-6 9.2S4 12.4 4 8.3a6 6 0 1 1 12 0Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <circle
-                  cx="10"
-                  cy="8"
-                  r="2"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-              </svg>
-              <span>{hub.city || 'Location not listed'}</span>
-            </p>
-          </div>
+    <Link className="hub-card-link" to={`/hubs/${hub.id}`}>
+      <article className="hub-card" aria-labelledby={titleId}>
+        <div className="hub-card-cover">
+          {hub.cover_image && (
+            <img
+              className="hub-card-cover-image"
+              src={hub.cover_image}
+              alt=""
+              loading="lazy"
+              onError={(event) => {
+                event.currentTarget.style.visibility = 'hidden'
+              }}
+            />
+          )}
+          <div className="hub-card-cover-shade" />
+          <span className="hub-card-category">
+            {CATEGORY_LABELS[hub.hub_type]}
+          </span>
+          <span className="hub-card-cover-mark" aria-hidden="true">
+            BYB
+          </span>
         </div>
 
-        <p className="hub-card-description">
-          {hub.short_description || 'No description available yet.'}
-        </p>
-      </div>
-    </article>
+        <div className="hub-card-content">
+          <div className="hub-card-heading">
+            <div className="hub-card-logo" aria-hidden="true">
+              {hub.logo && (
+                <img
+                  src={hub.logo}
+                  alt=""
+                  loading="lazy"
+                  onError={(event) => {
+                    event.currentTarget.style.visibility = 'hidden'
+                  }}
+                />
+              )}
+              <span>{hub.name.trim().charAt(0).toUpperCase() || 'H'}</span>
+            </div>
+
+            <div className="hub-card-title-group">
+              <div className="hub-card-title-line">
+                <h3 id={titleId}>{hub.name}</h3>
+                {hub.is_verified && (
+                  <span
+                    className="hub-card-verified"
+                    role="img"
+                    aria-label="Verified Hub"
+                    title="Verified Hub"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path
+                        d="m5 10 3.2 3.2L15.5 6"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                )}
+              </div>
+
+              <p className="hub-card-location">
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path
+                    d="M16 8.3c0 4.1-6 9.2-6 9.2S4 12.4 4 8.3a6 6 0 1 1 12 0Z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <circle
+                    cx="10"
+                    cy="8"
+                    r="2"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+                <span>{hub.city || 'Location not listed'}</span>
+              </p>
+            </div>
+          </div>
+
+          <p className="hub-card-description">
+            {hub.short_description || 'No description available yet.'}
+          </p>
+        </div>
+      </article>
+    </Link>
   )
 }
 
 export default function HubDiscoverPage() {
+  const pendingRequests = useRef(
+    new Map<string, Promise<HubDiscoveryResponse>>(),
+  )
   const [searchInput, setSearchInput] = useState('')
   const [query, setQuery] = useState<DiscoveryQuery>({
     search: '',
@@ -156,17 +162,29 @@ export default function HubDiscoverPage() {
 
   useEffect(() => {
     let isCurrentRequest = true
+    const requestKey = JSON.stringify([
+      query.search,
+      query.hub_type,
+      query.page,
+      retryCount,
+    ])
 
     const loadHubs = async () => {
       setLoading(true)
       setError('')
 
-      try {
-        const response = await hubsApi.getHubs({
+      let request = pendingRequests.current.get(requestKey)
+      if (!request) {
+        request = hubsApi.getHubs({
           search: query.search || undefined,
           hub_type: query.hub_type || undefined,
           page: query.page,
         })
+        pendingRequests.current.set(requestKey, request)
+      }
+
+      try {
+        const response = await request
 
         if (isCurrentRequest) {
           setDiscovery(response)
@@ -177,6 +195,10 @@ export default function HubDiscoverPage() {
           setError('Unable to load Hubs right now. Please try again.')
         }
       } finally {
+        if (pendingRequests.current.get(requestKey) === request) {
+          pendingRequests.current.delete(requestKey)
+        }
+
         if (isCurrentRequest) {
           setLoading(false)
         }
@@ -209,13 +231,16 @@ export default function HubDiscoverPage() {
   const retry = () => setRetryCount((previous) => previous + 1)
 
   return (
-    <main className="hub-discover-page">
+    <section
+      className="hub-discover-page"
+      aria-labelledby="hub-discover-page-title"
+    >
       <header className="hub-discover-header">
         <div className="hub-discover-header-copy">
           <span className="hub-discover-eyebrow">
             COMMUNITY, WITHOUT BORDERS
           </span>
-          <h1>Find your people.</h1>
+          <h1 id="hub-discover-page-title">Find your people.</h1>
           <p>
             Discover the colleges, clubs, organisations, and communities
             shaping what comes next.
@@ -255,7 +280,7 @@ export default function HubDiscoverPage() {
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.currentTarget.value)}
-              placeholder="Search by name, interest, or place"
+              placeholder="Search names, descriptions, slugs, or parent organisations"
               autoComplete="off"
             />
             {searchInput && (
@@ -401,6 +426,6 @@ export default function HubDiscoverPage() {
           )}
         </div>
       </section>
-    </main>
+    </section>
   )
 }

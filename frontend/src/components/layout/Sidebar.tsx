@@ -11,7 +11,7 @@ const navigationItems = [
   { label: 'Home', path: '/home', icon: '\u2302', available: true },
   { label: 'Discover', path: '/discover', icon: '\u2315', available: false },
   { label: 'Events', path: '/events', icon: '\u25A6', available: true },
-  { label: 'Hubs', path: '/hubs', icon: '\u25C8', available: false },
+  { label: 'Hubs', path: '/hubs', icon: '\u25C8', available: true },
   { label: 'Saved', path: '/saved', icon: '\u2661', available: false },
 ]
 

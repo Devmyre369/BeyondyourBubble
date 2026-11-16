@@ -18,6 +18,8 @@ import ProfileEditPage from './features/profile/pages/ProfileEditPage'
 import FeedPage from './features/feed/FeedPage'
 import CreatePostPage from './features/feed/CreatePostPage'
 import EventsPage from './features/events/EventsPage'
+import HubDiscoverPage from './features/hubs/HubDiscoverPage'
+import HubDetailPage from './features/hubs/HubDetailPage'
 import AppLayout from './components/layout/AppLayout'
 
 export default function App() {
@@ -60,6 +62,8 @@ export default function App() {
               element={<CreatePostPage type="moment" />}
             />
             <Route path="/events" element={<EventsPage />} />
+            <Route path="/hubs" element={<HubDiscoverPage />} />
+            <Route path="/hubs/:hubId" element={<HubDetailPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/edit-profile" element={<ProfileEditPage />} />
           </Route>

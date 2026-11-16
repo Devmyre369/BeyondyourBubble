@@ -241,6 +241,19 @@
   gap: 18px;
 }
 
+.hub-card-link {
+  display: block;
+  min-width: 0;
+  color: inherit;
+  border-radius: var(--byb-radius-lg);
+  text-decoration: none;
+}
+
+.hub-card-link:focus-visible {
+  outline: 2px solid var(--byb-crimson);
+  outline-offset: 3px;
+}
+
 .hub-card {
   min-width: 0;
   overflow: hidden;

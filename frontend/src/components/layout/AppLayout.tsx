@@ -10,6 +10,7 @@ const mobileNavigation = [
   { label: 'Home', path: '/home', icon: 'home', available: true },
   { label: 'Explore', path: '/discover', icon: 'explore', available: false },
   { label: 'Events', path: '/events', icon: 'events', available: true },
+  { label: 'Hubs', path: '/hubs', icon: 'hubs', available: true },
   { label: 'Profile', path: '/profile', icon: 'profile', available: true },
 ] as const
 
@@ -51,6 +52,13 @@ function MobileNavigationIcon({
           <rect x="3" y="5" width="18" height="16" rx="2" />
           <path d="M16 3v4M8 3v4M3 10h18" />
           <path d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01" />
+        </>
+      )}
+      {name === 'hubs' && (
+        <>
+          <path d="m12 3.5 6.5 3.75v7.5L12 18.5l-6.5-3.75v-7.5L12 3.5Z" />
+          <circle cx="12" cy="10" r="1.5" />
+          <path d="M12 11.5v3.5m-1.3-2.8-2.4 1.4m5.4-1.4 2.4 1.4" />
         </>
       )}
       {name === 'profile' && (

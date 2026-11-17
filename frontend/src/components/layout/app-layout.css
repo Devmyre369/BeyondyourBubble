@@ -34,10 +34,11 @@
 .byb-sidebar-top {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 12px;
   flex-shrink: 0;
   min-height: 42px;
-  margin-bottom: 34px;
+  margin-bottom: 24px;
 }
 
 .byb-brand {

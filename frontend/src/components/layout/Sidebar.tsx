@@ -48,6 +48,13 @@ export default function Sidebar({
       aria-modal={mobileOpen || undefined}
     >
       <div className="byb-sidebar-top">
+        <NavLink to="/home" className="byb-brand" aria-label="BYB Home">
+          <span className="byb-brand-mark">B</span>
+          <span className="byb-brand-name">
+            BYB<span>.</span>
+          </span>
+        </NavLink>
+
         <button
           type="button"
           className="byb-sidebar-toggle"

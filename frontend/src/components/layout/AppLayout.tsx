@@ -288,7 +288,6 @@ export default function AppLayout() {
             className="byb-header-brand"
             aria-label="BYB Home"
           >
-            <span className="byb-brand-mark">B</span>
             <span className="byb-brand-name">
               BYB<span>.</span>
             </span>

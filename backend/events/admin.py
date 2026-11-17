@@ -1,6 +1,3 @@
-from django.contrib import admin
-
-# Register your models here.
 
 from django.contrib import admin
 
@@ -11,20 +8,45 @@ from .models import Event
 class EventAdmin(admin.ModelAdmin):
     list_display = (
         "title",
-        "organiser",
+        "organising_hub",
+        "created_by",
+        "category",
+        "format",
         "status",
+        "moderation_status",
         "city",
         "starts_at",
         "created_at",
     )
 
-    list_filter = ("status", "city", "created_at")
+    list_filter = (
+        "status",
+        "moderation_status",
+        "category",
+        "format",
+        "city",
+        "created_at",
+    )
 
     search_fields = (
         "title",
         "description",
         "city",
-        "organiser__username",
+        "organising_hub__name",
+        "created_by__username",
+        "created_by__email",
     )
 
-    readonly_fields = ("id", "created_at", "updated_at")
+    readonly_fields = (
+        "id",
+        "created_at",
+        "updated_at",
+    )
+
+    list_select_related = (
+        "organising_hub",
+        "created_by",
+        "reviewed_by",
+    )
+
+    ordering = ("-created_at",)

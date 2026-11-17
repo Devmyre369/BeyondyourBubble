@@ -47,7 +47,7 @@ class EventAssociationValidationMixin:
                 "Authentication is required to associate content with an event."
             )
 
-        if event.organiser_id != request.user.id:
+        if event.created_by_id != request.user.id:
             raise serializers.ValidationError(
                 "Only the event organiser can currently associate content "
                 "with this event. Attendee access will be supported later."

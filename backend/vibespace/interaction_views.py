@@ -8,7 +8,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import Profile
+from accounts.models import Notification, Profile
+from accounts.services.notification_service import create_notification
 
 from .models import Vibe, Moment, Comment, Revibe, SavedContent, Like, Share
 from .serializers import (
@@ -111,6 +112,13 @@ class ContentCommentListCreateView(APIView):
                 moment=content,
                 vibe=None,
             )
+
+        create_notification(
+            request.user,
+            content.author,
+            Notification.Verb.COMMENT,
+            **{content_type: content},
+        )
 
         return Response(
             {
@@ -238,6 +246,12 @@ class ContentRevibeView(APIView):
                     moment=content,
                 )
 
+            create_notification(
+                request.user,
+                content.author,
+                Notification.Verb.REVIBE,
+                **{content_type: content},
+            )
             message = "Revibe published successfully."
             response_status = status.HTTP_201_CREATED
 
@@ -323,6 +337,13 @@ class ContentLikeView(APIView):
             user=request.user,
             **target,
         )
+        if created:
+            create_notification(
+                request.user,
+                content.author,
+                Notification.Verb.LIKE,
+                **{content_type: content},
+            )
         likes = self.get_like_queryset(content_type, content)
 
         return Response(
@@ -373,6 +394,13 @@ class ContentShareView(APIView):
             )
         else:
             raise NotFound("Invalid content type.")
+
+        create_notification(
+            request.user,
+            content.author,
+            Notification.Verb.SHARE,
+            **{content_type: content},
+        )
 
         return Response(
             {"share_count": shares.count()},
@@ -434,6 +462,15 @@ class SavedContentListCreateView(generics.ListCreateAPIView):
             vibe=vibe,
             moment=moment,
         )
+        if created:
+            content = vibe if vibe is not None else moment
+            content_type = "vibe" if vibe is not None else "moment"
+            create_notification(
+                request.user,
+                content.author,
+                Notification.Verb.SAVE,
+                **{content_type: content},
+            )
 
         return Response(
             {

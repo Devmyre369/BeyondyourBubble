@@ -7,7 +7,6 @@ import {
   type SearchCategory,
   type SearchResponse,
 } from '../../services/searchApi'
-import GlobalSearchBox from './GlobalSearchBox'
 import FollowButton from '../profile/components/FollowButton'
 import './search-page.css'
 
@@ -77,10 +76,6 @@ export default function SearchPage() {
     }
   }, [category, page, query, requestKey])
 
-  const handleSearch = (nextQuery: string) => {
-    setSearchParams({ q: nextQuery, category: 'all', page: '1' })
-  }
-
   const selectCategory = (nextCategory: SearchCategory) => {
     setSearchParams({
       q: query,
@@ -136,12 +131,7 @@ export default function SearchPage() {
       <header className="search-page-header">
         <span className="search-page-eyebrow">DISCOVER BEYOND YOUR BUBBLE</span>
         <h1>Search BYB</h1>
-        <p>Find posts, people, Vibes, events, and Hubs across the community.</p>
-        <GlobalSearchBox
-          key={query}
-          initialQuery={query}
-          onSearch={handleSearch}
-        />
+        <p>Find posts, people, Vibes, events, and Hubs across the community. Use the search bar above to search again.</p>
       </header>
 
       {query.length >= 2 && (

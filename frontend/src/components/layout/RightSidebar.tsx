@@ -12,7 +12,7 @@ export default function RightSidebar() {
           connected to moments beyond your everyday circle.
         </p>
         <Link to="/home" className="byb-context-link">
-          Explore your feed <span aria-hidden="true">{'\u2192'}</span>
+          Open your feed <span aria-hidden="true">{'\u2192'}</span>
         </Link>
       </section>
 

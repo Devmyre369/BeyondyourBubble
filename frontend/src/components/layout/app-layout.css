@@ -322,8 +322,9 @@
   z-index: 30;
   display: grid;
   grid-template-columns: minmax(40px, 1fr) auto minmax(40px, 1fr);
+  grid-template-rows: 40px auto;
   align-items: center;
-  min-height: 66px;
+  row-gap: 8px;
   padding: 8px clamp(16px, 3vw, 40px);
   background: rgba(13, 13, 18, 0.9);
   border-bottom: 1px solid var(--byb-border-subtle);
@@ -332,7 +333,7 @@
 
 .byb-header-brand {
   position: absolute;
-  top: 50%;
+  top: 28px;
   left: 50%;
   display: inline-flex;
   align-items: center;
@@ -344,10 +345,72 @@
 
 .byb-header-spacer-left {
   grid-column: 1;
+  grid-row: 1;
 }
 
 .byb-header-spacer-right {
   grid-column: 3;
+  grid-row: 1;
+}
+
+.byb-header-notifications {
+  position: relative;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  color: var(--byb-text-secondary);
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: 50%;
+  transition:
+    color var(--byb-transition-fast),
+    border-color var(--byb-transition-fast);
+}
+
+.byb-header-notifications:hover,
+.byb-header-notifications.active {
+  color: var(--byb-crimson);
+  border-color: var(--byb-crimson-border);
+}
+
+.byb-header-notifications svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.byb-notification-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  place-items: center;
+  color: #fff;
+  background: var(--byb-crimson);
+  border: 2px solid var(--byb-bg);
+  border-radius: var(--byb-radius-full);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.byb-global-search-slot {
+  z-index: 25;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: center;
+  width: min(100%, 520px);
+  min-width: 0;
 }
 
 .byb-header-brand .byb-brand-mark {
@@ -639,7 +702,8 @@
 
   .byb-create-toolbar {
     grid-template-columns: minmax(40px, 1fr) auto minmax(40px, 1fr);
-    min-height: 62px;
+    grid-template-rows: 40px auto;
+    row-gap: 7px;
     padding: 7px 12px;
   }
 
@@ -648,9 +712,45 @@
     left: auto;
   }
 
-  .byb-create-menu {
-    grid-column: 3;
-    grid-row: 1;
+  .byb-mobile-navigation .byb-create-menu {
+    position: relative;
+  }
+
+  .byb-mobile-navigation .byb-create-options {
+    top: auto;
+    right: 50%;
+    bottom: calc(100% + 10px);
+    left: auto;
+    transform: translateX(50%);
+  }
+
+  .byb-mobile-create-nav-item {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .byb-mobile-create-button {
+    gap: 2px;
+    color: var(--byb-text);
+  }
+
+  .byb-mobile-create-button.active {
+    color: var(--byb-crimson);
+  }
+
+  .byb-mobile-create-icon {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    color: #fff;
+    background: var(--byb-crimson);
+    border-radius: 50%;
+    font-size: 28px;
+    font-weight: 350;
+    line-height: 1;
   }
 
   .byb-mobile-menu-button {

@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from accounts.models import User, Profile
+from accounts.models import Notification
 from vibespace.models import (
     Vibe,
     Moment,
@@ -73,6 +74,11 @@ class VibeSpaceInteractionAPITests(TestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Like.objects.count(), 1)
+        self.assertEqual(Notification.objects.filter(
+            recipient=self.owner,
+            actor=self.other_user,
+            verb=Notification.Verb.LIKE,
+        ).count(), 1)
 
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -115,6 +121,11 @@ class VibeSpaceInteractionAPITests(TestCase):
         self.assertEqual(first_response.data["share_count"], 1)
         self.assertEqual(second_response.data["share_count"], 2)
         self.assertEqual(Share.objects.count(), 2)
+        self.assertEqual(Notification.objects.filter(
+            recipient=self.owner,
+            actor=self.other_user,
+            verb=Notification.Verb.SHARE,
+        ).count(), 2)
 
     def test_content_lists_return_all_interaction_counts(self):
         Comment.objects.create(
@@ -185,6 +196,11 @@ class VibeSpaceInteractionAPITests(TestCase):
         self.assertEqual(comment.vibe, self.vibe)
         self.assertIsNone(comment.moment)
         self.assertEqual(comment.text, "Great Vibe!")
+        self.assertEqual(Notification.objects.filter(
+            recipient=self.owner,
+            actor=self.other_user,
+            verb=Notification.Verb.COMMENT,
+        ).count(), 1)
 
     def test_authenticated_user_can_comment_on_moment(self):
         self.client.force_authenticate(user=self.other_user)
@@ -321,6 +337,11 @@ class VibeSpaceInteractionAPITests(TestCase):
         self.assertEqual(revibe.moment, self.moment)
         self.assertEqual(revibe.revibe_type, Revibe.RevibeType.QUOTE)
         self.assertEqual(revibe.quote_text, "This moment was unforgettable!")
+        self.assertEqual(Notification.objects.filter(
+            recipient=self.owner,
+            actor=self.other_user,
+            verb=Notification.Verb.REVIBE,
+        ).count(), 1)
 
     def test_quote_revibe_requires_text(self):
         self.client.force_authenticate(user=self.other_user)
@@ -394,6 +415,11 @@ class VibeSpaceInteractionAPITests(TestCase):
         self.assertEqual(first_response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(second_response.status_code, status.HTTP_200_OK)
         self.assertEqual(Revibe.objects.count(), 1)
+        self.assertEqual(Notification.objects.filter(
+            recipient=self.owner,
+            actor=self.other_user,
+            verb=Notification.Verb.REVIBE,
+        ).count(), 1)
 
     def test_user_can_remove_own_revibe(self):
         Revibe.objects.create(
@@ -447,6 +473,11 @@ class VibeSpaceInteractionAPITests(TestCase):
         self.assertEqual(saved.user, self.other_user)
         self.assertEqual(saved.vibe, self.vibe)
         self.assertIsNone(saved.moment)
+        self.assertEqual(Notification.objects.filter(
+            recipient=self.owner,
+            actor=self.other_user,
+            verb=Notification.Verb.SAVE,
+        ).count(), 1)
 
     def test_user_can_save_moment(self):
         self.client.force_authenticate(user=self.other_user)

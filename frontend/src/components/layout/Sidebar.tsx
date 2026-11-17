@@ -12,7 +12,7 @@ type SidebarProps = {
 
 const navigationItems = [
   { label: 'Home', path: '/home', icon: '\u2302', available: true },
-  { label: 'Discover', path: '/discover', icon: '\u2315', available: false },
+  { label: 'Notifications', path: '/notifications', icon: '\u2665', available: true },
   { label: 'Events', path: '/events', icon: '\u25A6', available: true },
   { label: 'Hubs', path: '/hubs', icon: '\u25C8', available: true },
   { label: 'Saved', path: '/saved', icon: '\u2661', available: false },

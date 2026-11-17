@@ -17,11 +17,6 @@
   border-radius: var(--byb-radius-xl);
 }
 
-.search-page-header .global-search {
-  margin-top: 8px;
-  text-align: left;
-}
-
 .search-page-eyebrow {
   display: block;
   color: var(--byb-crimson-hover);

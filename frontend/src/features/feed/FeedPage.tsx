@@ -8,7 +8,6 @@ import {
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { feedApi, type FeedEntry } from '../../services/feedApi'
-import GlobalSearchBox from '../search/GlobalSearchBox'
 import vibespaceApi, {
   type Comment,
   type LikeState,
@@ -427,13 +426,8 @@ export default function FeedPage() {
         <div className="feed-search-intro">
           <span className="feed-search-eyebrow">DISCOVER BYB</span>
           <h1>Find what moves you.</h1>
-          <p>Search people, posts, Vibes, events, and Hubs.</p>
+          <p>Find people, posts, Vibes, events, and Hubs using the search above.</p>
         </div>
-        <GlobalSearchBox
-          onSearch={(query) =>
-            navigate(`/search?q=${encodeURIComponent(query)}`)
-          }
-        />
       </header>
 
       <section

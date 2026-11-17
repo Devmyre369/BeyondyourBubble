@@ -1,14 +1,15 @@
 ﻿
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { notificationsApi } from '../../services/notificationsApi'
+import GlobalSearchBox from '../../features/search/GlobalSearchBox'
 import Sidebar from './Sidebar'
 import RightSidebar from './RightSidebar'
 import './app-layout.css'
 
 const mobileNavigation = [
   { label: 'Home', path: '/home', icon: 'home', available: true },
-  { label: 'Explore', path: '/discover', icon: 'explore', available: false },
   { label: 'Events', path: '/events', icon: 'events', available: true },
   { label: 'Hubs', path: '/hubs', icon: 'hubs', available: true },
   { label: 'Profile', path: '/profile', icon: 'profile', available: true },
@@ -41,12 +42,6 @@ function MobileNavigationIcon({
           <path d="M9 21v-7h6v7" />
         </>
       )}
-      {name === 'explore' && (
-        <>
-          <circle cx="10.5" cy="10.5" r="6.5" />
-          <path d="m16 16 5 5" />
-        </>
-      )}
       {name === 'events' && (
         <>
           <rect x="3" y="5" width="18" height="16" rx="2" />
@@ -74,6 +69,7 @@ function MobileNavigationIcon({
 export default function AppLayout() {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [isMobile, setIsMobile] = useState(() =>
     window.matchMedia('(max-width: 850px)').matches,
   )
@@ -82,6 +78,7 @@ export default function AppLayout() {
   )
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [uploadMenuOpen, setUploadMenuOpen] = useState(false)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
 
   const toggleSidebar = () => {
@@ -161,9 +158,42 @@ export default function AppLayout() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [uploadMenuOpen])
 
+  useEffect(() => {
+    const refreshUnreadCount = () => {
+      notificationsApi.getUnreadCount()
+        .then(setUnreadNotifications)
+        .catch((requestError: unknown) => {
+          console.error('Unable to load notification count:', requestError)
+        })
+    }
+
+    refreshUnreadCount()
+    const intervalId = window.setInterval(refreshUnreadCount, 60_000)
+    window.addEventListener('byb:notifications-updated', refreshUnreadCount)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('byb:notifications-updated', refreshUnreadCount)
+    }
+  }, [location.pathname])
+
   const openComposer = (type: 'vibe' | 'moment') => {
     setUploadMenuOpen(false)
     navigate(`/create/${type}`)
+  }
+
+  const searchQuery =
+    location.pathname === '/search'
+      ? new URLSearchParams(location.search).get('q') || ''
+      : ''
+
+  const handleGlobalSearch = (query: string) => {
+    const params = new URLSearchParams({
+      q: query,
+      category: 'all',
+      page: '1',
+    })
+    navigate(`/search?${params.toString()}`)
   }
 
   const renderNavigationItem = (
@@ -264,41 +294,31 @@ export default function AppLayout() {
             </span>
           </NavLink>
 
-          {isMobile ? (
-            <div className="byb-create-menu">
-              <div
-                id="byb-create-options"
-                className="byb-create-options"
-                aria-label="Upload options"
-                hidden={!uploadMenuOpen}
-              >
-                <button type="button" onClick={() => openComposer('vibe')}>
-                  Upload a vibe
-                </button>
-                <button type="button" onClick={() => openComposer('moment')}>
-                  Upload a moment
-                </button>
-              </div>
-              <button
-                type="button"
-                className={`byb-create-button${uploadMenuOpen ? ' active' : ''}`}
-                aria-label="Create a vibe or moment"
-                aria-controls="byb-create-options"
-                aria-expanded={uploadMenuOpen}
-                onClick={() => setUploadMenuOpen((previous) => !previous)}
-              >
-                <span className="byb-create-icon" aria-hidden="true">
-                  +
-                </span>
-                <span>Create</span>
-              </button>
-            </div>
-          ) : (
-            <span
-              className="byb-header-spacer byb-header-spacer-right"
-              aria-hidden="true"
+          <NavLink
+            to="/notifications"
+            className={({ isActive }) =>
+              `byb-header-notifications${isActive ? ' active' : ''}`
+            }
+            aria-label={`Notifications${unreadNotifications ? `, ${unreadNotifications} unread` : ''}`}
+            title="Notifications"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M20.8 8.8c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11A4.8 4.8 0 0 1 12 6.1a4.8 4.8 0 0 1 8.8 2.7Z" />
+            </svg>
+            {unreadNotifications > 0 && (
+              <span className="byb-notification-badge">
+                {unreadNotifications > 99 ? '99+' : unreadNotifications}
+              </span>
+            )}
+          </NavLink>
+
+          <div className="byb-global-search-slot">
+            <GlobalSearchBox
+              key={location.pathname === '/search' ? `search:${searchQuery}` : 'global-search'}
+              initialQuery={searchQuery}
+              onSearch={handleGlobalSearch}
             />
-          )}
+          </div>
         </header>
         <Outlet />
       </main>
@@ -306,7 +326,36 @@ export default function AppLayout() {
       <RightSidebar />
 
       <nav className="byb-mobile-navigation" aria-label="Mobile navigation">
-        {mobileNavigation.map(renderNavigationItem)}
+        {mobileNavigation.slice(0, 2).map(renderNavigationItem)}
+        <div className="byb-mobile-create-nav-item">
+          <div className="byb-create-menu">
+            <div
+              id="byb-create-options"
+              className="byb-create-options"
+              aria-label="Upload options"
+              hidden={!uploadMenuOpen}
+            >
+              <button type="button" onClick={() => openComposer('vibe')}>
+                Upload a vibe
+              </button>
+              <button type="button" onClick={() => openComposer('moment')}>
+                Upload a moment
+              </button>
+            </div>
+            <button
+              type="button"
+              className={`byb-mobile-nav-item byb-mobile-create-button${uploadMenuOpen ? ' active' : ''}`}
+              aria-label="Create a vibe or moment"
+              aria-controls="byb-create-options"
+              aria-expanded={uploadMenuOpen}
+              onClick={() => setUploadMenuOpen((previous) => !previous)}
+            >
+              <span className="byb-mobile-create-icon" aria-hidden="true">+</span>
+              <span>Create</span>
+            </button>
+          </div>
+        </div>
+        {mobileNavigation.slice(2).map(renderNavigationItem)}
       </nav>
     </div>
   )

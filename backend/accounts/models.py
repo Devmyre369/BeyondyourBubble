@@ -226,6 +226,65 @@ class Follow(models.Model):
         return f"{self.follower.username} follows {self.following.username}"
 
 
+class Notification(models.Model):
+    class Verb(models.TextChoices):
+        LIKE = "like", "Liked your post"
+        COMMENT = "comment", "Commented on your post"
+        SAVE = "save", "Saved your post"
+        SHARE = "share", "Shared your post"
+        FOLLOW = "follow", "Started following you"
+        REVIBE = "revibe", "Revibed your post"
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+    recipient = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifications_received",
+    )
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifications_sent",
+    )
+    verb = models.CharField(max_length=16, choices=Verb.choices)
+    vibe = models.ForeignKey(
+        "vibespace.Vibe",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+    moment = models.ForeignKey(
+        "vibespace.Moment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["recipient", "-created_at"],
+                name="accounts_notif_recency_idx",
+            ),
+            models.Index(
+                fields=["recipient", "read_at"],
+                name="accounts_notif_unread_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.actor.username} {self.verb} for {self.recipient.username}"
+
+
 # ==================================================
 # PENDING SIGNUP
 # ==================================================

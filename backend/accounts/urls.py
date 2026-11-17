@@ -16,6 +16,12 @@ from accounts.social_views import (
     FollowRelationshipView,
     ProfileConnectionsView,
 )
+from accounts.notification_views import (
+    NotificationListView,
+    NotificationReadAllView,
+    NotificationReadView,
+    NotificationUnreadCountView,
+)
 
 
 urlpatterns = [
@@ -73,6 +79,26 @@ urlpatterns = [
         ProfileConnectionsView.as_view(),
         {"relationship": "following"},
         name="profile-following",
+    ),
+    path(
+        "notifications/",
+        NotificationListView.as_view(),
+        name="notification-list",
+    ),
+    path(
+        "notifications/read-all/",
+        NotificationReadAllView.as_view(),
+        name="notification-read-all",
+    ),
+    path(
+        "notifications/unread-count/",
+        NotificationUnreadCountView.as_view(),
+        name="notification-unread-count",
+    ),
+    path(
+        "notifications/<uuid:notification_id>/read/",
+        NotificationReadView.as_view(),
+        name="notification-read",
     ),
 
     path(

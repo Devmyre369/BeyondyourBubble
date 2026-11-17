@@ -9,12 +9,13 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import Follow, Profile
+from accounts.models import Follow, Notification, Profile
 from accounts.services.follow_service import (
     follow_user,
     is_following,
     unfollow_user,
 )
+from accounts.services.notification_service import create_notification
 from accounts.social_serializers import PublicConnectionUserSerializer
 
 
@@ -83,6 +84,13 @@ class FollowRelationshipView(APIView):
             return Response(
                 {"detail": str(error)},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if created:
+            create_notification(
+                request.user,
+                target,
+                Notification.Verb.FOLLOW,
             )
 
         return Response(

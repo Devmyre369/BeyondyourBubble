@@ -22,6 +22,7 @@ import HubDiscoverPage from './features/hubs/HubDiscoverPage'
 import HubDetailPage from './features/hubs/HubDetailPage'
 import SearchPage from './features/search/SearchPage'
 import PublicUserProfilePage from './features/search/PublicUserProfilePage'
+import NotificationsPage from './features/notifications/NotificationsPage'
 import AppLayout from './components/layout/AppLayout'
 import { useAuth } from './context/AuthContext'
 import { FollowProvider } from './context/FollowProvider'
@@ -72,6 +73,10 @@ export default function App() {
           <Route element={<ProfileRoute />}>
             <Route path="/home" element={<FeedPage />} />
             <Route
+              path="/discover"
+              element={<Navigate to="/home" replace />}
+            />
+            <Route
               path="/create/vibe"
               element={<CreatePostPage type="vibe" />}
             />
@@ -80,6 +85,7 @@ export default function App() {
               element={<CreatePostPage type="moment" />}
             />
             <Route path="/events" element={<EventsPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/hubs" element={<HubDiscoverPage />} />
             <Route path="/hubs/:hubId" element={<HubDetailPage />} />

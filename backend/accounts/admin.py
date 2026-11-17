@@ -2,7 +2,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import User, Profile, PendingSignup, EmailOTP
+from .models import User, Profile, PendingSignup, EmailOTP, Notification
 
 
 # ==================================================
@@ -175,3 +175,17 @@ class EmailOTPAdmin(admin.ModelAdmin):
         "purpose",
         "is_used",
     )
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = (
+        "recipient",
+        "actor",
+        "verb",
+        "created_at",
+        "read_at",
+    )
+    list_filter = ("verb", "read_at")
+    search_fields = ("recipient__username", "actor__username")
+    readonly_fields = ("id", "created_at")

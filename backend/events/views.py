@@ -2,14 +2,19 @@
 from django.db.models import Q
 
 from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import Event
 from .serializers import (
     EventChoiceSerializer,
     EventDiscoverySerializer,
     EventSubmissionSerializer,
+    EventModerationQueueSerializer,
+    EventModerationReviewSerializer,
 )
+from .services.moderation_service import review_event
 
 
 class EventDiscoveryListCreateView(generics.ListCreateAPIView):
@@ -101,3 +106,58 @@ class EventChoiceListView(generics.ListAPIView):
             ],
             moderation_status=Event.ModerationStatus.APPROVED,
         ).order_by("-starts_at", "-created_at")
+
+
+class EventModerationQueueView(generics.ListAPIView):
+    """
+    List events awaiting BYB staff moderation.
+    """
+
+    serializer_class = EventModerationQueueSerializer
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        return Event.objects.filter(
+            moderation_status=Event.ModerationStatus.PENDING,
+            organising_hub__is_active=True,
+        ).select_related(
+            "organising_hub",
+            "created_by",
+        ).order_by("created_at")
+
+
+class EventModerationReviewView(APIView):
+    """
+    Approve or reject a pending event.
+    """
+
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, event_id):
+        serializer = EventModerationReviewSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+
+        event = review_event(
+            event_id=event_id,
+            reviewer=request.user,
+            decision=serializer.validated_data["decision"],
+            review_notes=serializer.validated_data.get(
+                "review_notes",
+                "",
+            ),
+        )
+
+        return Response({
+            "message": (
+                "Event approved and published."
+                if event.moderation_status == Event.ModerationStatus.APPROVED
+                else "Event rejected."
+            ),
+            "event_id": str(event.id),
+            "status": event.status,
+            "moderation_status": event.moderation_status,
+            "review_notes": event.review_notes,
+            "reviewed_at": event.reviewed_at,
+        })

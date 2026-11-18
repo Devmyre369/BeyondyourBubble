@@ -179,3 +179,76 @@ class EventDiscoverySerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+
+
+class EventModerationQueueSerializer(serializers.ModelSerializer):
+    """
+    Event details shown to BYB staff in the moderation queue.
+    """
+
+    organising_hub_name = serializers.CharField(
+        source="organising_hub.name",
+        read_only=True,
+    )
+
+    created_by_username = serializers.CharField(
+        source="created_by.username",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Event
+        fields = [
+            "id",
+            "title",
+            "description",
+            "category",
+            "cover_image_url",
+            "starts_at",
+            "ends_at",
+            "format",
+            "venue_name",
+            "venue_address",
+            "city",
+            "online_join_url",
+            "online_access_instructions",
+            "organising_hub",
+            "organising_hub_name",
+            "created_by",
+            "created_by_username",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class EventModerationReviewSerializer(serializers.Serializer):
+    """
+    Validates a staff member's moderation decision.
+    """
+
+    decision = serializers.ChoiceField(
+        choices=[
+            ("approve", "Approve"),
+            ("reject", "Reject"),
+        ]
+    )
+
+    review_notes = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=5000,
+    )
+
+    def validate(self, attrs):
+        if (
+            attrs["decision"] == "reject"
+            and not attrs.get("review_notes", "").strip()
+        ):
+            raise serializers.ValidationError({
+                "review_notes": (
+                    "Please provide a reason when rejecting an event."
+                )
+            })
+
+        return attrs

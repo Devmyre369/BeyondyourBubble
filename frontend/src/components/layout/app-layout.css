@@ -327,9 +327,13 @@
   align-items: center;
   row-gap: 8px;
   padding: 8px clamp(16px, 3vw, 40px);
-  background: rgba(13, 13, 18, 0.9);
+
+  /* Use an opaque background to avoid sticky-layer rendering issues */
+  background: var(--byb-bg-secondary);
+
   border-bottom: 1px solid var(--byb-border-subtle);
-  backdrop-filter: blur(16px);
+
+  /* Intentionally no backdrop-filter */
 }
 
 .byb-header-brand {
@@ -834,8 +838,9 @@
   .byb-sidebar-scroll,
   .byb-sidebar.collapsed .byb-sidebar-scroll {
     width: 100%;
-    flex: 0 0 auto;
-    overflow: visible;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .byb-sidebar-bottom,

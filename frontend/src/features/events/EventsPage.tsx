@@ -69,7 +69,14 @@ export default function EventsPage() {
 
         if (!active || requestId !== requestVersion.current) return
 
-        setEvents(response.results)
+        const results = Array.isArray(response?.results)
+  ? response.results
+  : []
+
+setEvents(results)
+setCount(Number(response?.count) || results.length)
+setHasMore(Boolean(response?.next))
+setNextPage(2)
         setCount(response.count)
         setHasMore(Boolean(response.next))
         setNextPage(2)
@@ -111,7 +118,14 @@ export default function EventsPage() {
 
       if (requestId !== requestVersion.current) return
 
-      setEvents((previous) => [...previous, ...response.results])
+      const results = Array.isArray(response?.results)
+  ? response.results
+  : []
+
+setEvents((previous) => [
+  ...(Array.isArray(previous) ? previous : []),
+  ...results,
+])
       setHasMore(Boolean(response.next))
       setNextPage((previous) => previous + 1)
     } catch {

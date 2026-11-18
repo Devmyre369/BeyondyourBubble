@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from hubs.models import Hub
 
 from .models import Event
+from .pagination import EventPagination
 from .permissions import can_submit_hub_event
 from .serializers import (
     EventChoiceSerializer,
@@ -31,6 +32,7 @@ class EventDiscoveryListCreateView(generics.ListCreateAPIView):
     """
 
     permission_classes = [IsAuthenticated]
+    pagination_class = EventPagination
 
     def get_queryset(self):
         queryset = Event.objects.filter(
@@ -123,6 +125,7 @@ class HubEventManagementListView(generics.ListAPIView):
 
     serializer_class = HubEventManagementSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = EventPagination
 
     def get_queryset(self):
         hub_id = self.kwargs["hub_id"]
@@ -250,6 +253,7 @@ class EventModerationQueueView(generics.ListAPIView):
 
     serializer_class = EventModerationQueueSerializer
     permission_classes = [IsAdminUser]
+    pagination_class = EventPagination
 
     def get_queryset(self):
         return Event.objects.filter(

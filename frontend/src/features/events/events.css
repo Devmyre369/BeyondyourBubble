@@ -210,3 +210,121 @@
     animation: none;
   }
 }
+
+
+
+/* Event discovery filters */
+.events-filter-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.events-filter-select,
+.events-filter-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 11px;
+  color: var(--byb-text);
+  background: var(--byb-bg-secondary);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-md);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.events-filter-select:focus,
+.events-filter-input:focus {
+  border-color: var(--byb-crimson);
+}
+
+.events-filter-select option {
+  color: var(--byb-text);
+  background: var(--byb-surface);
+}
+
+.events-clear-filters {
+  margin-top: 10px;
+  padding: 0;
+  color: var(--byb-crimson);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.events-results-count {
+  margin: 7px 0 0;
+  color: var(--byb-muted);
+  font-size: 11px;
+}
+
+.events-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.events-retry-button,
+.events-load-more-button {
+  min-height: 40px;
+  padding: 0 20px;
+  color: white;
+  background: var(--byb-crimson);
+  border: 0;
+  border-radius: var(--byb-radius-md);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.events-retry-button {
+  margin-top: 16px;
+}
+
+.events-retry-button:hover,
+.events-load-more-button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.events-load-more-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
+}
+
+.events-load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+.events-inline-error {
+  margin: 18px 0 0;
+  color: var(--byb-danger);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 1050px) {
+  .events-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .events-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .events-filter-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

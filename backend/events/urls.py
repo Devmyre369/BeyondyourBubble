@@ -7,6 +7,9 @@ from .views import (
     EventDiscoveryListCreateView,
     EventModerationQueueView,
     EventModerationReviewView,
+    HubEventManagementListView,
+    EventManagementDetailView,
+    EventManagementCancelView,
 )
 
 
@@ -30,6 +33,21 @@ urlpatterns = [
         "moderation/<uuid:event_id>/review/",
         EventModerationReviewView.as_view(),
         name="event-moderation-review",
+    ),
+    path(
+        "hubs/<uuid:hub_id>/",
+        HubEventManagementListView.as_view(),
+        name="hub-event-management",
+    ),
+    path(
+        "manage/<uuid:event_id>/",
+        EventManagementDetailView.as_view(),
+        name="event-management-detail",
+    ),
+    path(
+        "manage/<uuid:event_id>/cancel/",
+        EventManagementCancelView.as_view(),
+        name="event-management-cancel",
     ),
     path(
         "<uuid:id>/",

@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from events.models import Event
@@ -627,3 +627,248 @@ class EventDiscoveryAPITests(APITestCase):
             Event.ModerationStatus.APPROVED,
         )
         self.assertEqual(event.status, Event.Status.PUBLISHED)
+
+
+
+    def test_owner_can_view_all_hub_events(self):
+        self.create_event(
+            title="Pending Event",
+            status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.PENDING,
+        )
+        self.create_event(
+            title="Rejected Event",
+            status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.REJECTED,
+            review_notes="Needs changes",
+        )
+        self.create_event(
+            title="Published Event",
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.get(
+            f"/api/events/hubs/{self.hub.id}/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 3)
+
+        rejected_event = next(
+            event for event in response.data
+            if event["title"] == "Rejected Event"
+        )
+        self.assertEqual(rejected_event["review_notes"], "Needs changes")
+
+    def test_editor_can_manage_event_created_by_another_hub_member(self):
+        event = self.create_event(
+            created_by=self.owner,
+            title="Original Event",
+        )
+
+        self.authenticate(self.editor)
+
+        response = self.client.patch(
+            f"/api/events/manage/{event.id}/",
+            {"title": "Updated Event"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["title"], "Updated Event")
+
+    def test_member_cannot_view_hub_event_management(self):
+        self.authenticate(self.member)
+
+        response = self.client.get(
+            f"/api/events/hubs/{self.hub.id}/"
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_non_member_cannot_view_hub_event_management(self):
+        self.authenticate(self.non_member)
+
+        response = self.client.get(
+            f"/api/events/hubs/{self.hub.id}/"
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_manager_cannot_access_another_hubs_events(self):
+        another_hub = Hub.objects.create(
+            name="Another Hub",
+            slug="another-hub",
+            description="Another test hub",
+            created_by=self.non_member,
+            owner=self.non_member,
+        )
+
+        event = self.create_event(
+            organising_hub=another_hub,
+            title="Another Hub Event",
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.get(
+            f"/api/events/manage/{event.id}/"
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_editing_approved_event_resets_moderation(self):
+        event = self.create_event(
+            status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
+            reviewed_by=self.staff,
+            reviewed_at=timezone.now(),
+            review_notes="Approved",
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.patch(
+            f"/api/events/manage/{event.id}/",
+            {"title": "Updated Approved Event"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        event.refresh_from_db()
+
+        self.assertEqual(event.status, Event.Status.DRAFT)
+        self.assertEqual(
+            event.moderation_status,
+            Event.ModerationStatus.PENDING,
+        )
+        self.assertIsNone(event.reviewed_by)
+        self.assertIsNone(event.reviewed_at)
+        self.assertEqual(event.review_notes, "")
+
+    def test_editing_rejected_event_resubmits_for_moderation(self):
+        event = self.create_event(
+            status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.REJECTED,
+            reviewed_by=self.staff,
+            reviewed_at=timezone.now(),
+            review_notes="Please correct the event details.",
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.patch(
+            f"/api/events/manage/{event.id}/",
+            {"description": "Updated description"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        event.refresh_from_db()
+
+        self.assertEqual(event.status, Event.Status.DRAFT)
+        self.assertEqual(
+            event.moderation_status,
+            Event.ModerationStatus.PENDING,
+        )
+        self.assertIsNone(event.reviewed_by)
+        self.assertIsNone(event.reviewed_at)
+        self.assertEqual(event.review_notes, "")
+
+    def test_editing_pending_event_keeps_it_pending(self):
+        event = self.create_event(
+            status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.PENDING,
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.patch(
+            f"/api/events/manage/{event.id}/",
+            {"title": "Updated Pending Event"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        event.refresh_from_db()
+
+        self.assertEqual(event.status, Event.Status.DRAFT)
+        self.assertEqual(
+            event.moderation_status,
+            Event.ModerationStatus.PENDING,
+        )
+
+    def test_owner_can_cancel_published_event(self):
+        event = self.create_event(
+            status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        event.refresh_from_db()
+
+        self.assertEqual(event.status, Event.Status.CANCELLED)
+        self.assertEqual(
+            event.moderation_status,
+            Event.ModerationStatus.APPROVED,
+        )
+
+    def test_member_cannot_cancel_published_event(self):
+        event = self.create_event(
+            status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
+        )
+
+        self.authenticate(self.member)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/"
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+        event.refresh_from_db()
+        self.assertEqual(event.status, Event.Status.PUBLISHED)
+
+    def test_cancelled_event_cannot_be_edited(self):
+        event = self.create_event(
+            status=Event.Status.CANCELLED,
+            moderation_status=Event.ModerationStatus.APPROVED,
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.patch(
+            f"/api/events/manage/{event.id}/",
+            {"title": "Attempted Update"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_completed_event_cannot_be_edited(self):
+        event = self.create_event(
+            status=Event.Status.COMPLETED,
+            moderation_status=Event.ModerationStatus.APPROVED,
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.patch(
+            f"/api/events/manage/{event.id}/",
+            {"title": "Attempted Update"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)

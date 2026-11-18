@@ -2,18 +2,25 @@
 from django.db.models import Q
 
 from rest_framework import generics
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from hubs.models import Hub
+
 from .models import Event
+from .permissions import can_submit_hub_event
 from .serializers import (
     EventChoiceSerializer,
     EventDiscoverySerializer,
     EventSubmissionSerializer,
     EventModerationQueueSerializer,
     EventModerationReviewSerializer,
+    HubEventManagementSerializer,
+    EventUpdateSerializer,
 )
+from .services.event_service import update_event, cancel_event
 from .services.moderation_service import review_event
 
 
@@ -88,10 +95,8 @@ class EventDiscoveryDetailView(generics.RetrieveAPIView):
 
 class EventChoiceListView(generics.ListAPIView):
     """
-    Return events created by the authenticated user.
-
-    Used by VibeSpace when associating Vibes and Moments
-    with an event.
+    Return approved events created by the authenticated user.
+    Used by VibeSpace for event association.
     """
 
     serializer_class = EventChoiceSerializer
@@ -106,6 +111,136 @@ class EventChoiceListView(generics.ListAPIView):
             ],
             moderation_status=Event.ModerationStatus.APPROVED,
         ).order_by("-starts_at", "-created_at")
+
+
+class HubEventManagementListView(generics.ListAPIView):
+    """
+    List all events belonging to a Hub.
+
+    Only approved Hub owners, admins and editors can access it.
+    Includes pending, rejected, published, cancelled and completed events.
+    """
+
+    serializer_class = HubEventManagementSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        hub_id = self.kwargs["hub_id"]
+
+        try:
+            hub = Hub.objects.get(
+                id=hub_id,
+                is_active=True,
+            )
+        except Hub.DoesNotExist:
+            raise NotFound("Hub not found.")
+
+        if not can_submit_hub_event(
+            user=self.request.user,
+            hub=hub,
+        ):
+            raise PermissionDenied(
+                "Only approved Hub owners, administrators and editors "
+                "can manage this Hub's events."
+            )
+
+        return Event.objects.filter(
+            organising_hub=hub,
+        ).select_related(
+            "organising_hub",
+            "created_by",
+            "reviewed_by",
+        ).order_by("-created_at")
+
+
+class EventManagementDetailView(APIView):
+    """
+    Retrieve or update an event belonging to a Hub.
+
+    GET: Retrieve event management details.
+    PUT: Full update.
+    PATCH: Partial update.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get_event(self, event_id, user):
+        event = (
+            Event.objects
+            .select_related("organising_hub")
+            .filter(
+                id=event_id,
+                organising_hub__is_active=True,
+            )
+            .first()
+        )
+
+        if event is None:
+            raise NotFound("Event not found.")
+
+        if not can_submit_hub_event(
+            user=user,
+            hub=event.organising_hub,
+        ):
+            raise PermissionDenied(
+                "You do not have permission to manage this Hub event."
+            )
+
+        return event
+
+    def get(self, request, event_id):
+        event = self.get_event(event_id, request.user)
+
+        serializer = HubEventManagementSerializer(event)
+
+        return Response(serializer.data)
+
+    def put(self, request, event_id):
+        return self.update(request, event_id, partial=False)
+
+    def patch(self, request, event_id):
+        return self.update(request, event_id, partial=True)
+
+    def update(self, request, event_id, partial):
+        event = self.get_event(event_id, request.user)
+
+        serializer = EventUpdateSerializer(
+            event,
+            data=request.data,
+            partial=partial,
+        )
+        serializer.is_valid(raise_exception=True)
+
+        updated_event = update_event(
+            event_id=event.id,
+            user=request.user,
+            validated_data=serializer.validated_data,
+        )
+
+        return Response(
+            HubEventManagementSerializer(updated_event).data
+        )
+
+
+class EventManagementCancelView(APIView):
+    """
+    Cancel a published event belonging to a Hub.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, event_id):
+        event = cancel_event(
+            event_id=event_id,
+            user=request.user,
+        )
+
+        return Response({
+            "message": "Event cancelled successfully.",
+            "event_id": str(event.id),
+            "status": event.status,
+            "moderation_status": event.moderation_status,
+        })
 
 
 class EventModerationQueueView(generics.ListAPIView):

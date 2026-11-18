@@ -1,3 +1,4 @@
+
 from django.contrib.auth import get_user_model
 
 from rest_framework.test import APITestCase
@@ -55,24 +56,38 @@ class GlobalSearchTests(APITestCase):
             first_name="Riya",
             last_name="Shah",
         )
+
+        event_hub = Hub.objects.create(
+            name="Robotics Event Hub",
+            slug="robotics-event-hub",
+            hub_type=Hub.HubType.COMMUNITY,
+            created_by=author,
+            owner=author,
+        )
+
         event = Event.objects.create(
-            organiser=author,
+            organising_hub=event_hub,
+            created_by=author,
             title="Robotics Day",
             description="A campus robotics event.",
             city="Lucknow",
             status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
         )
+
         Vibe.objects.create(
             author=author,
             event=event,
             text="Building a robotics project.",
         )
+
         Moment.objects.create(
             author=author,
             event=event,
             image_url="https://example.com/robotics.png",
             caption="Robotics demonstration",
         )
+
         Hub.objects.create(
             name="Robotics Hub",
             slug="robotics-hub",
@@ -114,20 +129,33 @@ class GlobalSearchTests(APITestCase):
             visibility=Profile.Visibility.PRIVATE,
         )
         public_user = self.create_user_with_profile("public_author")
-        Vibe.objects.create(author=private_user, text="Secret robotics post")
-        Vibe.objects.create(author=public_user, text="Public robotics post")
-        Vibe.objects.create(author=self.searcher, text="My robotics post")
+
+        Vibe.objects.create(
+            author=private_user,
+            text="Secret robotics post",
+        )
+        Vibe.objects.create(
+            author=public_user,
+            text="Public robotics post",
+        )
+        Vibe.objects.create(
+            author=self.searcher,
+            text="My robotics post",
+        )
 
         response = self.client.get("/api/search/?q=robotics")
 
         self.assertEqual(response.status_code, 200)
+
         usernames = {
-            user["username"] for user in response.data["results"]["users"]
+            user["username"]
+            for user in response.data["results"]["users"]
         }
         post_authors = {
             post["author_username"]
             for post in response.data["results"]["posts"]
         }
+
         self.assertNotIn("private_robotics", usernames)
         self.assertNotIn("private_robotics", post_authors)
         self.assertIn("public_author", post_authors)
@@ -135,16 +163,31 @@ class GlobalSearchTests(APITestCase):
 
     def test_search_excludes_unpublished_events_and_inactive_hubs(self):
         organizer = self.create_user_with_profile("event_organizer")
+
+        event_hub = Hub.objects.create(
+            name="Event Test Hub",
+            slug="event-test-hub",
+            hub_type=Hub.HubType.COMMUNITY,
+            created_by=organizer,
+            owner=organizer,
+        )
+
         Event.objects.create(
-            organiser=organizer,
+            organising_hub=event_hub,
+            created_by=organizer,
             title="Robotics draft",
             status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.PENDING,
         )
+
         Event.objects.create(
-            organiser=organizer,
+            organising_hub=event_hub,
+            created_by=organizer,
             title="Robotics published",
             status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
         )
+
         Hub.objects.create(
             name="Active Robotics Hub",
             slug="active-robotics-hub",
@@ -152,6 +195,7 @@ class GlobalSearchTests(APITestCase):
             created_by=organizer,
             owner=organizer,
         )
+
         Hub.objects.create(
             name="Inactive Robotics Hub",
             slug="inactive-robotics-hub",
@@ -175,6 +219,7 @@ class GlobalSearchTests(APITestCase):
 
     def test_search_category_pagination_and_counts(self):
         owner = self.create_user_with_profile("hub_owner")
+
         for index in range(12):
             Hub.objects.create(
                 name=f"Robotics Hub {index}",
@@ -196,10 +241,12 @@ class GlobalSearchTests(APITestCase):
 
     def test_search_requires_authentication_and_valid_parameters(self):
         self.client.credentials()
+
         unauthenticated = self.client.get("/api/search/?q=robotics")
         self.assertEqual(unauthenticated.status_code, 401)
 
         self.authenticate_as(self.searcher)
+
         for query in ("", "a"):
             with self.subTest(query=query):
                 invalid_query = self.client.get(

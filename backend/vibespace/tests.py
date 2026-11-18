@@ -1,12 +1,10 @@
-from django.test import TestCase
-
-# Create your tests here.
 
 from io import BytesIO
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+
 from PIL import Image
 
 from rest_framework import status
@@ -14,6 +12,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import User, Profile
 from events.models import Event
+from hubs.models import Hub
 from .models import Vibe, Moment
 
 
@@ -57,12 +56,22 @@ class VibeSpaceAPITests(TestCase):
         )
 
     def create_event(self, organiser):
+        hub = Hub.objects.create(
+            name=f"{organiser.username} Test Hub",
+            slug=f"{organiser.username}-test-hub",
+            hub_type=Hub.HubType.COMMUNITY,
+            created_by=organiser,
+            owner=organiser,
+        )
+
         return Event.objects.create(
-            organiser=organiser,
+            organising_hub=hub,
+            created_by=organiser,
             title="BYB Test Event",
             description="Test event",
             city="Lucknow",
             status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
         )
 
     def create_test_image(self):

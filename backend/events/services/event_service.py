@@ -4,7 +4,7 @@ from django.db import transaction
 from rest_framework.exceptions import PermissionDenied
 
 from events.models import Event
-from events.permissions import CanSubmitHubEvent
+from events.permissions import can_submit_hub_event
 from hubs.models import Hub
 
 
@@ -13,25 +13,25 @@ def create_event(*, hub, user, validated_data):
     """
     Create an event on behalf of an active Hub.
 
-    Every submitted event starts as a draft awaiting BYB moderation.
-    The client cannot override ownership or moderation fields.
+    Every newly submitted event:
+    - Belongs to an organising Hub.
+    - Records the submitting user.
+    - Starts as a draft.
+    - Requires BYB moderation approval.
+
+    Ownership and moderation fields are controlled by the backend.
     """
 
     if not isinstance(hub, Hub):
-        raise PermissionDenied("A valid organising Hub is required.")
+        raise PermissionDenied(
+            "A valid organising Hub is required."
+        )
 
-    permission = CanSubmitHubEvent()
-
-    if not permission.has_object_permission(
-        request=type(
-            "EventSubmissionRequest",
-            (),
-            {"user": user},
-        )(),
-        view=None,
-        hub=hub,
-    ):
-        raise PermissionDenied(permission.message)
+    if not can_submit_hub_event(user=user, hub=hub):
+        raise PermissionDenied(
+            "Only approved Hub owners, administrators, and editors "
+            "of an active Hub can submit events."
+        )
 
     event = Event.objects.create(
         **validated_data,

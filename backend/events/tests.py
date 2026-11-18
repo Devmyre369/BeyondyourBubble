@@ -3,7 +3,6 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from events.models import Event
@@ -33,21 +32,16 @@ class EventDiscoveryAPITests(APITestCase):
             owner=self.owner,
         )
 
-        self.create_membership(
-            self.owner,
-            HubMembership.Role.OWNER,
-        )
-        self.create_membership(
-            self.editor,
-            HubMembership.Role.EDITOR,
-        )
-        self.create_membership(
-            self.member,
-            HubMembership.Role.MEMBER,
-        )
+        self.create_membership(self.owner, HubMembership.Role.OWNER)
+        self.create_membership(self.editor, HubMembership.Role.EDITOR)
+        self.create_membership(self.member, HubMembership.Role.MEMBER)
 
         self.starts_at = timezone.now() + timedelta(days=7)
         self.ends_at = self.starts_at + timedelta(hours=3)
+
+    # --------------------------------------------------
+    # TEST HELPERS
+    # --------------------------------------------------
 
     def create_user(self, username):
         return User.objects.create_user(
@@ -628,7 +622,9 @@ class EventDiscoveryAPITests(APITestCase):
         )
         self.assertEqual(event.status, Event.Status.PUBLISHED)
 
-
+    # --------------------------------------------------
+    # HUB EVENT MANAGEMENT TESTS
+    # --------------------------------------------------
 
     def test_owner_can_view_all_hub_events(self):
         self.create_event(
@@ -636,15 +632,15 @@ class EventDiscoveryAPITests(APITestCase):
             status=Event.Status.DRAFT,
             moderation_status=Event.ModerationStatus.PENDING,
         )
+
         self.create_event(
             title="Rejected Event",
             status=Event.Status.DRAFT,
             moderation_status=Event.ModerationStatus.REJECTED,
             review_notes="Needs changes",
         )
-        self.create_event(
-            title="Published Event",
-        )
+
+        self.create_event(title="Published Event")
 
         self.authenticate(self.owner)
 
@@ -659,7 +655,11 @@ class EventDiscoveryAPITests(APITestCase):
             event for event in response.data
             if event["title"] == "Rejected Event"
         )
-        self.assertEqual(rejected_event["review_notes"], "Needs changes")
+
+        self.assertEqual(
+            rejected_event["review_notes"],
+            "Needs changes",
+        )
 
     def test_editor_can_manage_event_created_by_another_hub_member(self):
         event = self.create_event(
@@ -717,6 +717,10 @@ class EventDiscoveryAPITests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 403)
+
+    # --------------------------------------------------
+    # EVENT MODIFICATION AND MODERATION RESET TESTS
+    # --------------------------------------------------
 
     def test_editing_approved_event_resets_moderation(self):
         event = self.create_event(
@@ -802,6 +806,10 @@ class EventDiscoveryAPITests(APITestCase):
             Event.ModerationStatus.PENDING,
         )
 
+    # --------------------------------------------------
+    # EVENT CANCELLATION TESTS
+    # --------------------------------------------------
+
     def test_owner_can_cancel_published_event(self):
         event = self.create_event(
             status=Event.Status.PUBLISHED,
@@ -839,6 +847,7 @@ class EventDiscoveryAPITests(APITestCase):
         self.assertEqual(response.status_code, 403)
 
         event.refresh_from_db()
+
         self.assertEqual(event.status, Event.Status.PUBLISHED)
 
     def test_cancelled_event_cannot_be_edited(self):

@@ -15,7 +15,7 @@ const navigationItems = [
   { label: 'Notifications', path: '/notifications', icon: '\u2665', available: true },
   { label: 'Events', path: '/events', icon: '\u25A6', available: true },
   { label: 'Hubs', path: '/hubs', icon: '\u25C8', available: true },
-  { label: 'Saved', path: '/saved', icon: '\u2661', available: false },
+  { label: 'Saved', path: '/saved', icon: '\u2661', available: true },
 ]
 
 export default function Sidebar({

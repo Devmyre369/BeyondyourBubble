@@ -19,7 +19,11 @@ export default function PostActionIcon({
     <svg
       className="post-action-icon"
       viewBox="0 0 24 24"
-      fill={name === 'like' && active ? 'currentColor' : 'none'}
+      fill={
+        (name === 'like' || name === 'save') && active
+          ? 'currentColor'
+          : 'none'
+      }
       stroke="currentColor"
       strokeWidth="1.8"
       strokeLinecap="round"

@@ -22,6 +22,7 @@ import ProfilePage from './features/profile/pages/ProfilePage'
 import ProfileEditPage from './features/profile/pages/ProfileEditPage'
 
 import FeedPage from './features/feed/FeedPage'
+import SavedPage from './features/feed/SavedPage'
 import CreatePostPage from './features/feed/CreatePostPage'
 import DeletePostPage from './features/vibespace/pages/DeletePostPage'
 import EventsPage from './features/events/EventsPage'
@@ -127,6 +128,8 @@ export default function App() {
 
               <Route element={<ProfileRoute />}>
                 <Route path="/home" element={<FeedPage />} />
+
+                <Route path="/saved" element={<SavedPage />} />
 
                 <Route
                   path="/discover"

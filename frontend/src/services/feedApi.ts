@@ -33,4 +33,12 @@ export const feedApi = {
 
     return response.data
   },
+
+  async getSavedFeed(page = 1): Promise<FeedResponse> {
+    const response = await api.get<FeedResponse>(
+      `/vibespace/saved/feed/?page=${page}`
+    )
+
+    return response.data
+  },
 }

@@ -12,7 +12,7 @@ from accounts.models import Profile
 from accounts.services.follow_service import annotate_content_follow_state
 
 from .feed_serializers import FeedEntrySerializer
-from .models import Vibe, Moment
+from .models import Vibe, Moment, SavedContent
 
 
 class FeedPagination(PageNumberPagination):
@@ -240,3 +240,99 @@ class ProfilePostsView(APIView):
             "previous": page_number - 1 if page_number > 1 else None,
             "results": serializer.data,
         })
+
+
+class SavedFeedView(APIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = FeedPagination
+
+    def get(self, request):
+        user = request.user
+
+        saved_rows = list(
+            SavedContent.objects
+            .filter(user=user)
+            .order_by("-created_at")
+            .values_list("vibe_id", "moment_id")
+        )
+
+        order = []
+        for vibe_id, moment_id in saved_rows:
+            if vibe_id:
+                order.append(("vibe", str(vibe_id)))
+            elif moment_id:
+                order.append(("moment", str(moment_id)))
+
+        total_count = len(order)
+
+        paginator = self.pagination_class()
+        try:
+            page_number = int(request.query_params.get("page", "1"))
+            if page_number < 1:
+                raise ValueError
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "Invalid page number."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        start = (page_number - 1) * paginator.page_size
+        end = start + paginator.page_size
+        if start >= total_count and page_number > 1:
+            return Response(
+                {"detail": "Invalid page."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        page_order = order[start:end]
+        vibe_ids = [item_id for kind, item_id in page_order if kind == "vibe"]
+        moment_ids = [item_id for kind, item_id in page_order if kind == "moment"]
+
+        visibility_filter = (
+            Q(author__profile__visibility=Profile.Visibility.PUBLIC)
+            | Q(author=user)
+        )
+
+        vibes = annotate_content_follow_state(
+            Vibe.objects
+            .filter(visibility_filter, id__in=vibe_ids)
+            .select_related("author", "author__profile", "event"),
+            user,
+        ).annotate(
+            like_count=Count("likes", distinct=True),
+            comment_count=Count("comments", distinct=True),
+            revibe_count=Count("revibes", distinct=True),
+            save_count=Count("saved_by", distinct=True),
+            share_count=Count("shares", distinct=True),
+        )
+
+        moments = annotate_content_follow_state(
+            Moment.objects
+            .filter(visibility_filter, id__in=moment_ids)
+            .select_related("author", "author__profile", "event"),
+            user,
+        ).annotate(
+            like_count=Count("likes", distinct=True),
+            comment_count=Count("comments", distinct=True),
+            revibe_count=Count("revibes", distinct=True),
+            save_count=Count("saved_by", distinct=True),
+            share_count=Count("shares", distinct=True),
+        )
+
+        entries = build_feed_entries(list(vibes), list(moments))
+        entries_map = {
+            (entry["content_type"], str(entry["id"])): entry
+            for entry in entries
+        }
+        page_entries = [
+            entries_map[key] for key in page_order if key in entries_map
+        ]
+
+        serializer = FeedEntrySerializer(page_entries, many=True)
+        return Response({
+            "count": total_count,
+            "next": page_number + 1 if end < total_count else None,
+            "previous": page_number - 1 if page_number > 1 else None,
+            "results": serializer.data,
+        })
+

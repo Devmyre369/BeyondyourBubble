@@ -598,6 +598,40 @@ class VibeSpaceInteractionAPITests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(SavedContent.objects.count(), 0)
 
+    def test_saved_feed_returns_hydrated_entries(self):
+        SavedContent.objects.create(user=self.other_user, vibe=self.vibe)
+        SavedContent.objects.create(user=self.other_user, moment=self.moment)
+
+        self.client.force_authenticate(user=self.other_user)
+
+        response = self.client.get("/api/vibespace/saved/feed/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        results = response.data["results"]
+        self.assertEqual(len(results), 2)
+        self.assertEqual(
+            {item["content_type"] for item in results},
+            {"vibe", "moment"},
+        )
+
+    def test_saved_feed_excludes_private_content(self):
+        private_vibe = Vibe.objects.create(
+            author=self.private_user,
+            text="Private Vibe",
+        )
+        SavedContent.objects.create(user=self.other_user, vibe=private_vibe)
+        SavedContent.objects.create(user=self.other_user, vibe=self.vibe)
+
+        self.client.force_authenticate(user=self.other_user)
+
+        response = self.client.get("/api/vibespace/saved/feed/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {str(item["id"]) for item in response.data["results"]}
+        self.assertIn(str(self.vibe.id), returned_ids)
+        self.assertNotIn(str(private_vibe.id), returned_ids)
+
 
 class VibeSpaceDeleteAPITests(TestCase):
 

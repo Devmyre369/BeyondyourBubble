@@ -8,7 +8,7 @@ from .views import (
     MomentDetailView,
 )
 
-from .feed_views import FeedView, ProfilePostsView
+from .feed_views import FeedView, ProfilePostsView, SavedFeedView
 
 from .interaction_views import (
     ContentCommentListCreateView,
@@ -68,6 +68,7 @@ urlpatterns = [
 
     # Saved content
     path("saved/", SavedContentListCreateView.as_view(), name="saved-content-list-create"),
+    path("saved/feed/", SavedFeedView.as_view(), name="saved-content-feed"),
     path(
         "saved/<uuid:saved_id>/",
         SavedContentDetailView.as_view(),

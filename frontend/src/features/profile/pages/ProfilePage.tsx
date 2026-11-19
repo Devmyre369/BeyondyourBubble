@@ -116,16 +116,6 @@ export default function ProfilePage() {
         {/* PROFILE HERO */}
 
         <section className="vibespace-hero">
-          <div className="vibespace-cover">
-            {profile.cover_image ? (
-              <img src={profile.cover_image} alt={`${fullName}'s cover`} />
-            ) : (
-              <div className="vibespace-cover-placeholder">
-                <span>YOUR WORLD. YOUR EXPERIENCES.</span>
-              </div>
-            )}
-          </div>
-
           <div className="vibespace-identity">
             <div className="vibespace-avatar">
               {profile.profile_picture ? (

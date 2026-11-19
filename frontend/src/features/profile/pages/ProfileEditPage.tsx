@@ -5,7 +5,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../context/AuthContext'
 import profileApi, {
   type CreateProfileData,
-  type ProfileImageType,
   type UserProfile,
 } from '../../../services/profileApi'
 
@@ -131,13 +130,10 @@ export default function ProfileEditPage() {
   )
 
   const [profilePicture, setProfilePicture] = useState<File | null>(null)
-  const [coverImage, setCoverImage] = useState<File | null>(null)
 
   const [profilePreview, setProfilePreview] = useState('')
-  const [coverPreview, setCoverPreview] = useState('')
 
   const [removeProfilePicture, setRemoveProfilePicture] = useState(false)
-  const [removeCoverImage, setRemoveCoverImage] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -146,9 +142,8 @@ export default function ProfileEditPage() {
   useEffect(() => {
     return () => {
       if (profilePreview) URL.revokeObjectURL(profilePreview)
-      if (coverPreview) URL.revokeObjectURL(coverPreview)
     }
-  }, [profilePreview, coverPreview])
+  }, [profilePreview])
 
   if (!profile) {
     return <div className="profile-loading">Loading profile...</div>
@@ -161,16 +156,11 @@ export default function ProfileEditPage() {
     }))
   }
 
-  const handleImageChange = (
-    event: ChangeEvent<HTMLInputElement>,
-    imageType: ProfileImageType
+  const handleProfilePictureChange = (
+    event: ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0]
     if (!file) return
-
-    const maxSize = imageType === 'profile_picture'
-      ? 5 * 1024 * 1024
-      : 10 * 1024 * 1024
 
     if (!allowedTypes.includes(file.type)) {
       setError('Please select a JPG, PNG or WEBP image.')
@@ -178,27 +168,16 @@ export default function ProfileEditPage() {
       return
     }
 
-    if (file.size > maxSize) {
-      setError(
-        imageType === 'profile_picture'
-          ? 'Profile picture must be 5 MB or smaller.'
-          : 'Cover image must be 10 MB or smaller.'
-      )
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Profile picture must be 5 MB or smaller.')
       event.target.value = ''
       return
     }
 
     setError('')
-
-    if (imageType === 'profile_picture') {
-      setProfilePicture(file)
-      setProfilePreview(URL.createObjectURL(file))
-      setRemoveProfilePicture(false)
-    } else {
-      setCoverImage(file)
-      setCoverPreview(URL.createObjectURL(file))
-      setRemoveCoverImage(false)
-    }
+    setProfilePicture(file)
+    setProfilePreview(URL.createObjectURL(file))
+    setRemoveProfilePicture(false)
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -235,21 +214,10 @@ export default function ProfileEditPage() {
         updatedProfile = await profileApi.deleteProfileImage('profile_picture')
       }
 
-      if (removeCoverImage && !coverImage && updatedProfile.cover_image) {
-        updatedProfile = await profileApi.deleteProfileImage('cover_image')
-      }
-
       if (profilePicture) {
         updatedProfile = await profileApi.uploadProfileImage(
           'profile_picture',
           profilePicture
-        )
-      }
-
-      if (coverImage) {
-        updatedProfile = await profileApi.uploadProfileImage(
-          'cover_image',
-          coverImage
         )
       }
 
@@ -292,26 +260,13 @@ export default function ProfileEditPage() {
                 title="Profile picture"
                 image={profile.profile_picture}
                 preview={profilePreview}
-                onChange={(event) => handleImageChange(event, 'profile_picture')}
+                onChange={handleProfilePictureChange}
                 onRemove={() => {
                   setRemoveProfilePicture(true)
                   setProfilePicture(null)
                   setProfilePreview('')
                 }}
                 isRemoved={removeProfilePicture}
-              />
-
-              <ImagePreview
-                title="Cover image"
-                image={profile.cover_image}
-                preview={coverPreview}
-                onChange={(event) => handleImageChange(event, 'cover_image')}
-                onRemove={() => {
-                  setRemoveCoverImage(true)
-                  setCoverImage(null)
-                  setCoverPreview('')
-                }}
-                isRemoved={removeCoverImage}
               />
             </div>
           </section>

@@ -320,6 +320,13 @@ export default function AppLayout() {
           </div>
         </header>
         <Outlet />
+        <footer className="byb-signature-idea">
+          <span className="byb-signature-idea-label">BYB SIGNATURE IDEA</span>
+          <p>
+            You don't have to be physically present to be part of an
+            experience.
+          </p>
+        </footer>
       </main>
 
       <RightSidebar />

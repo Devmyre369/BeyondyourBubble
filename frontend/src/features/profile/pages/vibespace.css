@@ -182,6 +182,63 @@
   margin-top: 42px;
 }
 
+/* PROFILE DETAIL CARDS */
+
+.vibespace-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+  margin-top: 26px;
+}
+
+.vibespace-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--byb-border);
+  border-radius: 16px;
+  background: var(--byb-surface);
+}
+
+.vibespace-card-wide {
+  grid-column: 1 / -1;
+}
+
+.vibespace-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vibespace-card-head h2 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: -0.3px;
+}
+
+.vibespace-card .vibespace-info-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.vibespace-card .vibespace-links a:first-child {
+  padding-top: 0;
+}
+
+.vibespace-philosophy-quote {
+  margin: 0;
+  color: #e8e1e3;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.vibespace-content-body {
+  margin-top: 8px;
+}
+
 .vibespace-main-column,
 .vibespace-sidebar {
   display: grid;

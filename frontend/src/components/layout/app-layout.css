@@ -312,6 +312,38 @@
   background: var(--byb-bg);
 }
 
+.byb-signature-idea {
+  max-width: 1180px;
+  margin: 20px auto 44px;
+  padding: 24px 24px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.byb-signature-idea-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--byb-crimson);
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.byb-signature-idea p {
+  margin: 0;
+  color: #e7dfe1;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+@media (max-width: 850px) {
+  .byb-signature-idea {
+    margin: 14px auto calc(24px + env(safe-area-inset-bottom));
+    padding: 20px 18px 0;
+  }
+}
+
+
 .byb-create-toolbar {
   position: sticky;
   top: 0;

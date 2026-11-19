@@ -36,26 +36,36 @@ function InfoItem({
   )
 }
 
-function TagList({
+function TagCard({
+  label,
   title,
   items,
 }: {
+  label: string
   title: string
   items: string[]
 }) {
-  if (!items?.length) return null
-
   return (
-    <section className="vibespace-section">
-      <h2>{title}</h2>
-      <div className="vibespace-tags">
-        {items.map((item) => (
-          <span className="vibespace-tag" key={item}>
-            {item}
-          </span>
-        ))}
+    <article className="vibespace-card">
+      <div className="vibespace-card-head">
+        <span className="vibespace-section-label">{label}</span>
+        <h2>{title}</h2>
       </div>
-    </section>
+
+      {items?.length ? (
+        <div className="vibespace-tags">
+          {items.map((item) => (
+            <span className="vibespace-tag" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="vibespace-empty-note">
+          No {title.toLowerCase()} added yet.
+        </p>
+      )}
+    </article>
   )
 }
 
@@ -87,6 +97,17 @@ export default function ProfilePage() {
 
   const fullName = `${profile.first_name} ${profile.last_name}`.trim()
   const isStudent = profile.profile_type === 'student'
+
+  const hasBackgroundInfo =
+    Boolean(profile.institution) ||
+    Boolean(profile.course) ||
+    Boolean(profile.current_organization) ||
+    Boolean(profile.job_title)
+
+  const hasOnlinePresence =
+    Boolean(profile.linkedin_url) ||
+    Boolean(profile.github_url) ||
+    Boolean(profile.website_url)
 
   return (
     <main className="vibespace-page">
@@ -156,6 +177,119 @@ export default function ProfilePage() {
           )}
         </section>
 
+        {/* PROFILE DETAIL CARDS (above posts / vibes / moments) */}
+
+        <section className="vibespace-cards" aria-label="Profile details">
+          <article className="vibespace-card">
+            <div className="vibespace-card-head">
+              <span className="vibespace-section-label">IDENTITY</span>
+              <h2>Identity</h2>
+            </div>
+
+            {isStudent ? (
+              <div className="vibespace-info-grid">
+                <InfoItem label="Institution" value={profile.institution} />
+                <InfoItem label="Course" value={profile.course} />
+                <InfoItem
+                  label="Field of study"
+                  value={profile.field_of_study}
+                />
+                <InfoItem
+                  label="Academic year"
+                  value={profile.academic_year}
+                />
+                <InfoItem
+                  label="Graduation year"
+                  value={profile.graduation_year}
+                />
+              </div>
+            ) : (
+              <div className="vibespace-info-grid">
+                <InfoItem
+                  label="Organisation"
+                  value={profile.current_organization}
+                />
+                <InfoItem label="Job title" value={profile.job_title} />
+                <InfoItem label="Industry" value={profile.industry} />
+                <InfoItem
+                  label="Experience"
+                  value={
+                    profile.experience_years !== null
+                      ? `${profile.experience_years} years`
+                      : null
+                  }
+                />
+              </div>
+            )}
+
+            {!hasBackgroundInfo && (
+              <p className="vibespace-empty-note">
+                Your background information will appear here.
+              </p>
+            )}
+          </article>
+
+          <TagCard
+            label="SKILLS"
+            title="Skills"
+            items={profile.skills || []}
+          />
+
+          <article className="vibespace-card">
+            <div className="vibespace-card-head">
+              <span className="vibespace-section-label">ONLINE PRESENCE</span>
+              <h2>Online presence</h2>
+            </div>
+
+            <div className="vibespace-links">
+              {profile.linkedin_url && (
+                <a
+                  href={profile.linkedin_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  LinkedIn <span>↗</span>
+                </a>
+              )}
+
+              {profile.github_url && (
+                <a
+                  href={profile.github_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  GitHub <span>↗</span>
+                </a>
+              )}
+
+              {profile.website_url && (
+                <a
+                  href={profile.website_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Personal website <span>↗</span>
+                </a>
+              )}
+
+              {!hasOnlinePresence && (
+                <p className="vibespace-empty-note">
+                  Add your online links to your profile.
+                </p>
+              )}
+            </div>
+          </article>
+
+          <TagCard
+            label="INTERESTS"
+            title="Interests"
+            items={profile.interests || []}
+          />
+
+        </section>
+
+        {/* SECTION TABS */}
+
         {statisticsError && (
           <p className="profile-list-error" role="alert">{statisticsError}</p>
         )}
@@ -169,147 +303,22 @@ export default function ProfilePage() {
 
         {/* PROFILE CONTENT */}
 
-        <div className="vibespace-content-grid">
-          <div className="vibespace-main-column">
-
-            {section !== 'followers' && section !== 'following' && (
-            <>
-            {/* ABOUT ME */}
-
-            <section className="vibespace-section">
-              <div className="vibespace-section-heading">
-                <div>
-                  <span className="vibespace-section-label">
-                    01 / IDENTITY
-                  </span>
-                  <h2>About me</h2>
-                </div>
-              </div>
-
-              {isStudent ? (
-                <div className="vibespace-info-grid">
-                  <InfoItem label="Institution" value={profile.institution} />
-                  <InfoItem label="Course" value={profile.course} />
-                  <InfoItem
-                    label="Field of study"
-                    value={profile.field_of_study}
-                  />
-                  <InfoItem
-                    label="Academic year"
-                    value={profile.academic_year}
-                  />
-                  <InfoItem
-                    label="Graduation year"
-                    value={profile.graduation_year}
-                  />
-                </div>
-              ) : (
-                <div className="vibespace-info-grid">
-                  <InfoItem
-                    label="Organisation"
-                    value={profile.current_organization}
-                  />
-                  <InfoItem label="Job title" value={profile.job_title} />
-                  <InfoItem label="Industry" value={profile.industry} />
-                  <InfoItem
-                    label="Experience"
-                    value={
-                      profile.experience_years !== null
-                        ? `${profile.experience_years} years`
-                        : null
-                    }
-                  />
-                </div>
-              )}
-
-              {!profile.institution &&
-                !profile.course &&
-                !profile.current_organization &&
-                !profile.job_title && (
-                  <p className="vibespace-empty-note">
-                    Your background information will appear here.
-                  </p>
-                )}
-            </section>
-
-            {/* VIBESPACE CONTENT */}
-
+        <div className="vibespace-content-body">
+          {section !== 'followers' && section !== 'following' && (
             <VibeSpaceContent
               key={user?.username || 'anonymous'}
               username={profile.username || user?.username || ''}
               section={section}
             />
-            </>
-            )}
+          )}
 
-            {(section === 'followers' || section === 'following') && (
-              <ProfileConnectionsList
-                key={`${profile.username}:${section}`}
-                username={profile.username || user?.username || ''}
-                relationship={section}
-              />
-            )}
-          </div>
-
-          {/* PROFILE SIDEBAR */}
-
-          <aside className="vibespace-sidebar">
-            <TagList title="Interests" items={profile.interests || []} />
-
-            <TagList title="Skills" items={profile.skills || []} />
-
-            <section className="vibespace-section">
-              <h2>Online presence</h2>
-
-              <div className="vibespace-links">
-                {profile.linkedin_url && (
-                  <a
-                    href={profile.linkedin_url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    LinkedIn <span>↗</span>
-                  </a>
-                )}
-
-                {profile.github_url && (
-                  <a
-                    href={profile.github_url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    GitHub <span>↗</span>
-                  </a>
-                )}
-
-                {profile.website_url && (
-                  <a
-                    href={profile.website_url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Personal website <span>↗</span>
-                  </a>
-                )}
-
-                {!profile.linkedin_url &&
-                  !profile.github_url &&
-                  !profile.website_url && (
-                    <p className="vibespace-empty-note">
-                      Add your online links to your profile.
-                    </p>
-                  )}
-              </div>
-            </section>
-
-            <section className="vibespace-section vibespace-philosophy">
-              <span>THE BYB IDEA</span>
-              <p>
-                You don't have to be physically present to be
-                part of an experience.
-              </p>
-            </section>
-          </aside>
+          {(section === 'followers' || section === 'following') && (
+            <ProfileConnectionsList
+              key={`${profile.username}:${section}`}
+              username={profile.username || user?.username || ''}
+              relationship={section}
+            />
+          )}
         </div>
 
         {/* FOOTER */}

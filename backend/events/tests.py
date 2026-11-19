@@ -367,9 +367,11 @@ class EventDiscoveryAPITests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
 
-        titles = [event["title"] for event in response.data]
+        results = response.data["results"]
+        titles = [event["title"] for event in results]
 
         self.assertEqual(titles, ["Approved Event"])
+        self.assertEqual(response.data["count"], 1)
 
     def test_discovery_excludes_events_from_inactive_hubs(self):
         inactive_hub = Hub.objects.create(
@@ -394,9 +396,97 @@ class EventDiscoveryAPITests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
 
-        titles = [event["title"] for event in response.data]
+        results = response.data["results"]
+        titles = [event["title"] for event in results]
 
         self.assertEqual(titles, ["Active Hub Event"])
+        self.assertEqual(response.data["count"], 1)
+
+    def test_discovery_response_uses_default_page_size(self):
+        for index in range(13):
+            self.create_event(title=f"Paginated Event {index}")
+
+        self.authenticate(self.non_member)
+
+        response = self.client.get("/api/events/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 13)
+        self.assertEqual(len(response.data["results"]), 12)
+        self.assertIsNotNone(response.data["next"])
+        self.assertIsNone(response.data["previous"])
+
+    def test_discovery_supports_custom_page_size(self):
+        for index in range(3):
+            self.create_event(title=f"Custom Size Event {index}")
+
+        self.authenticate(self.non_member)
+
+        first_page = self.client.get("/api/events/?page_size=2")
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(first_page.data["count"], 3)
+        self.assertEqual(len(first_page.data["results"]), 2)
+        self.assertIsNotNone(first_page.data["next"])
+        self.assertIsNone(first_page.data["previous"])
+
+        second_page = self.client.get("/api/events/?page_size=2&page=2")
+        self.assertEqual(second_page.status_code, 200)
+        self.assertEqual(second_page.data["count"], 3)
+        self.assertEqual(len(second_page.data["results"]), 1)
+        self.assertIsNone(second_page.data["next"])
+        self.assertIsNotNone(second_page.data["previous"])
+
+    def test_discovery_enforces_maximum_page_size(self):
+        for index in range(51):
+            self.create_event(title=f"Large Page Event {index}")
+
+        self.authenticate(self.non_member)
+
+        response = self.client.get("/api/events/?page_size=100")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 51)
+        self.assertEqual(len(response.data["results"]), 50)
+
+    def test_discovery_filters_still_apply_with_pagination(self):
+        self.create_event(
+            title="Cultural Event",
+            category=Event.Category.CULTURAL,
+            city="Delhi",
+        )
+        self.create_event(
+            title="Technical Event",
+            category=Event.Category.TECHNICAL,
+            city="Lucknow",
+        )
+        self.create_event(
+            title="Another Technical Event",
+            category=Event.Category.TECHNICAL,
+            city="Lucknow",
+        )
+
+        self.authenticate(self.non_member)
+
+        response = self.client.get(
+            "/api/events/?category=technical&city=Lucknow&page_size=1"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertIsNotNone(response.data["next"])
+
+    def test_event_choices_returns_plain_list(self):
+        event = self.create_event(created_by=self.owner)
+
+        self.authenticate(self.owner)
+
+        response = self.client.get("/api/events/choices/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], str(event.id))
 
     def test_online_join_details_are_public_in_v1(self):
         event = self.create_event(
@@ -454,10 +544,14 @@ class EventDiscoveryAPITests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
 
-        event_ids = [item["id"] for item in response.data]
+        results = response.data["results"]
+        event_ids = [item["id"] for item in results]
 
         self.assertEqual(len(event_ids), 1)
         self.assertEqual(event_ids[0], str(pending_event.id))
+        self.assertEqual(response.data["count"], 1)
+        self.assertIsNone(response.data["next"])
+        self.assertIsNone(response.data["previous"])
 
     def test_non_staff_cannot_access_moderation_queue(self):
         self.authenticate(self.owner)
@@ -649,10 +743,14 @@ class EventDiscoveryAPITests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 3)
+
+        results = response.data["results"]
+
+        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(len(results), 3)
 
         rejected_event = next(
-            event for event in response.data
+            event for event in results
             if event["title"] == "Rejected Event"
         )
 
@@ -660,6 +758,32 @@ class EventDiscoveryAPITests(APITestCase):
             rejected_event["review_notes"],
             "Needs changes",
         )
+
+    def test_hub_event_management_supports_page_size(self):
+        for index in range(3):
+            self.create_event(title=f"Hub Event {index}")
+
+        self.authenticate(self.owner)
+
+        first_page = self.client.get(
+            f"/api/events/hubs/{self.hub.id}/?page_size=2"
+        )
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(first_page.data["count"], 3)
+        self.assertEqual(len(first_page.data["results"]), 2)
+        self.assertIsNotNone(first_page.data["next"])
+        self.assertIsNone(first_page.data["previous"])
+
+        second_page = self.client.get(
+            f"/api/events/hubs/{self.hub.id}/?page_size=2&page=2"
+        )
+
+        self.assertEqual(second_page.status_code, 200)
+        self.assertEqual(second_page.data["count"], 3)
+        self.assertEqual(len(second_page.data["results"]), 1)
+        self.assertIsNone(second_page.data["next"])
+        self.assertIsNotNone(second_page.data["previous"])
 
     def test_editor_can_manage_event_created_by_another_hub_member(self):
         event = self.create_event(

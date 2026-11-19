@@ -1,6 +1,8 @@
 
 from django.test import TestCase
 
+from unittest.mock import patch
+
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -15,6 +17,7 @@ from vibespace.models import (
     Like,
     Share,
 )
+from vibespace.service.moment_image_service import MomentImageError
 
 
 class VibeSpaceInteractionAPITests(TestCase):
@@ -594,3 +597,152 @@ class VibeSpaceInteractionAPITests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(SavedContent.objects.count(), 0)
+
+
+class VibeSpaceDeleteAPITests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+
+        self.owner = User.objects.create_user(
+            username="owner",
+            email="owner@example.com",
+            password="TestPassword123!",
+            email_verified=True,
+        )
+        self.other_user = User.objects.create_user(
+            username="other",
+            email="other@example.com",
+            password="TestPassword123!",
+            email_verified=True,
+        )
+
+        Profile.objects.create(
+            user=self.owner,
+            profile_type=Profile.ProfileType.STUDENT,
+            visibility=Profile.Visibility.PUBLIC,
+        )
+        Profile.objects.create(
+            user=self.other_user,
+            profile_type=Profile.ProfileType.STUDENT,
+            visibility=Profile.Visibility.PUBLIC,
+        )
+
+        self.vibe = Vibe.objects.create(
+            author=self.owner,
+            text="A Vibe to delete",
+        )
+
+        self.moment = Moment.objects.create(
+            author=self.owner,
+            image_url="https://example.com/moment.png",
+            cloudinary_public_id="byb/test/moment",
+            caption="A Moment to delete",
+        )
+
+    def test_author_can_delete_vibe(self):
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.delete(
+            f"/api/vibespace/vibes/{self.vibe.id}/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertFalse(Vibe.objects.filter(id=self.vibe.id).exists())
+
+    def test_non_author_cannot_delete_vibe(self):
+        self.client.force_authenticate(user=self.other_user)
+
+        response = self.client.delete(
+            f"/api/vibespace/vibes/{self.vibe.id}/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Vibe.objects.filter(id=self.vibe.id).exists())
+
+    def test_unauthenticated_cannot_delete_vibe(self):
+        response = self.client.delete(
+            f"/api/vibespace/vibes/{self.vibe.id}/"
+        )
+
+        self.assertIn(
+            response.status_code,
+            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
+        )
+        self.assertTrue(Vibe.objects.filter(id=self.vibe.id).exists())
+
+    def test_deleting_vibe_cascades_related_content(self):
+        Comment.objects.create(
+            author=self.other_user,
+            vibe=self.vibe,
+            text="A comment",
+        )
+        Like.objects.create(user=self.other_user, vibe=self.vibe)
+        Share.objects.create(user=self.other_user, vibe=self.vibe)
+        Revibe.objects.create(
+            author=self.other_user,
+            vibe=self.vibe,
+            revibe_type=Revibe.RevibeType.DIRECT,
+        )
+        SavedContent.objects.create(user=self.other_user, vibe=self.vibe)
+
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.delete(
+            f"/api/vibespace/vibes/{self.vibe.id}/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(Vibe.objects.filter(id=self.vibe.id).exists())
+        self.assertEqual(Comment.objects.filter(vibe_id=self.vibe.id).count(), 0)
+        self.assertEqual(Like.objects.filter(vibe_id=self.vibe.id).count(), 0)
+        self.assertEqual(Share.objects.filter(vibe_id=self.vibe.id).count(), 0)
+        self.assertEqual(Revibe.objects.filter(vibe_id=self.vibe.id).count(), 0)
+        self.assertEqual(
+            SavedContent.objects.filter(vibe_id=self.vibe.id).count(),
+            0,
+        )
+
+    @patch("vibespace.views.delete_moment_image")
+    def test_author_can_delete_moment(self, mock_delete_image):
+        mock_delete_image.return_value = {"result": "ok"}
+
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.delete(
+            f"/api/vibespace/moments/{self.moment.id}/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertFalse(Moment.objects.filter(id=self.moment.id).exists())
+        mock_delete_image.assert_called_once_with("byb/test/moment")
+
+    def test_non_author_cannot_delete_moment(self):
+        self.client.force_authenticate(user=self.other_user)
+
+        response = self.client.delete(
+            f"/api/vibespace/moments/{self.moment.id}/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Moment.objects.filter(id=self.moment.id).exists())
+
+    @patch(
+        "vibespace.views.delete_moment_image",
+        side_effect=MomentImageError("storage unavailable"),
+    )
+    def test_moment_delete_succeeds_when_image_cleanup_fails(
+        self, mock_delete_image
+    ):
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.delete(
+            f"/api/vibespace/moments/{self.moment.id}/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertFalse(Moment.objects.filter(id=self.moment.id).exists())
+        mock_delete_image.assert_called_once_with("byb/test/moment")

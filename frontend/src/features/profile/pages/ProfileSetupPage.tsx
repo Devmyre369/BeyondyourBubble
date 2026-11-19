@@ -73,7 +73,6 @@ const initialForm: FormState = {
 }
 
 const MAX_PROFILE_SIZE = 5 * 1024 * 1024
-const MAX_COVER_SIZE = 10 * 1024 * 1024
 
 const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
@@ -130,23 +129,13 @@ function TextField({
   )
 }
 
-function validateImage(
-  file: File,
-  imageType: 'profile_picture' | 'cover_image'
-): string | null {
+function validateProfileImage(file: File): string | null {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
     return 'Only JPG, JPEG, PNG, and WEBP images are allowed.'
   }
 
-  const maxSize =
-    imageType === 'profile_picture'
-      ? MAX_PROFILE_SIZE
-      : MAX_COVER_SIZE
-
-  const maxSizeLabel = imageType === 'profile_picture' ? '5 MB' : '10 MB'
-
-  if (file.size > maxSize) {
-    return `Image size must not exceed ${maxSizeLabel}.`
+  if (file.size > MAX_PROFILE_SIZE) {
+    return 'Image size must not exceed 5 MB.'
   }
 
   return null
@@ -159,10 +148,8 @@ export default function ProfileSetupPage() {
   const [form, setForm] = useState<FormState>(initialForm)
 
   const [profilePicture, setProfilePicture] = useState<File | null>(null)
-  const [coverImage, setCoverImage] = useState<File | null>(null)
 
   const [profilePreview, setProfilePreview] = useState('')
-  const [coverPreview, setCoverPreview] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -172,12 +159,8 @@ export default function ProfileSetupPage() {
       if (profilePreview) {
         URL.revokeObjectURL(profilePreview)
       }
-
-      if (coverPreview) {
-        URL.revokeObjectURL(coverPreview)
-      }
     }
-  }, [profilePreview, coverPreview])
+  }, [profilePreview])
 
   const updateField = <K extends keyof FormState>(
     key: K,
@@ -189,15 +172,14 @@ export default function ProfileSetupPage() {
     }))
   }
 
-  const handleImageChange = (
-    event: ChangeEvent<HTMLInputElement>,
-    imageType: 'profile_picture' | 'cover_image'
+  const handleProfilePictureChange = (
+    event: ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0]
 
     if (!file) return
 
-    const validationError = validateImage(file, imageType)
+    const validationError = validateProfileImage(file)
 
     if (validationError) {
       setError(validationError)
@@ -206,16 +188,8 @@ export default function ProfileSetupPage() {
     }
 
     setError('')
-
-    const previewUrl = URL.createObjectURL(file)
-
-    if (imageType === 'profile_picture') {
-      setProfilePicture(file)
-      setProfilePreview(previewUrl)
-    } else {
-      setCoverImage(file)
-      setCoverPreview(previewUrl)
-    }
+    setProfilePicture(file)
+    setProfilePreview(URL.createObjectURL(file))
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -272,13 +246,6 @@ export default function ProfileSetupPage() {
         updatedProfile = await profileApi.uploadProfileImage(
           'profile_picture',
           profilePicture
-        )
-      }
-
-      if (coverImage) {
-        updatedProfile = await profileApi.uploadProfileImage(
-          'cover_image',
-          coverImage
         )
       }
 
@@ -567,9 +534,7 @@ export default function ProfileSetupPage() {
             name="profile_picture"
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            onChange={(event) =>
-              handleImageChange(event, 'profile_picture')
-            }
+            onChange={handleProfilePictureChange}
           />
 
           <span className="profile-field-hint">
@@ -579,30 +544,6 @@ export default function ProfileSetupPage() {
           {profilePreview && (
             <div className="profile-image-preview">
               <img src={profilePreview} alt="Profile picture preview" />
-            </div>
-          )}
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="cover_image">Cover image</label>
-
-          <input
-            id="cover_image"
-            name="cover_image"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(event) =>
-              handleImageChange(event, 'cover_image')
-            }
-          />
-
-          <span className="profile-field-hint">
-            JPG, PNG or WEBP. Maximum size: 10 MB.
-          </span>
-
-          {coverPreview && (
-            <div className="cover-image-preview">
-              <img src={coverPreview} alt="Cover image preview" />
             </div>
           )}
         </div>

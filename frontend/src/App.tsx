@@ -23,6 +23,7 @@ import ProfileEditPage from './features/profile/pages/ProfileEditPage'
 
 import FeedPage from './features/feed/FeedPage'
 import CreatePostPage from './features/feed/CreatePostPage'
+import DeletePostPage from './features/vibespace/pages/DeletePostPage'
 import EventsPage from './features/events/EventsPage'
 import HubDiscoverPage from './features/hubs/HubDiscoverPage'
 import HubDetailPage from './features/hubs/HubDetailPage'
@@ -140,6 +141,11 @@ export default function App() {
                 <Route
                   path="/create/moment"
                   element={<CreatePostPage type="moment" />}
+                />
+
+                <Route
+                  path="/delete/:contentType/:id"
+                  element={<DeletePostPage />}
                 />
 
                 <Route path="/events" element={<EventsPage />} />

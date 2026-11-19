@@ -393,21 +393,21 @@ export default function FeedPage() {
     }
   }
 
-  const handleDelete = async (entry: FeedEntry) => {
-    if (!window.confirm(`Delete this ${entry.content_type}?`)) return
-
-    try {
-      if (entry.content_type === 'vibe') {
-        await vibespaceApi.deleteVibe(entry.id)
-      } else {
-        await vibespaceApi.deleteMoment(entry.id)
-      }
-      setEntries((previous) =>
-        previous.filter((item) => getKey(item) !== getKey(entry)),
-      )
-    } catch {
-      setActionError(`Unable to delete this ${entry.content_type}.`)
+  const goToDelete = (entry: FeedEntry) => {
+    const post = {
+      contentType: entry.content_type,
+      text: entry.content_type === 'vibe' ? entry.content_text : undefined,
+      caption:
+        entry.content_type === 'moment' ? entry.content_text : undefined,
+      image_url:
+        entry.content_type === 'moment' ? entry.image_url : undefined,
+      event_title: entry.event_title,
+      created_at: entry.created_at,
     }
+
+    navigate(`/delete/${entry.content_type}/${entry.id}`, {
+      state: { post, returnTo: '/home' },
+    })
   }
 
   const formatDate = (date: string) => {
@@ -636,7 +636,7 @@ export default function FeedPage() {
                     type="button"
                     className="feed-delete-action"
                     aria-label={`Delete this ${entry.content_type}`}
-                    onClick={() => void handleDelete(entry)}
+                    onClick={() => goToDelete(entry)}
                   >
                     <PostActionIcon name="delete" />
                   </button>

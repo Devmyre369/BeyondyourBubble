@@ -84,64 +84,32 @@
 
 .vibespace-hero {
   min-width: 0;
-}
-
-.vibespace-cover {
-  position: relative;
-  height: clamp(155px, 25vw, 275px);
-  overflow: hidden;
-  border-radius: 14px;
+  padding: 26px;
+  border: 1px solid var(--byb-border);
+  border-radius: 18px;
   background:
-    radial-gradient(ellipse at 75% 20%, rgba(229, 57, 79, 0.35), transparent 48%),
-    linear-gradient(120deg, #202027, #351b25 65%, #18181e);
-}
-
-.vibespace-cover img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-}
-
-.vibespace-cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  background:
-    radial-gradient(ellipse at 75% 20%, rgba(229, 57, 79, 0.32), transparent 48%),
-    linear-gradient(120deg, #202027, #351b25 65%, #18181e);
-}
-
-.vibespace-cover-placeholder span {
-  color: rgba(255, 255, 255, 0.58);
-  font-size: clamp(10px, 2vw, 13px);
-  font-weight: 800;
-  letter-spacing: 3px;
-  text-align: center;
+    radial-gradient(ellipse at 88% 6%, rgba(229, 57, 79, 0.12), transparent 46%),
+    var(--byb-surface);
 }
 
 .vibespace-identity {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 22px;
-  padding: 0 18px;
-  margin-top: -48px;
-  position: relative;
 }
 
 .vibespace-avatar {
-  flex: 0 0 112px;
-  width: 112px;
-  height: 112px;
+  flex: 0 0 104px;
+  width: 104px;
+  height: 104px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  border: 5px solid var(--byb-surface);
+  border: 4px solid var(--byb-surface-light);
   border-radius: 50%;
   background: var(--byb-crimson);
   color: #fff;
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 800;
 }
 
@@ -153,7 +121,6 @@
 
 .vibespace-identity-details {
   min-width: 0;
-  padding-bottom: 5px;
 }
 
 .vibespace-profile-type {
@@ -184,8 +151,8 @@
 }
 
 .vibespace-bio {
-  max-width: 720px;
-  margin: 22px 18px 0;
+  max-width: 760px;
+  margin: 20px 0 0;
   color: #d1d1d8;
   font-size: 14px;
   line-height: 1.8;
@@ -197,7 +164,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 13px 18px 26px;
+  margin: 12px 0 0;
   color: var(--byb-muted);
   font-size: 12px;
 }
@@ -205,10 +172,6 @@
 .vibespace-location span {
   color: var(--byb-crimson);
   font-size: 18px;
-}
-
-.vibespace-identity:not(:has(+ .vibespace-bio)):not(:has(~ .vibespace-location)) {
-  padding-bottom: 12px;
 }
 
 .vibespace-content-grid {
@@ -430,19 +393,21 @@
     gap: 12px;
   }
 
+  .vibespace-hero {
+    padding: 20px;
+  }
+
   .vibespace-identity {
     align-items: flex-start;
     flex-direction: column;
     gap: 12px;
-    padding: 0 19px;
-    margin-top: -42px;
   }
 
   .vibespace-avatar {
-    flex-basis: 92px;
-    width: 92px;
-    height: 92px;
-    font-size: 27px;
+    flex-basis: 88px;
+    width: 88px;
+    height: 88px;
+    font-size: 26px;
   }
 
   .vibespace-identity-details h2 {
@@ -450,12 +415,12 @@
   }
 
   .vibespace-bio {
-    margin: 18px 19px 0;
+    margin: 16px 0 0;
     font-size: 13px;
   }
 
   .vibespace-location {
-    margin: 12px 19px 22px;
+    margin: 10px 0 0;
   }
 
   .vibespace-info-grid {

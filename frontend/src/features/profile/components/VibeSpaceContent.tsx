@@ -5,6 +5,8 @@ import {
   type FormEvent,
 } from 'react'
 
+import { useNavigate } from 'react-router-dom'
+
 import { useAuth } from '../../../context/AuthContext'
 
 import vibespaceApi, {
@@ -38,6 +40,7 @@ export default function VibeSpaceContent({
   section = 'posts',
 }: VibeSpaceContentProps) {
   const { user, isAuthenticated } = useAuth()
+  const navigate = useNavigate()
 
   const currentUsername = user?.username || ''
   const isOwnProfile = currentUsername === username
@@ -76,6 +79,25 @@ export default function VibeSpaceContent({
   const [commentActionLoading, setCommentActionLoading] = useState<LoadingState>({})
 
   const getKey = (type: ContentType, id: string) => `${type}:${id}`
+
+  const goToDelete = (
+    type: ContentType,
+    id: string,
+    post: {
+      text?: string
+      image_url?: string
+      caption?: string
+      event_title?: string | null
+      created_at?: string
+    },
+  ) => {
+    navigate(`/delete/${type}/${id}`, {
+      state: {
+        returnTo: window.location.pathname,
+        post: { contentType: type, ...post },
+      },
+    })
+  }
 
   const adjustCount = (
     type: ContentType,
@@ -365,44 +387,6 @@ export default function VibeSpaceContent({
       setError('Unable to update your Like. Please try again.')
     } finally {
       setLikeLoading((previous) => ({ ...previous, [key]: false }))
-    }
-  }
-
-  // Delete Vibe
-
-  const handleDeleteVibe = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this Vibe?')) {
-      return
-    }
-
-    setError('')
-    setSuccess('')
-
-    try {
-      await vibespaceApi.deleteVibe(id)
-      setVibes((previous) => previous.filter((item) => item.id !== id))
-      setSuccess('Vibe deleted successfully.')
-    } catch {
-      setError('Unable to delete this Vibe. Please try again.')
-    }
-  }
-
-  // Delete Moment
-
-  const handleDeleteMoment = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this Moment?')) {
-      return
-    }
-
-    setError('')
-    setSuccess('')
-
-    try {
-      await vibespaceApi.deleteMoment(id)
-      setMoments((previous) => previous.filter((item) => item.id !== id))
-      setSuccess('Moment deleted successfully.')
-    } catch {
-      setError('Unable to delete this Moment. Please try again.')
     }
   }
 
@@ -1168,9 +1152,22 @@ export default function VibeSpaceContent({
                   type,
                   item.id,
                   isOwnProfile && item.author_username === currentUsername
-                    ? () => type === 'vibe'
-                      ? void handleDeleteVibe(item.id)
-                      : void handleDeleteMoment(item.id)
+                    ? () => {
+                        if (type === 'vibe') {
+                          goToDelete('vibe', item.id, {
+                            text: (item as Vibe).text,
+                            event_title: item.event_title,
+                            created_at: item.created_at,
+                          })
+                        } else {
+                          goToDelete('moment', item.id, {
+                            image_url: (item as Moment).image_url,
+                            caption: (item as Moment).caption,
+                            event_title: item.event_title,
+                            created_at: item.created_at,
+                          })
+                        }
+                      }
                     : undefined,
                 )}
               </article>
@@ -1218,7 +1215,11 @@ export default function VibeSpaceContent({
                   'vibe',
                   vibe.id,
                   isOwnProfile && vibe.author_username === currentUsername
-                    ? () => void handleDeleteVibe(vibe.id)
+                    ? () => goToDelete('vibe', vibe.id, {
+                        text: vibe.text,
+                        event_title: vibe.event_title,
+                        created_at: vibe.created_at,
+                      })
                     : undefined,
                 )}
               </article>
@@ -1271,7 +1272,12 @@ export default function VibeSpaceContent({
                     moment.id,
                     isOwnProfile &&
                       moment.author_username === currentUsername
-                      ? () => void handleDeleteMoment(moment.id)
+                      ? () => goToDelete('moment', moment.id, {
+                          image_url: moment.image_url,
+                          caption: moment.caption,
+                          event_title: moment.event_title,
+                          created_at: moment.created_at,
+                        })
                       : undefined,
                   )}
                 </div>

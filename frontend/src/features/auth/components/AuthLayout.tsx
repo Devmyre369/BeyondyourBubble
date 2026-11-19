@@ -18,7 +18,11 @@ export default function AuthLayout({
     <main className="auth-layout">
       <section className="auth-visual">
         <div className="auth-brand">
-          <span className="brand-mark">B</span>
+          <img
+            className="brand-mark"
+            src="/images/byb-splash-logo.png"
+            alt="BYB"
+          />
           <span>BYB</span>
         </div>
 
@@ -48,7 +52,11 @@ export default function AuthLayout({
       <section className="auth-form-section">
         <div className="auth-form-container">
           <div className="auth-mobile-brand">
-            <span className="brand-mark">B</span>
+            <img
+              className="brand-mark"
+              src="/images/byb-splash-logo.png"
+              alt="BYB"
+            />
             <span>BYB</span>
           </div>
 

@@ -51,17 +51,12 @@
 }
 
 .byb-brand-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 38px;
   height: 38px;
   flex-shrink: 0;
-  color: white;
-  background: linear-gradient(135deg, var(--byb-crimson-dark), var(--byb-crimson));
-  border-radius: 11px;
-  font-size: 21px;
-  font-weight: 850;
+  object-fit: contain;
+  mix-blend-mode: screen;
 }
 
 .byb-brand-name {
@@ -421,8 +416,7 @@
 .byb-header-brand .byb-brand-mark {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  font-size: 19px;
+  object-fit: contain;
 }
 
 .byb-header-brand .byb-brand-name {

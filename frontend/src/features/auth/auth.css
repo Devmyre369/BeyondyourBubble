@@ -81,14 +81,9 @@
 .brand-mark {
   width: 38px;
   height: 38px;
-  display: grid;
-  place-items: center;
-  border-radius: 11px;
-  background: var(--byb-crimson);
-  color: white;
-  font-size: 21px;
-  font-weight: 900;
-  box-shadow: 0 5px 24px rgba(229, 57, 79, 0.25);
+  display: block;
+  object-fit: contain;
+  mix-blend-mode: screen;
 }
 
 /* =========================================

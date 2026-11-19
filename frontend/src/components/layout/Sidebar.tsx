@@ -49,7 +49,11 @@ export default function Sidebar({
     >
       <div className="byb-sidebar-top">
         <NavLink to="/home" className="byb-brand" aria-label="BYB Home">
-          <span className="byb-brand-mark">B</span>
+          <img
+            className="byb-brand-mark"
+            src="/images/byb-splash-logo.png"
+            alt="BYB"
+          />
           <span className="byb-brand-name">
             BYB<span>.</span>
           </span>

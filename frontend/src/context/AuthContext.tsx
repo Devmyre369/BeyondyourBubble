@@ -1,4 +1,3 @@
-
 import { createContext, useContext } from 'react'
 
 import type { AuthResponse, AuthUser } from '../services/authApi'

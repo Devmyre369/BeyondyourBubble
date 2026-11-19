@@ -18,10 +18,10 @@
 
 .byb-splash-logo {
   display: block;
-  width: min(50vw, 300px);
+  width: min(32vw, 190px);
   height: auto;
-  max-height: 38vh;
-  max-height: 38dvh;
+  max-height: 26vh;
+  max-height: 26dvh;
   object-fit: contain;
   object-position: center;
   mix-blend-mode: screen;
@@ -39,8 +39,8 @@
 
 @media (max-width: 480px) {
   .byb-splash-logo {
-    width: min(64vw, 220px);
-    max-height: 32dvh;
+    width: min(44vw, 140px);
+    max-height: 22dvh;
   }
 }
 

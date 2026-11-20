@@ -439,6 +439,230 @@
   }
 }
 
+/* Profile page refinement */
+.vibespace-header {
+  align-items: flex-end;
+  margin-bottom: 22px;
+}
+
+.vibespace-header-subtitle {
+  margin: 6px 0 0;
+  color: var(--byb-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.vibespace-header-actions {
+  gap: 10px;
+}
+
+.vibespace-visibility {
+  padding: 8px 11px;
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-full);
+  background: var(--byb-surface);
+  font-size: 10px;
+}
+
+.vibespace-edit-button {
+  min-height: 38px;
+  padding-inline: 15px;
+}
+
+.vibespace-profile-card {
+  overflow: hidden;
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-xl);
+  background: var(--byb-surface);
+  box-shadow: var(--byb-shadow-sm);
+}
+
+.vibespace-cover {
+  position: relative;
+  height: clamp(145px, 21vw, 220px);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 78% 22%, rgba(229, 57, 79, .36), transparent 38%),
+    linear-gradient(120deg, #27202b, #42232c 54%, #17171e);
+}
+
+.vibespace-cover > img,
+.vibespace-cover-shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.vibespace-cover > img {
+  object-fit: cover;
+  object-position: center 45%;
+}
+
+.vibespace-cover-shade {
+  background: linear-gradient(180deg, rgba(10, 10, 14, .02), rgba(10, 10, 14, .3));
+}
+
+.vibespace-cover-mark {
+  position: absolute;
+  right: 22px;
+  bottom: 13px;
+  color: rgba(255, 255, 255, .5);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 2px;
+}
+
+.vibespace-profile-card .vibespace-hero {
+  padding: 0 28px 24px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.vibespace-profile-card .vibespace-identity {
+  position: relative;
+  align-items: flex-end;
+  gap: 20px;
+  margin-top: -56px;
+}
+
+.vibespace-profile-card .vibespace-avatar {
+  flex-basis: 112px;
+  width: 112px;
+  height: 112px;
+  border: 5px solid var(--byb-surface);
+  background: linear-gradient(140deg, var(--byb-crimson-dark), var(--byb-crimson));
+  box-shadow: 0 5px 18px rgba(0, 0, 0, .35);
+}
+
+.vibespace-profile-card .vibespace-identity-details {
+  padding-bottom: 9px;
+}
+
+.vibespace-profile-card .vibespace-bio {
+  max-width: 790px;
+  margin-top: 18px;
+}
+
+.vibespace-profile-card .vibespace-location {
+  margin-top: 10px;
+}
+
+.vibespace-details-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 28px 0 13px;
+}
+
+.vibespace-details-heading h2 {
+  margin: 5px 0 0;
+  color: var(--byb-text);
+  font-size: 18px;
+  letter-spacing: -.35px;
+}
+
+.vibespace-details-heading > span {
+  color: var(--byb-muted);
+  font-size: 10px;
+}
+
+.vibespace-cards {
+  margin-top: 0;
+  gap: 13px;
+}
+
+.vibespace-cards .vibespace-card {
+  padding: 18px;
+  border-radius: 13px;
+  background: linear-gradient(145deg, var(--byb-surface), rgba(25, 25, 32, .88));
+}
+
+.vibespace-cards .vibespace-card-head h2 {
+  font-size: 15px;
+}
+
+.vibespace-statistics-loading {
+  min-height: 66px;
+  display: grid;
+  place-items: center;
+  margin-top: 24px;
+  color: var(--byb-muted);
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.vibespace-content-body {
+  margin-top: 0;
+}
+
+.vibespace-profile-card .vibespace-location svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--byb-crimson);
+}
+
+.vibespace-profile-card .vibespace-location span {
+  display: none;
+}
+
+.vibespace-profile-card .vibespace-location::before {
+  content: '⌖';
+  color: var(--byb-crimson);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.vibespace-post {
+  padding: 18px;
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: 13px;
+}
+
+.vibespace-post:last-child {
+  border-bottom: 1px solid var(--byb-border);
+}
+
+.vibespace-post-list {
+  gap: 12px;
+}
+
+.vibespace-moment-card {
+  overflow: hidden;
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: 13px;
+}
+
+.vibespace-moment-card > img {
+  aspect-ratio: 4 / 3;
+  transition: transform .25s ease;
+}
+
+.vibespace-moment-card:hover > img {
+  transform: scale(1.025);
+}
+
+.vibespace-moment-info {
+  padding: 13px;
+}
+
+.vibespace-moment-info .vibespace-interaction-actions {
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  .vibespace-header {
+    align-items: flex-start;
+  }
+}
+
 @media (max-width: 560px) {
   .vibespace-page {
     padding: 25px 14px 20px;
@@ -450,25 +674,40 @@
     gap: 12px;
   }
 
-  .vibespace-hero {
-    padding: 20px;
+  .vibespace-header-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
   }
 
-  .vibespace-identity {
-    align-items: flex-start;
-    flex-direction: column;
+  .vibespace-profile-card .vibespace-hero {
+    padding: 0 17px 19px;
+  }
+
+  .vibespace-cover {
+    height: 140px;
+  }
+
+  .vibespace-profile-card .vibespace-identity {
+    align-items: flex-end;
     gap: 12px;
+    margin-top: -45px;
   }
 
-  .vibespace-avatar {
-    flex-basis: 88px;
-    width: 88px;
-    height: 88px;
-    font-size: 26px;
+  .vibespace-profile-card .vibespace-avatar {
+    flex-basis: 82px;
+    width: 82px;
+    height: 82px;
+    font-size: 24px;
+  }
+
+  .vibespace-profile-card .vibespace-identity-details {
+    flex: 1;
+    padding-bottom: 5px;
   }
 
   .vibespace-identity-details h2 {
-    font-size: 24px;
+    font-size: clamp(18px, 5vw, 23px);
   }
 
   .vibespace-bio {
@@ -485,6 +724,16 @@
     gap: 17px;
   }
 
+  .vibespace-details-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-top: 22px;
+  }
+
+  .vibespace-header-subtitle {
+    max-width: 320px;
+  }
+
   .vibespace-sidebar {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -496,6 +745,18 @@
   .vibespace-footer {
     flex-direction: column;
     gap: 8px;
+  }
+}
+
+@media (max-width: 380px) {
+  .vibespace-profile-card .vibespace-identity {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-top: -39px;
+  }
+
+  .vibespace-profile-card .vibespace-identity-details {
+    padding-left: 3px;
   }
 }
 

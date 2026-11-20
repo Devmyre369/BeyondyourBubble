@@ -5,6 +5,11 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from events.models import Event, EventModerationReview
+from accounts.models import Notification
+from accounts.services.notification_service import (
+    create_notification,
+    notify_hub_managers,
+)
 
 
 @transaction.atomic
@@ -80,5 +85,31 @@ def review_event(*, event_id, reviewer, decision, review_notes=""):
         ),
         review_notes=event.review_notes,
     )
+
+    approved = decision == "approve"
+    verb = (
+        Notification.Verb.EVENT_APPROVED
+        if approved
+        else Notification.Verb.EVENT_REJECTED
+    )
+    manager_notices = notify_hub_managers(
+        actor=reviewer,
+        hub=event.organising_hub,
+        event=event,
+        verb=verb,
+    )
+    notified_manager_ids = {
+        notice.recipient_id
+        for notice in manager_notices
+        if notice is not None
+    }
+    if event.created_by_id not in notified_manager_ids:
+        create_notification(
+            actor=reviewer,
+            recipient_id=event.created_by_id,
+            verb=verb,
+            event=event,
+            hub=event.organising_hub,
+        )
 
     return event

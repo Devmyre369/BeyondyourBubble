@@ -30,13 +30,44 @@ const api = axios.create({
 
 // Only one refresh operation can run at a time.
 let refreshPromise: Promise<string> | null = null
+let sessionInvalidated = false
 
 function clearSession() {
+  const hadSession = Boolean(
+    sessionStorage.getItem(ACCESS_TOKEN_KEY) ||
+    sessionStorage.getItem(REFRESH_TOKEN_KEY) ||
+    sessionStorage.getItem(USER_KEY),
+  )
   sessionStorage.removeItem(ACCESS_TOKEN_KEY)
   sessionStorage.removeItem(REFRESH_TOKEN_KEY)
   sessionStorage.removeItem(USER_KEY)
 
-  window.dispatchEvent(new Event('byb:auth-expired'))
+  sessionInvalidated = true
+  if (hadSession) {
+    // Wait until provider effects have registered their listeners during the
+    // initial React mount (StrictMode mounts effects after child effects).
+    window.setTimeout(() => {
+      if (!sessionStorage.getItem(ACCESS_TOKEN_KEY)) {
+        window.dispatchEvent(new Event('byb:auth-expired'))
+      }
+    }, 0)
+  }
+}
+
+function tokenIsExpired(token: string | null): boolean {
+  if (!token) return true
+
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return true
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const claims = JSON.parse(
+      window.atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')),
+    ) as { exp?: unknown }
+    return typeof claims.exp !== 'number' || claims.exp <= Date.now() / 1000 + 15
+  } catch {
+    return true
+  }
 }
 
 async function performTokenRefresh(): Promise<string> {
@@ -106,10 +137,48 @@ function getRefreshedAccessToken(): Promise<string> {
   return refreshPromise
 }
 
-// Attach the current access token to outgoing requests.
-api.interceptors.request.use((config) => {
-  const accessToken =
+// Refresh expired JWTs before starting protected requests. If both tokens
+// have expired, clear the stale session without sending doomed API calls.
+api.interceptors.request.use(async (config) => {
+  const requestUrl = config.url || ''
+  const authEndpoints = [
+    '/accounts/token/refresh/',
+    '/accounts/login/',
+    '/accounts/signup/',
+    '/accounts/verify-signup/',
+    '/accounts/password-reset/',
+  ]
+  const isAuthEndpoint = authEndpoints.some((endpoint) =>
+    requestUrl.includes(endpoint),
+  )
+
+  let accessToken =
     sessionStorage.getItem(ACCESS_TOKEN_KEY)
+
+  if (!isAuthEndpoint && sessionInvalidated) {
+    if (accessToken) {
+      // A successful login has stored a fresh token since the old session
+      // was invalidated.
+      sessionInvalidated = false
+    } else {
+      throw new axios.CanceledError('Please sign in to continue.')
+    }
+  }
+
+  if (!isAuthEndpoint && accessToken && tokenIsExpired(accessToken)) {
+    const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY)
+    if (tokenIsExpired(refreshToken)) {
+      clearSession()
+      throw new axios.CanceledError('Your session has expired. Please sign in again.')
+    }
+
+    try {
+      accessToken = await getRefreshedAccessToken()
+    } catch {
+      clearSession()
+      throw new axios.CanceledError('Your session has expired. Please sign in again.')
+    }
+  }
 
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`

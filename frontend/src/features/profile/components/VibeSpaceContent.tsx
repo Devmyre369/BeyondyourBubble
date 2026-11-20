@@ -1,6 +1,7 @@
 
 import {
   useEffect,
+  useRef,
   useState,
   type FormEvent,
 } from 'react'
@@ -54,6 +55,19 @@ export default function VibeSpaceContent({
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const lastScrolledHash = useRef('')
+
+  useEffect(() => {
+    const hash = window.location.hash
+    if (loading || !hash || hash === lastScrolledHash.current) return
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(hash.slice(1))
+      if (!target) return
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      lastScrolledHash.current = hash
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [loading, vibes.length, moments.length])
 
   // Interaction state
 
@@ -1198,7 +1212,7 @@ export default function VibeSpaceContent({
             </div>
           ) : (
             vibes.map((vibe) => (
-              <article className="vibespace-post" key={vibe.id}>
+              <article className="vibespace-post" id={`vibe-${vibe.id}`} key={vibe.id}>
                 <div className="vibespace-post-meta">
                   <span>{formatDate(vibe.created_at)}</span>
 
@@ -1249,7 +1263,7 @@ export default function VibeSpaceContent({
             </div>
           ) : (
             moments.map((moment) => (
-              <article className="vibespace-moment-card" key={moment.id}>
+              <article className="vibespace-moment-card" id={`moment-${moment.id}`} key={moment.id}>
                 <img
                   src={moment.image_url}
                   alt={moment.caption || 'VibeSpace Moment'}

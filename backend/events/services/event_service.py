@@ -9,6 +9,8 @@ from events.permissions import (
     can_submit_hub_event,
 )
 from hubs.models import Hub
+from accounts.models import Notification
+from accounts.services.notification_service import notify_hub_managers, notify_staff
 
 
 @transaction.atomic
@@ -34,7 +36,7 @@ def create_event(*, hub, user, validated_data):
             "of an active Hub can submit events."
         )
 
-    return Event.objects.create(
+    event = Event.objects.create(
         **validated_data,
         organising_hub=hub,
         created_by=user,
@@ -44,6 +46,24 @@ def create_event(*, hub, user, validated_data):
         reviewed_at=None,
         review_notes="",
     )
+    manager_notices = notify_hub_managers(
+        actor=user,
+        hub=hub,
+        event=event,
+        verb=Notification.Verb.EVENT_SUBMITTED,
+    )
+    notify_staff(
+        actor=user,
+        event=event,
+        hub=hub,
+        verb=Notification.Verb.EVENT_SUBMITTED,
+        exclude_ids={
+            notice.recipient_id
+            for notice in manager_notices
+            if notice is not None
+        },
+    )
+    return event
 
 
 @transaction.atomic
@@ -98,6 +118,27 @@ def update_event(*, event_id, user, validated_data):
 
     event.save()
 
+    notified_manager_ids = {
+        notice.recipient_id
+        for notice in notify_hub_managers(
+            actor=user,
+            hub=event.organising_hub,
+            event=event,
+            verb=Notification.Verb.EVENT_UPDATED,
+        )
+        if notice is not None
+    }
+    if event.created_by_id not in notified_manager_ids:
+        from accounts.services.notification_service import create_notification
+
+        create_notification(
+            actor=user,
+            recipient_id=event.created_by_id,
+            event=event,
+            hub=event.organising_hub,
+            verb=Notification.Verb.EVENT_UPDATED,
+        )
+
     return event
 
 
@@ -138,5 +179,25 @@ def cancel_event(*, event_id, user):
 
     event.status = Event.Status.CANCELLED
     event.save(update_fields=["status", "updated_at"])
+    notified_manager_ids = {
+        notice.recipient_id
+        for notice in notify_hub_managers(
+            actor=user,
+            hub=event.organising_hub,
+            event=event,
+            verb=Notification.Verb.EVENT_CANCELLED,
+        )
+        if notice is not None
+    }
+    if event.created_by_id not in notified_manager_ids:
+        from accounts.services.notification_service import create_notification
+
+        create_notification(
+            actor=user,
+            recipient_id=event.created_by_id,
+            event=event,
+            hub=event.organising_hub,
+            verb=Notification.Verb.EVENT_CANCELLED,
+        )
 
     return event

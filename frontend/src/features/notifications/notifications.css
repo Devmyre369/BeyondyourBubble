@@ -46,6 +46,12 @@
   border-color: var(--byb-crimson-border);
 }
 
+.byb-notifications-header button:disabled,
+.byb-notifications-load-more:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
 .byb-notifications-list {
   display: grid;
 }
@@ -127,6 +133,28 @@
   color: var(--byb-danger);
   background: var(--byb-crimson-soft);
   border-radius: var(--byb-radius-md);
+}
+
+.byb-notifications-error-state {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 56px 20px;
+  color: var(--byb-danger);
+  text-align: center;
+}
+
+.byb-notifications-error-state p {
+  margin: 0;
+}
+
+.byb-notifications-error-state button {
+  padding: 9px 14px;
+  color: var(--byb-text);
+  background: var(--byb-surface);
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-full);
+  cursor: pointer;
 }
 
 .byb-notifications-load-more {

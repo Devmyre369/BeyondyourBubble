@@ -91,3 +91,34 @@ class NotificationAPITests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         notification.refresh_from_db()
         self.assertIsNone(notification.read_at)
+
+    def test_mark_all_read_updates_only_the_authenticated_users_notifications(self):
+        first = Notification.objects.create(
+            recipient=self.recipient,
+            actor=self.actor,
+            verb=Notification.Verb.FOLLOW,
+        )
+        second = Notification.objects.create(
+            recipient=self.recipient,
+            actor=self.actor,
+            verb=Notification.Verb.LIKE,
+        )
+        other_notice = Notification.objects.create(
+            recipient=self.actor,
+            actor=self.recipient,
+            verb=Notification.Verb.FOLLOW,
+        )
+        self.client.force_authenticate(user=self.recipient)
+
+        response = self.client.post("/api/accounts/notifications/read-all/")
+        unread = self.client.get("/api/accounts/notifications/unread-count/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["read_count"], 2)
+        self.assertEqual(unread.data["unread_count"], 0)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        other_notice.refresh_from_db()
+        self.assertIsNotNone(first.read_at)
+        self.assertIsNotNone(second.read_at)
+        self.assertIsNone(other_notice.read_at)

@@ -432,11 +432,43 @@ a.search-result-card:hover {
   border-radius: var(--byb-radius-xl);
 }
 
+.public-profile-cover {
+  position: relative;
+  height: clamp(140px, 22vw, 210px);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 84% 20%, rgba(229, 57, 79, .34), transparent 40%),
+    linear-gradient(120deg, #27202b, #42232c 54%, #17171e);
+}
+
+.public-profile-cover > img,
+.public-profile-cover > div {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.public-profile-cover > img { object-fit: cover; }
+.public-profile-cover > div { background: linear-gradient(180deg, transparent 35%, rgba(12, 12, 17, .38)); }
+
+.public-profile-cover > span {
+  position: absolute;
+  right: 20px;
+  bottom: 12px;
+  color: rgba(255,255,255,.52);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 2px;
+}
+
 .public-profile-identity {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 16px;
-  padding: 22px 22px 0;
+  padding: 0 22px;
+  margin-top: -45px;
 }
 
 .public-profile-avatar,
@@ -453,11 +485,13 @@ a.search-result-card:hover {
   font-size: 25px;
   font-weight: 800;
   object-fit: cover;
+  box-shadow: 0 5px 18px rgba(0, 0, 0, .35);
 }
 
 .public-profile-identity-copy {
   min-width: 0;
-  padding-bottom: 6px;
+  flex: 1;
+  padding-bottom: 9px;
 }
 
 .public-profile-identity-copy h1 {
@@ -473,7 +507,7 @@ a.search-result-card:hover {
 }
 
 .public-profile-body {
-  padding: 16px 22px 22px;
+  padding: 14px 22px 22px;
 }
 
 .public-profile-bio {
@@ -492,6 +526,10 @@ a.search-result-card:hover {
 
 .public-profile-content {
   margin-top: 18px;
+}
+
+.public-profile-statistics {
+  border-radius: 0 0 var(--byb-radius-xl) var(--byb-radius-xl);
 }
 
 .public-profile-back {
@@ -552,7 +590,7 @@ a.search-result-card:hover {
     flex-direction: column;
     gap: 7px;
     padding: 0 15px;
-    margin-top: -41px;
+    margin-top: -38px;
     text-align: center;
   }
 
@@ -563,4 +601,10 @@ a.search-result-card:hover {
   .public-profile-body {
     padding: 14px 15px 18px;
   }
+}
+
+@media (max-width: 560px) {
+  .public-profile-cover { height: 135px; }
+  .public-profile-statistics { gap: 12px; }
+  .public-profile-statistics a { flex: 1; text-align: center; }
 }

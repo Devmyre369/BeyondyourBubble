@@ -35,6 +35,7 @@ export default function ProfileSections({
           key={key}
           to={`${basePath}/${key}`}
           className={activeSection === key ? 'active' : ''}
+          aria-current={activeSection === key ? 'page' : undefined}
         >
           {label}
           <span>{counts[key]}</span>

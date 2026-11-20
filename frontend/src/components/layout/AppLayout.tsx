@@ -76,7 +76,7 @@ function MobileNavigationIcon({
 }
 
 export default function AppLayout() {
-  const { profile, user } = useAuth()
+  const { profile, user, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [isMobile, setIsMobile] = useState(() =>
@@ -168,11 +168,24 @@ export default function AppLayout() {
   }, [uploadMenuOpen])
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
+
     const refreshUnreadCount = () => {
       notificationsApi.getUnreadCount()
         .then(setUnreadNotifications)
         .catch((requestError: unknown) => {
-          console.error('Unable to load notification count:', requestError)
+          const status = (
+            requestError as { response?: { status?: number } }
+          )?.response?.status
+          const code = (requestError as { code?: string })?.code
+
+          // An expired session is handled by the shared API interceptor,
+          // which clears auth state and sends the user to sign in.
+          if (status !== 401 && code !== 'ERR_CANCELED') {
+            console.error('Unable to load notification count:', requestError)
+          }
         })
     }
 
@@ -184,7 +197,11 @@ export default function AppLayout() {
       window.clearInterval(intervalId)
       window.removeEventListener('byb:notifications-updated', refreshUnreadCount)
     }
-  }, [location.pathname])
+  }, [isAuthenticated, location.pathname])
+
+  const displayedUnreadNotifications = isAuthenticated
+    ? unreadNotifications
+    : 0
 
   const openComposer = (type: 'vibe' | 'moment') => {
     setUploadMenuOpen(false)
@@ -307,15 +324,15 @@ export default function AppLayout() {
             className={({ isActive }) =>
               `byb-header-notifications${isActive ? ' active' : ''}`
             }
-            aria-label={`Notifications${unreadNotifications ? `, ${unreadNotifications} unread` : ''}`}
+            aria-label={`Notifications${displayedUnreadNotifications ? `, ${displayedUnreadNotifications} unread` : ''}`}
             title="Notifications"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M20.8 8.8c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11A4.8 4.8 0 0 1 12 6.1a4.8 4.8 0 0 1 8.8 2.7Z" />
             </svg>
-            {unreadNotifications > 0 && (
+            {displayedUnreadNotifications > 0 && (
               <span className="byb-notification-badge">
-                {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                {displayedUnreadNotifications > 99 ? '99+' : displayedUnreadNotifications}
               </span>
             )}
           </NavLink>

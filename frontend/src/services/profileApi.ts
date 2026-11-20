@@ -123,21 +123,34 @@ interface ProfileImageResponse {
   profile: UserProfile
 }
 
+let ownProfileRequest: Promise<ProfileResponse> | null = null
+
+function getOwnProfileResponse(): Promise<ProfileResponse> {
+  if (!ownProfileRequest) {
+    ownProfileRequest = api.get<ProfileResponse>('/accounts/profile/')
+      .then((response) => response.data)
+      .finally(() => {
+        ownProfileRequest = null
+      })
+  }
+  return ownProfileRequest
+}
+
 export const profileApi = {
   getMyProfile: async (): Promise<UserProfile> => {
-    const response = await api.get<ProfileResponse>(
-      '/accounts/profile/'
-    )
-
-    return response.data.profile
+    const response = await getOwnProfileResponse()
+    return response.profile
   },
 
   getMyProfileOverview: async (): Promise<ProfileOverview> => {
-    const response = await api.get<ProfileOverviewResponse>('/accounts/profile/')
+    const response = await getOwnProfileResponse()
+    if (!response.statistics) {
+      throw new Error('Profile statistics were not returned.')
+    }
     return {
-      profile: response.data.profile,
-      statistics: response.data.statistics,
-      is_following: response.data.is_following,
+      profile: response.profile,
+      statistics: response.statistics,
+      is_following: response.is_following ?? false,
     }
   },
 

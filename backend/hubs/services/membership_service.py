@@ -6,6 +6,11 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 
 from hubs.models import Hub, HubMembership
 from hubs.permissions import can_edit_hub
+from accounts.models import Notification
+from accounts.services.notification_service import (
+    create_notification,
+    notify_hub_managers,
+)
 
 
 User = get_user_model()
@@ -72,6 +77,16 @@ def join_hub(hub_id, user):
             joined_at=joined_at,
         )
 
+    notify_hub_managers(
+        actor=user,
+        hub=hub,
+        verb=(
+            Notification.Verb.HUB_MEMBERSHIP_REQUEST
+            if status == HubMembership.Status.PENDING
+            else Notification.Verb.HUB_MEMBER_JOINED
+        ),
+        roles=(HubMembership.Role.OWNER, HubMembership.Role.ADMIN),
+    )
     return hub, membership
 
 
@@ -94,6 +109,12 @@ def leave_hub(hub_id, user):
             "The Hub owner cannot leave while they remain the owner."
         )
 
+    notify_hub_managers(
+        actor=user,
+        hub=hub,
+        verb=Notification.Verb.HUB_MEMBER_LEFT,
+        roles=(HubMembership.Role.OWNER, HubMembership.Role.ADMIN),
+    )
     membership.delete()
     return hub
 
@@ -126,6 +147,16 @@ def review_membership_request(hub_id, membership_id, actor, decision):
         membership.joined_at = None
 
     membership.save(update_fields=["status", "role", "joined_at"])
+    create_notification(
+        actor=actor,
+        recipient_id=membership.user_id,
+        hub=hub,
+        verb=(
+            Notification.Verb.HUB_MEMBERSHIP_APPROVED
+            if decision == "approve"
+            else Notification.Verb.HUB_MEMBERSHIP_REJECTED
+        ),
+    )
     return membership
 
 
@@ -181,6 +212,13 @@ def invite_member(hub_id, actor, username):
             joined_at=now,
         )
 
+    create_notification(
+        actor=actor,
+        recipient_id=invited_user.pk,
+        hub=hub,
+        verb=Notification.Verb.HUB_INVITED,
+    )
+
     return membership, created
 
 
@@ -214,6 +252,12 @@ def remove_member(hub_id, membership_id, actor):
             "Administrators can only remove members and editors."
         )
 
+    create_notification(
+        actor=actor,
+        recipient_id=membership.user_id,
+        hub=hub,
+        verb=Notification.Verb.HUB_MEMBER_REMOVED,
+    )
     membership.delete()
     return hub
 
@@ -256,4 +300,10 @@ def change_member_role(hub_id, membership_id, actor, new_role):
 
     membership.role = new_role
     membership.save(update_fields=["role"])
+    create_notification(
+        actor=actor,
+        recipient_id=membership.user_id,
+        hub=hub,
+        verb=Notification.Verb.HUB_ROLE_CHANGED,
+    )
     return membership

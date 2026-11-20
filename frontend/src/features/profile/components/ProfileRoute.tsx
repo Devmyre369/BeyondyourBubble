@@ -30,6 +30,7 @@ export default function ProfileRoute() {
         }
       } catch (err) {
         if (!active) return
+        if (axios.isCancel(err)) return
 
         if (axios.isAxiosError(err) && err.response?.status === 404) {
           setProfile(null)

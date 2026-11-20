@@ -127,6 +127,17 @@ export default function PublicUserProfilePage() {
         ← Back to BYB
       </Link>
       <article className="public-profile-card">
+        <div className="public-profile-cover">
+          {profile.cover_image && (
+            <img
+              src={profile.cover_image}
+              alt=""
+              onError={(event) => { event.currentTarget.style.visibility = 'hidden' }}
+            />
+          )}
+          <div aria-hidden="true" />
+          <span aria-hidden="true">BYB</span>
+        </div>
         <div className="public-profile-identity">
           {profile.profile_picture ? (
             <img

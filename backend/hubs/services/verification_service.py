@@ -4,6 +4,8 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from hubs.models import Hub, HubMembership, HubVerificationRequest
+from accounts.models import Notification
+from accounts.services.notification_service import create_notification, notify_staff
 
 
 def _require_staff(reviewer):
@@ -38,11 +40,17 @@ def request_hub_verification(*, hub_id, requester, request_notes=""):
         raise ValidationError("A verification request is already pending.")
 
     try:
-        return HubVerificationRequest.objects.create(
+        verification_request = HubVerificationRequest.objects.create(
             hub=hub,
             requested_by=requester,
             request_notes=request_notes.strip(),
         )
+        notify_staff(
+            actor=requester,
+            hub=hub,
+            verb=Notification.Verb.HUB_VERIFICATION_REQUESTED,
+        )
+        return verification_request
     except IntegrityError as exc:
         raise ValidationError("A verification request is already pending.") from exc
 
@@ -87,5 +95,16 @@ def review_hub_verification_request(*, request_id, reviewer, decision, review_no
     if decision == "approve":
         hub.is_verified = True
         hub.save(update_fields=["is_verified", "updated_at"])
+
+    create_notification(
+        actor=reviewer,
+        recipient_id=hub.owner_id,
+        hub=hub,
+        verb=(
+            Notification.Verb.HUB_VERIFICATION_APPROVED
+            if decision == "approve"
+            else Notification.Verb.HUB_VERIFICATION_REJECTED
+        ),
+    )
 
     return verification_request

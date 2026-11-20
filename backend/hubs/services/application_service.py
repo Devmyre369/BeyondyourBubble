@@ -6,6 +6,8 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError, PermissionDenied
 
 from hubs.models import Hub, HubApplication, HubMembership
+from accounts.models import Notification
+from accounts.services.notification_service import create_notification, notify_staff
 
 
 @transaction.atomic
@@ -82,6 +84,11 @@ def submit_application(applicant, data):
             "You already have a pending application for this organisation."
         ) from exc
 
+    notify_staff(
+        actor=applicant,
+        verb=Notification.Verb.HUB_APPLICATION_SUBMITTED,
+    )
+
     return application
 
 
@@ -142,6 +149,12 @@ def approve_application(application, reviewer, review_notes=""):
                 "updated_at",
             ]
         )
+        create_notification(
+            actor=reviewer,
+            recipient_id=application.applicant_id,
+            verb=Notification.Verb.HUB_APPLICATION_APPROVED,
+            hub=existing_hub,
+        )
         return {
             "application": application,
             "hub": existing_hub,
@@ -186,6 +199,13 @@ def approve_application(application, reviewer, review_notes=""):
             "reviewed_at",
             "updated_at",
         ]
+    )
+
+    create_notification(
+        actor=reviewer,
+        recipient_id=application.applicant_id,
+        verb=Notification.Verb.HUB_APPLICATION_APPROVED,
+        hub=hub,
     )
 
     return {
@@ -234,6 +254,12 @@ def reject_application(application, reviewer, review_notes=""):
             "reviewed_at",
             "updated_at",
         ]
+    )
+
+    create_notification(
+        actor=reviewer,
+        recipient_id=application.applicant_id,
+        verb=Notification.Verb.HUB_APPLICATION_REJECTED,
     )
 
     return {

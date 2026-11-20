@@ -11,7 +11,7 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.contrib.auth import get_user_model
-from accounts.models import Profile
+from accounts.models import Notification, Profile
 
 from .models import Hub, HubMembership, HubApplication, HubVerificationRequest
 from .serializers import HubDetailSerializer
@@ -437,6 +437,12 @@ class HubApplicationServiceTests(TestCase):
 
         self.assertEqual(membership.role, HubMembership.Role.OWNER)
         self.assertEqual(membership.status, HubMembership.Status.APPROVED)
+        notice = Notification.objects.get(
+            recipient=self.applicant,
+            verb=Notification.Verb.HUB_APPLICATION_APPROVED,
+        )
+        self.assertEqual(notice.actor, self.staff)
+        self.assertEqual(notice.hub, hub)
         self.assertIsNotNone(membership.joined_at)
 
     def test_applicant_becomes_owner_and_creator(self):
@@ -668,6 +674,11 @@ class HubApplicationAndVerificationAPITests(APITestCase):
         self.assertEqual(tracking.status_code, 200)
         self.assertEqual(tracking.data["count"], 1)
         self.assertEqual(tracking.data["results"][0]["id"], response.data["id"])
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.staff,
+            actor=self.applicant,
+            verb=Notification.Verb.HUB_APPLICATION_SUBMITTED,
+        ).exists())
 
     def test_application_submission_rejects_duplicate_and_existing_slug(self):
         first = self.client.post(
@@ -766,6 +777,11 @@ class HubApplicationAndVerificationAPITests(APITestCase):
         self.assertEqual(rejected.data["application"]["reviewer"], self.staff.pk)
         self.assertIsNotNone(rejected.data["application"]["reviewed_at"])
         self.assertEqual(Hub.objects.count(), 0)
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.applicant,
+            actor=self.staff,
+            verb=Notification.Verb.HUB_APPLICATION_REJECTED,
+        ).exists())
 
     def test_staff_applicant_cannot_review_own_application(self):
         self.authenticate(self.staff)
@@ -845,6 +861,12 @@ class HubApplicationAndVerificationAPITests(APITestCase):
         self.assertEqual(verification.reviewer, self.staff)
         self.assertEqual(verification.review_notes, "Identity confirmed.")
         self.assertIsNotNone(verification.reviewed_at)
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.applicant,
+            actor=self.staff,
+            hub=hub,
+            verb=Notification.Verb.HUB_VERIFICATION_APPROVED,
+        ).exists())
 
     def test_hub_owner_or_admin_cannot_verify_their_own_hub(self):
         for username, role in (
@@ -1921,6 +1943,43 @@ class HubMembershipAPITests(APITestCase):
         )
         self.assertIsNone(response.data["membership"]["joined_at"])
         self.assertFalse(response.data["can_leave"])
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.owner,
+            actor=self.user,
+            hub=self.hub,
+            verb=Notification.Verb.HUB_MEMBERSHIP_REQUEST,
+        ).exists())
+
+    def test_membership_review_and_invitation_notify_the_affected_user(self):
+        pending = self.add_membership(
+            self.user,
+            membership_status=HubMembership.Status.PENDING,
+        )
+        self.authenticate_as(self.owner)
+        response = self.client.post(
+            self.review_url(pending, "approve"), {}, format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.user,
+            actor=self.owner,
+            hub=self.hub,
+            verb=Notification.Verb.HUB_MEMBERSHIP_APPROVED,
+        ).exists())
+
+        invitee = self.create_user("membership_invitee")
+        invited = self.client.post(
+            f"/api/hubs/{self.hub.id}/members/invitations/",
+            {"username": invitee.username},
+            format="json",
+        )
+        self.assertEqual(invited.status_code, 201)
+        self.assertTrue(Notification.objects.filter(
+            recipient=invitee,
+            actor=self.owner,
+            hub=self.hub,
+            verb=Notification.Verb.HUB_INVITED,
+        ).exists())
 
     def test_duplicate_approved_and_pending_joins_are_rejected(self):
         cases = [

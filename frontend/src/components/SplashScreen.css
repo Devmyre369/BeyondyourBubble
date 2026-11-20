@@ -5,9 +5,6 @@
   z-index: 99999;
   display: grid;
   place-items: center;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
   overflow: hidden;
   background: var(--byb-bg);
   animation: byb-splash-animation 1.6s ease forwards;
@@ -16,11 +13,12 @@
 
 .byb-splash-logo {
   display: block;
-  width: min(28vw, 160px);
+  justify-self: center;
+  align-self: center;
+  width: clamp(78px, 16vw, 126px);
   margin: 0;
   height: auto;
-  max-height: 26vh;
-  max-height: 26dvh;
+  max-height: 18dvh;
   object-fit: contain;
   object-position: center;
   mix-blend-mode: screen;
@@ -38,8 +36,8 @@
 
 @media (max-width: 480px) {
   .byb-splash-logo {
-    width: min(36vw, 120px);
-    max-height: 22dvh;
+    width: clamp(72px, 24vw, 96px);
+    max-height: 16dvh;
   }
 }
 

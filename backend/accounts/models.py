@@ -333,6 +333,25 @@ class Notification(models.Model):
         REVIBE = "revibe", "Revibed your post"
         HANDSHAKE_REQUEST = "handshake_request", "Sent you a Handshake request"
         HANDSHAKE_ACCEPTED = "handshake_accepted", "Accepted your Handshake request"
+        EVENT_APPROVED = "event_approved", "Approved your event"
+        EVENT_REJECTED = "event_rejected", "Needs changes to your event"
+        EVENT_SUBMITTED = "event_submitted", "Submitted an event for review"
+        EVENT_UPDATED = "event_updated", "Updated a Hub event"
+        EVENT_CANCELLED = "event_cancelled", "Cancelled a Hub event"
+        HUB_APPLICATION_APPROVED = "hub_application_approved", "Approved your Hub application"
+        HUB_APPLICATION_REJECTED = "hub_application_rejected", "Rejected your Hub application"
+        HUB_APPLICATION_SUBMITTED = "hub_application_submitted", "Submitted a Hub application"
+        HUB_MEMBERSHIP_REQUEST = "hub_membership_request", "Requested to join your Hub"
+        HUB_MEMBER_JOINED = "hub_member_joined", "Joined your Hub"
+        HUB_MEMBER_LEFT = "hub_member_left", "Left your Hub"
+        HUB_MEMBERSHIP_APPROVED = "hub_membership_approved", "Approved your Hub membership"
+        HUB_MEMBERSHIP_REJECTED = "hub_membership_rejected", "Rejected your Hub membership"
+        HUB_INVITED = "hub_invited", "Added you to a Hub"
+        HUB_MEMBER_REMOVED = "hub_member_removed", "Removed you from a Hub"
+        HUB_ROLE_CHANGED = "hub_role_changed", "Changed your Hub role"
+        HUB_VERIFICATION_APPROVED = "hub_verification_approved", "Verified your Hub"
+        HUB_VERIFICATION_REJECTED = "hub_verification_rejected", "Declined your Hub verification request"
+        HUB_VERIFICATION_REQUESTED = "hub_verification_requested", "Requested Hub verification"
 
     id = models.UUIDField(
         primary_key=True,
@@ -349,7 +368,7 @@ class Notification(models.Model):
         on_delete=models.CASCADE,
         related_name="notifications_sent",
     )
-    verb = models.CharField(max_length=24, choices=Verb.choices)
+    verb = models.CharField(max_length=32, choices=Verb.choices)
     vibe = models.ForeignKey(
         "vibespace.Vibe",
         on_delete=models.SET_NULL,
@@ -366,6 +385,20 @@ class Notification(models.Model):
     )
     handshake = models.ForeignKey(
         "accounts.Handshake",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+    event = models.ForeignKey(
+        "events.Event",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+    hub = models.ForeignKey(
+        "hubs.Hub",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

@@ -14,7 +14,7 @@ import { resolveProfileSection } from '../components/profileSectionUtils'
 import './vibespace.css'
 
 function initials(firstName: string, lastName: string) {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.trim().toUpperCase()
 }
 
 function InfoItem({
@@ -55,7 +55,7 @@ function TagCard({
       {items?.length ? (
         <div className="vibespace-tags">
           {items.map((item) => (
-            <span className="vibespace-tag" key={item}>
+            <span className="vibespace-tag" key={`${item}-${label}`}>
               {item}
             </span>
           ))}
@@ -96,6 +96,8 @@ export default function ProfilePage() {
   }
 
   const fullName = `${profile.first_name} ${profile.last_name}`.trim()
+  const displayName = fullName || profile.username || user?.username || 'BYB Member'
+  const profileInitial = displayName.charAt(0).toUpperCase()
   const isStudent = profile.profile_type === 'student'
 
   const hasBackgroundInfo =
@@ -114,8 +116,9 @@ export default function ProfilePage() {
       <div className="vibespace-container">
         <header className="vibespace-header">
           <div>
-            <span className="vibespace-eyebrow">BEYOND YOUR BUBBLE</span>
+            <span className="vibespace-eyebrow">YOUR SPACE</span>
             <h1>Your VibeSpace</h1>
+            <p className="vibespace-header-subtitle">Your profile, interests, and stories in one place.</p>
           </div>
 
           <div className="vibespace-header-actions">
@@ -136,13 +139,25 @@ export default function ProfilePage() {
 
         {/* PROFILE HERO */}
 
-        <section className="vibespace-hero">
+        <section className="vibespace-profile-card" aria-label="Your profile">
+          <div className="vibespace-cover">
+            {profile.cover_image && (
+              <img
+                src={profile.cover_image}
+                alt=""
+                onError={(event) => { event.currentTarget.style.visibility = 'hidden' }}
+              />
+            )}
+            <div className="vibespace-cover-shade" />
+            <span className="vibespace-cover-mark" aria-hidden="true">BYB</span>
+          </div>
+          <div className="vibespace-hero">
           <div className="vibespace-identity">
             <div className="vibespace-avatar">
               {profile.profile_picture ? (
-                <img src={profile.profile_picture} alt={fullName} />
+                <img src={profile.profile_picture} alt={`${displayName}'s profile`} />
               ) : (
-                <span>{initials(profile.first_name, profile.last_name)}</span>
+                <span>{initials(profile.first_name, profile.last_name) || profileInitial}</span>
               )}
             </div>
 
@@ -151,7 +166,7 @@ export default function ProfilePage() {
                 {isStudent ? 'STUDENT' : 'PROFESSIONAL'}
               </span>
 
-              <h2>{fullName}</h2>
+              <h2>{displayName}</h2>
 
               <p className="vibespace-username">
                 @{profile.username || user?.username}
@@ -175,10 +190,38 @@ export default function ProfilePage() {
               {profile.city}
             </p>
           )}
+          </div>
         </section>
 
+        {/* SECTION TABS */}
+
+        {statisticsError && (
+          <p className="profile-list-error" role="alert">{statisticsError}</p>
+        )}
+        {statistics && (
+          <ProfileSections
+            basePath="/profile"
+            statistics={statistics}
+            activeSection={section}
+          />
+        )}
+        {!statistics && !statisticsError && (
+          <div className="vibespace-statistics-loading" role="status">
+            Loading profile statisticsâ€¦
+          </div>
+        )}
+
+        {section === 'posts' && (
+          <>
         {/* PROFILE DETAIL CARDS (above posts / vibes / moments) */}
 
+        <div className="vibespace-details-heading">
+          <div>
+            <span className="vibespace-section-label">ABOUT YOU</span>
+            <h2>Profile details</h2>
+          </div>
+          <span>Visible according to your profile privacy</span>
+        </div>
         <section className="vibespace-cards" aria-label="Profile details">
           <article className="vibespace-card">
             <div className="vibespace-card-head">
@@ -287,18 +330,7 @@ export default function ProfilePage() {
           />
 
         </section>
-
-        {/* SECTION TABS */}
-
-        {statisticsError && (
-          <p className="profile-list-error" role="alert">{statisticsError}</p>
-        )}
-        {statistics && (
-          <ProfileSections
-            basePath="/profile"
-            statistics={statistics}
-            activeSection={section}
-          />
+          </>
         )}
 
         {/* PROFILE CONTENT */}

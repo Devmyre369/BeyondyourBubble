@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from accounts.models import Notification
 from events.models import Event, EventModerationReview
 from hubs.models import Hub, HubMembership
 
@@ -128,6 +129,84 @@ class EventDiscoveryAPITests(APITestCase):
         )
         self.assertIsNone(event.reviewed_by)
         self.assertIsNone(event.reviewed_at)
+
+    def test_submission_notifies_staff_and_other_hub_managers_once(self):
+        self.authenticate(self.editor)
+        response = self.client.post(
+            "/api/events/", self.event_payload(), format="json",
+        )
+        event = Event.objects.get(pk=response.data["id"])
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Notification.objects.filter(
+            recipient=self.owner,
+            event=event,
+            verb=Notification.Verb.EVENT_SUBMITTED,
+        ).count(), 1)
+        self.assertEqual(Notification.objects.filter(
+            recipient=self.staff,
+            event=event,
+            verb=Notification.Verb.EVENT_SUBMITTED,
+        ).count(), 1)
+
+    def test_moderation_notifies_submitter_and_hub_managers(self):
+        event = Event.objects.create(
+            organising_hub=self.hub,
+            created_by=self.editor,
+            title="Moderated Event",
+            category=Event.Category.TECHNICAL,
+            starts_at=self.starts_at,
+            ends_at=self.ends_at,
+            format=Event.Format.OFFLINE,
+            venue_name="Hall",
+            venue_address="Road",
+            city="Lucknow",
+            status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.PENDING,
+        )
+        self.authenticate(self.staff)
+        response = self.client.post(
+            f"/api/events/moderation/{event.id}/review/",
+            {"decision": "approve"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Notification.objects.filter(
+            recipient=self.editor,
+            event=event,
+            verb=Notification.Verb.EVENT_APPROVED,
+        ).count(), 1)
+        self.assertEqual(Notification.objects.filter(
+            recipient=self.owner,
+            event=event,
+            verb=Notification.Verb.EVENT_APPROVED,
+        ).count(), 1)
+
+    def test_event_notifications_do_not_expose_inaccessible_pending_event(self):
+        event = Event.objects.create(
+            organising_hub=self.hub,
+            created_by=self.owner,
+            title="Private Pending Event",
+            category=Event.Category.TECHNICAL,
+            starts_at=self.starts_at,
+            ends_at=self.ends_at,
+            format=Event.Format.OFFLINE,
+            venue_name="Hall",
+            venue_address="Road",
+            city="Lucknow",
+            status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.PENDING,
+        )
+        Notification.objects.create(
+            recipient=self.non_member,
+            actor=self.staff,
+            verb=Notification.Verb.EVENT_SUBMITTED,
+            event=event,
+            hub=self.hub,
+        )
+        self.authenticate(self.non_member)
+        response = self.client.get("/api/accounts/notifications/")
+        item = response.data["results"][0]
+        self.assertIsNone(item["event_id"])
+        self.assertIsNone(item["event_title"])
 
     def test_editor_can_submit_event(self):
         self.authenticate(self.editor)
@@ -945,6 +1024,11 @@ class EventDiscoveryAPITests(APITestCase):
         self.assertIsNotNone(event.reviewed_at)
         self.assertEqual(event.review_notes, "Approved")
         self.assertEqual(event.moderation_history.count(), 1)
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.editor,
+            event=event,
+            verb=Notification.Verb.EVENT_UPDATED,
+        ).exists())
 
     def test_editing_rejected_event_resubmits_for_moderation(self):
         event = self.create_event(
@@ -1090,6 +1174,11 @@ class EventDiscoveryAPITests(APITestCase):
             event.moderation_status,
             Event.ModerationStatus.APPROVED,
         )
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.editor,
+            event=event,
+            verb=Notification.Verb.EVENT_CANCELLED,
+        ).exists())
 
     def test_member_cannot_cancel_published_event(self):
         event = self.create_event(

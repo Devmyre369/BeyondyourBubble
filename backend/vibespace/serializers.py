@@ -36,6 +36,14 @@ class InteractionCountSerializerMixin:
 
 class EventAssociationValidationMixin:
 
+    @staticmethod
+    def visible_event_queryset():
+        return Event.objects.filter(
+            status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
+            organising_hub__is_active=True,
+        )
+
     def validate_event(self, event):
         if event is None:
             return None
@@ -98,19 +106,10 @@ class VibeSerializer(
         read_only=True
     )
 
-    event_title = serializers.CharField(
-        source="event.title",
-        read_only=True,
-        allow_null=True
-    )
+    event_title = serializers.SerializerMethodField()
 
     event = serializers.PrimaryKeyRelatedField(
-        queryset=Event.objects.filter(
-            status__in=[
-                Event.Status.PUBLISHED,
-                Event.Status.COMPLETED,
-            ]
-        ),
+        queryset=EventAssociationValidationMixin.visible_event_queryset(),
         required=False,
         allow_null=True
     )
@@ -120,6 +119,12 @@ class VibeSerializer(
         trim_whitespace=True,
         allow_blank=False
     )
+
+    def get_event_title(self, obj):
+        event = obj.event
+        if event and event.moderation_status == Event.ModerationStatus.APPROVED and event.organising_hub.is_active and event.status == Event.Status.PUBLISHED:
+            return event.title
+        return None
 
     class Meta:
         model = Vibe
@@ -193,19 +198,10 @@ class MomentSerializer(
         read_only=True
     )
 
-    event_title = serializers.CharField(
-        source="event.title",
-        read_only=True,
-        allow_null=True
-    )
+    event_title = serializers.SerializerMethodField()
 
     event = serializers.PrimaryKeyRelatedField(
-        queryset=Event.objects.filter(
-            status__in=[
-                Event.Status.PUBLISHED,
-                Event.Status.COMPLETED,
-            ]
-        ),
+        queryset=EventAssociationValidationMixin.visible_event_queryset(),
         required=False,
         allow_null=True
     )
@@ -218,6 +214,12 @@ class MomentSerializer(
     )
 
     image_url = serializers.URLField(read_only=True)
+
+    def get_event_title(self, obj):
+        event = obj.event
+        if event and event.moderation_status == Event.ModerationStatus.APPROVED and event.organising_hub.is_active and event.status == Event.Status.PUBLISHED:
+            return event.title
+        return None
 
     class Meta:
         model = Moment

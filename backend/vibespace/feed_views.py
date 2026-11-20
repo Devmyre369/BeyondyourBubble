@@ -173,7 +173,7 @@ class FeedView(APIView):
         vibes = annotate_content_follow_state(
             Vibe.objects
             .filter(visibility_filter)
-            .select_related("author", "author__profile", "event"),
+            .select_related("author", "author__profile", "event__organising_hub"),
             user,
         ).annotate(
             like_count=Count("likes", distinct=True),
@@ -186,7 +186,7 @@ class FeedView(APIView):
         moments = annotate_content_follow_state(
             Moment.objects
             .filter(visibility_filter)
-            .select_related("author", "author__profile", "event"),
+            .select_related("author", "author__profile", "event__organising_hub"),
             user,
         ).annotate(
             like_count=Count("likes", distinct=True),
@@ -275,7 +275,7 @@ class ProfilePostsView(APIView):
         vibes = annotate_content_follow_state(
             Vibe.objects
             .filter(visibility_filter)
-            .select_related("author", "author__profile", "event"),
+            .select_related("author", "author__profile", "event__organising_hub"),
             request.user,
         ).annotate(
             like_count=Count("likes", distinct=True),
@@ -287,7 +287,7 @@ class ProfilePostsView(APIView):
         moments = annotate_content_follow_state(
             Moment.objects
             .filter(visibility_filter)
-            .select_related("author", "author__profile", "event"),
+            .select_related("author", "author__profile", "event__organising_hub"),
             request.user,
         ).annotate(
             like_count=Count("likes", distinct=True),
@@ -340,21 +340,24 @@ class SavedFeedView(APIView):
     def get(self, request):
         user = request.user
 
-        saved_rows = list(
-            SavedContent.objects
-            .filter(user=user)
-            .order_by("-created_at")
-            .values_list("vibe_id", "moment_id")
-        )
-
-        order = []
-        for vibe_id, moment_id in saved_rows:
-            if vibe_id:
-                order.append(("vibe", str(vibe_id)))
-            elif moment_id:
-                order.append(("moment", str(moment_id)))
-
-        total_count = len(order)
+        content_visible = Q(
+            author__profile__visibility=Profile.Visibility.PUBLIC,
+            author__is_active=True,
+            author__email_verified=True,
+        ) | Q(author=user)
+        saved = SavedContent.objects.filter(user=user).filter(
+            Q(vibe__isnull=False) & (
+                Q(vibe__author__profile__visibility=Profile.Visibility.PUBLIC,
+                  vibe__author__is_active=True, vibe__author__email_verified=True)
+                | Q(vibe__author=user)
+            )
+            | Q(moment__isnull=False) & (
+                Q(moment__author__profile__visibility=Profile.Visibility.PUBLIC,
+                  moment__author__is_active=True, moment__author__email_verified=True)
+                | Q(moment__author=user)
+            )
+        ).order_by("-created_at", "-id")
+        total_count = saved.count()
 
         paginator = self.pagination_class()
         try:
@@ -375,19 +378,18 @@ class SavedFeedView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        page_order = order[start:end]
+        saved_rows = list(saved.values_list("vibe_id", "moment_id")[start:end])
+        page_order = [
+            ("vibe", str(vibe_id)) if vibe_id else ("moment", str(moment_id))
+            for vibe_id, moment_id in saved_rows
+        ]
         vibe_ids = [item_id for kind, item_id in page_order if kind == "vibe"]
         moment_ids = [item_id for kind, item_id in page_order if kind == "moment"]
 
-        visibility_filter = (
-            Q(author__profile__visibility=Profile.Visibility.PUBLIC)
-            | Q(author=user)
-        )
-
         vibes = annotate_content_follow_state(
             Vibe.objects
-            .filter(visibility_filter, id__in=vibe_ids)
-            .select_related("author", "author__profile", "event"),
+            .filter(content_visible, id__in=vibe_ids)
+            .select_related("author", "author__profile", "event__organising_hub"),
             user,
         ).annotate(
             like_count=Count("likes", distinct=True),
@@ -399,8 +401,8 @@ class SavedFeedView(APIView):
 
         moments = annotate_content_follow_state(
             Moment.objects
-            .filter(visibility_filter, id__in=moment_ids)
-            .select_related("author", "author__profile", "event"),
+            .filter(content_visible, id__in=moment_ids)
+            .select_related("author", "author__profile", "event__organising_hub"),
             user,
         ).annotate(
             like_count=Count("likes", distinct=True),

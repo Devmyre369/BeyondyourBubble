@@ -54,17 +54,26 @@ class GlobalSearchView(APIView):
         end = offset + page_size
 
         visible_content = (
-            Q(author__profile__visibility=Profile.Visibility.PUBLIC)
+            Q(
+                author__profile__visibility=Profile.Visibility.PUBLIC,
+                author__is_active=True,
+                author__email_verified=True,
+            )
             | Q(author=request.user)
+        )
+        visible_event = Q(
+            event__status=Event.Status.PUBLISHED,
+            event__moderation_status=Event.ModerationStatus.APPROVED,
+            event__organising_hub__is_active=True,
         )
         vibes = annotate_content_follow_state(
             Vibe.objects.filter(visible_content)
             .filter(
                 Q(text__icontains=query)
                 | Q(author__username__icontains=query)
-                | Q(event__title__icontains=query)
+                | (visible_event & Q(event__title__icontains=query))
             )
-            .select_related("author", "author__profile", "event")
+            .select_related("author", "author__profile", "event__organising_hub")
             .order_by("-created_at", "-id"),
             request.user,
         )
@@ -73,9 +82,9 @@ class GlobalSearchView(APIView):
             .filter(
                 Q(caption__icontains=query)
                 | Q(author__username__icontains=query)
-                | Q(event__title__icontains=query)
+                | (visible_event & Q(event__title__icontains=query))
             )
-            .select_related("author", "author__profile", "event")
+            .select_related("author", "author__profile", "event__organising_hub")
             .order_by("-created_at", "-id"),
             request.user,
         )
@@ -106,10 +115,9 @@ class GlobalSearchView(APIView):
         )
         events = (
             Event.objects.filter(
-                status__in=[
-                    Event.Status.PUBLISHED,
-                    Event.Status.COMPLETED,
-                ]
+                status=Event.Status.PUBLISHED,
+                moderation_status=Event.ModerationStatus.APPROVED,
+                organising_hub__is_active=True,
             )
             .filter(
                 Q(title__icontains=query)
@@ -169,7 +177,7 @@ class GlobalSearchView(APIView):
                     "is_following": vibe.viewer_follows_author,
                     "content_text": vibe.text,
                     "image_url": "",
-                    "event_title": vibe.event.title if vibe.event else None,
+                    "event_title": self._visible_event_title(vibe.event),
                     "created_at": vibe.created_at,
                 })
             for moment in moments[:end]:
@@ -189,7 +197,7 @@ class GlobalSearchView(APIView):
                     "is_following": moment.viewer_follows_author,
                     "content_text": moment.caption,
                     "image_url": moment.image_url,
-                    "event_title": moment.event.title if moment.event else None,
+                    "event_title": self._visible_event_title(moment.event),
                     "created_at": moment.created_at,
                 })
             post_entries.sort(
@@ -249,3 +257,14 @@ class GlobalSearchView(APIView):
             "has_more": has_more,
             "results": results,
         })
+
+    @staticmethod
+    def _visible_event_title(event):
+        if (
+            event
+            and event.status == Event.Status.PUBLISHED
+            and event.moderation_status == Event.ModerationStatus.APPROVED
+            and event.organising_hub.is_active
+        ):
+            return event.title
+        return None

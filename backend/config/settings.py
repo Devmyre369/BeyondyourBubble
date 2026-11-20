@@ -28,15 +28,42 @@ load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
-    "django-insecure-byb-development-key-change-before-production"
+    "",
 )
 
-DEBUG = True
+DEBUG = os.environ.get("DJANGO_DEBUG", "true").strip().lower() in {
+    "1", "true", "yes", "on",
+}
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-]
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "django-insecure-local-development-only-key"
+    else:
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is disabled."
+        )
+if not DEBUG and (
+    len(SECRET_KEY) < 50
+    or SECRET_KEY.startswith("django-insecure-")
+    or len(set(SECRET_KEY)) < 5
+):
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY must be a unique random value of at least 50 characters."
+    )
+
+
+def env_list(name, default=""):
+    return [value.strip() for value in os.environ.get(name, default).split(",") if value.strip()]
+
+
+ALLOWED_HOSTS = env_list(
+    "DJANGO_ALLOWED_HOSTS",
+    "localhost,127.0.0.1,[::1]" if DEBUG else "",
+)
+if not DEBUG and not ALLOWED_HOSTS:
+    raise ImproperlyConfigured(
+        "DJANGO_ALLOWED_HOSTS must list the production API hostnames."
+    )
 
 
 # --------------------------------------------------
@@ -47,7 +74,7 @@ CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET")
 
-if not all([
+if not DEBUG and not all([
     CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET,
@@ -92,6 +119,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -146,7 +174,12 @@ if not DATABASE_URL:
 DATABASES = {
     "default": dj_database_url.parse(
         DATABASE_URL,
-        conn_max_age=600,
+        conn_max_age=int(os.environ.get("DB_CONN_MAX_AGE", "60")),
+        conn_health_checks=True,
+        ssl_require=(
+            not DEBUG
+            and DATABASE_URL.startswith(("postgres://", "postgresql://"))
+        ),
     )
 }
 
@@ -212,21 +245,71 @@ SIMPLE_JWT = {
 # --------------------------------------------------
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    *env_list(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173" if DEBUG else "",
+    ),
 ]
+CORS_ALLOW_CREDENTIALS = False
+CSRF_TRUSTED_ORIGINS = env_list(
+    "CSRF_TRUSTED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173" if DEBUG else "",
+)
+
+
+# --------------------------------------------------
+# PRODUCTION SECURITY
+# --------------------------------------------------
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = os.environ.get(
+    "SECURE_SSL_REDIRECT", "false" if DEBUG else "true",
+).strip().lower() in {"1", "true", "yes", "on"}
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+X_FRAME_OPTIONS = "DENY"
+SECURE_HSTS_SECONDS = int(
+    os.environ.get("SECURE_HSTS_SECONDS", "0" if DEBUG else "31536000")
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
 
 
 # --------------------------------------------------
 # EMAIL CONFIGURATION
 # --------------------------------------------------
 
-# Development: OTP emails appear in the Django terminal.
-# Production email delivery will be configured separately.
-
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-
-DEFAULT_FROM_EMAIL = "BYB <no-reply@byb.local>"
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend"
+    if DEBUG
+    else "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").strip().lower() in {
+    "1", "true", "yes", "on",
+}
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").strip().lower() in {
+    "1", "true", "yes", "on",
+}
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
+DEFAULT_FROM_EMAIL = os.environ.get(
+    "DEFAULT_FROM_EMAIL", "BYB <no-reply@localhost>" if DEBUG else "",
+)
+if not DEBUG and (
+    EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend"
+    or not EMAIL_HOST
+    or not DEFAULT_FROM_EMAIL
+):
+    raise ImproperlyConfigured(
+        "Production email requires a non-console EMAIL_BACKEND, EMAIL_HOST, "
+        "and DEFAULT_FROM_EMAIL."
+    )
 
 
 # --------------------------------------------------
@@ -246,7 +329,17 @@ USE_TZ = True
 # STATIC FILES
 # --------------------------------------------------
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+WHITENOISE_MANIFEST_STRICT = False
 
 
 # --------------------------------------------------

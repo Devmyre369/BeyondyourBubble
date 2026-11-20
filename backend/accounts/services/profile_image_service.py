@@ -31,6 +31,7 @@ ALLOWED_IMAGE_FORMATS = {
     "PNG",
     "WEBP",
 }
+MAX_IMAGE_PIXELS = 40_000_000
 
 
 def configure_cloudinary():
@@ -71,6 +72,8 @@ def validate_image_file(uploaded_file, image_type):
 
         image = Image.open(uploaded_file)
         image_format = image.format
+        if image.width * image.height > MAX_IMAGE_PIXELS:
+            raise ProfileImageError("Image dimensions are too large.")
         image.verify()
 
         if image_format not in ALLOWED_IMAGE_FORMATS:

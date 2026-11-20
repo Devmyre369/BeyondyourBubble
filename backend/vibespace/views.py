@@ -54,16 +54,23 @@ class VibeSpaceVisibilityMixin:
             "author",
             "author__profile",
             "event",
+            "event__organising_hub",
         )
 
         if user.is_authenticated:
             queryset = queryset.filter(
-                Q(author__profile__visibility=Profile.Visibility.PUBLIC)
+                Q(
+                    author__profile__visibility=Profile.Visibility.PUBLIC,
+                    author__is_active=True,
+                    author__email_verified=True,
+                )
                 | Q(author=user)
             )
         else:
             queryset = queryset.filter(
-                author__profile__visibility=Profile.Visibility.PUBLIC
+                author__profile__visibility=Profile.Visibility.PUBLIC,
+                author__is_active=True,
+                author__email_verified=True,
             )
 
         username = self.request.query_params.get("username")
@@ -111,7 +118,11 @@ class VibeListCreateView(
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if "page" not in request.query_params:
-            serializer = self.get_serializer(queryset, many=True)
+            # Preserve the legacy array shape while bounding unpaged reads.
+            serializer = self.get_serializer(
+                queryset[:self.paginator.page_size],
+                many=True,
+            )
             return Response(serializer.data)
 
         page = self.paginate_queryset(queryset)
@@ -187,7 +198,11 @@ class MomentListCreateView(
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if "page" not in request.query_params:
-            serializer = self.get_serializer(queryset, many=True)
+            # Preserve the legacy array shape while bounding unpaged reads.
+            serializer = self.get_serializer(
+                queryset[:self.paginator.page_size],
+                many=True,
+            )
             return Response(serializer.data)
 
         page = self.paginate_queryset(queryset)

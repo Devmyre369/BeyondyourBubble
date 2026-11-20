@@ -215,6 +215,50 @@ class GlobalSearchTests(APITestCase):
             ["Active Robotics Hub"],
         )
 
+    def test_search_excludes_unverified_authors_and_masks_hidden_event_context(self):
+        author = self.create_user_with_profile("search_visibility_author")
+        author.email_verified = False
+        author.save(update_fields=["email_verified"])
+        Vibe.objects.create(author=author, text="Secret unverified robotics")
+
+        visible_author = self.create_user_with_profile("search_visible_author")
+        hidden_hub = Hub.objects.create(
+            name="Hidden Event Hub",
+            slug="hidden-event-hub",
+            hub_type=Hub.HubType.COMMUNITY,
+            created_by=visible_author,
+            owner=visible_author,
+        )
+        hidden_event = Event.objects.create(
+            organising_hub=hidden_hub,
+            created_by=visible_author,
+            title="Hidden event phrase",
+            description="Not approved for public discovery.",
+            status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.REJECTED,
+        )
+        Vibe.objects.create(
+            author=visible_author,
+            event=hidden_event,
+            text="Public content remains searchable",
+        )
+
+        hidden_title_search = self.client.get(
+            "/api/search/?q=hidden%20event%20phrase&category=posts"
+        )
+        public_post_search = self.client.get(
+            "/api/search/?q=public%20content&category=posts"
+        )
+        unverified_search = self.client.get(
+            "/api/search/?q=unverified%20robotics&category=posts"
+        )
+
+        self.assertEqual(hidden_title_search.data["counts"]["posts"], 0)
+        self.assertEqual(unverified_search.data["counts"]["posts"], 0)
+        result = public_post_search.data["results"]["posts"][0]
+        self.assertEqual(result["content_text"], "Public content remains searchable")
+        self.assertIsNone(result["event_title"])
+
     def test_search_category_pagination_and_counts(self):
         owner = self.create_user_with_profile("hub_owner")
 

@@ -12,6 +12,7 @@ class MomentImageError(Exception):
 
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
+MAX_IMAGE_PIXELS = 40_000_000
 
 ALLOWED_CONTENT_TYPES = {
     "image/jpeg",
@@ -47,6 +48,8 @@ def validate_moment_image(uploaded_file):
 
         image = Image.open(uploaded_file)
         image_format = image.format
+        if image.width * image.height > MAX_IMAGE_PIXELS:
+            raise MomentImageError("Image dimensions are too large.")
         image.verify()
 
         if image_format not in ALLOWED_IMAGE_FORMATS:

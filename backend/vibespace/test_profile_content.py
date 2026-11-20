@@ -108,7 +108,7 @@ class ProfileContentApiTests(APITestCase):
         self.assertEqual(moments_page_one.data["count"], 11)
         self.assertEqual(len(moments_page_one.data["results"]), 10)
         self.assertEqual(moments_page_one.data["next"], 2)
-        self.assertEqual(len(legacy_vibes.data), 12)
+        self.assertEqual(len(legacy_vibes.data), 10)
 
     def test_private_profile_posts_are_not_publicly_accessible(self):
         Vibe.objects.create(

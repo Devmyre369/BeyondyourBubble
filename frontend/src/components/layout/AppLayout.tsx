@@ -11,7 +11,7 @@ import './app-layout.css'
 const mobileNavigation = [
   { label: 'Home', path: '/home', icon: 'home', available: true },
   { label: 'Events', path: '/events', icon: 'events', available: true },
-  { label: 'Hubs', path: '/hubs', icon: 'hubs', available: true },
+  { label: 'Handshake', path: '/handshakes', icon: 'handshake', available: true },
   { label: 'Profile', path: '/profile', icon: 'profile', available: true },
   { label: 'Moderation', path: '/staff/events/moderation', icon: 'moderation', available: true },
   { label: 'Hub review', path: '/staff/hubs/review', icon: 'hubs', available: true },
@@ -62,6 +62,12 @@ function MobileNavigationIcon({
         <>
           <circle cx="12" cy="8" r="3.5" />
           <path d="M5 21c.7-3.7 3.2-5.5 7-5.5s6.3 1.8 7 5.5" />
+        </>
+      )}
+      {name === 'handshake' && (
+        <>
+          <path d="m8.5 12 2.1 2.1a2 2 0 0 0 2.8 0l2.1-2.1" />
+          <path d="m3.5 9 3-3h3l2 2 2-2h3l3 3-4 4m-13-4 4 4m-4-4-1.5 1.5 3 3L7 13m13-4 1.5 1.5-3 3L17 13" />
         </>
       )}
       {name === 'moderation' && <path d="m4 20 9-9m-2-2 6-6 4 4-6 6m-7 0 3 3-7 2 2-7Z" />}

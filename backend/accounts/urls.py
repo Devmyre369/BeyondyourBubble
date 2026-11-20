@@ -22,6 +22,13 @@ from accounts.notification_views import (
     NotificationReadView,
     NotificationUnreadCountView,
 )
+from accounts.handshake_views import (
+    HandshakeConnectionDetailView,
+    HandshakeListView,
+    HandshakeRequestCreateView,
+    HandshakeResponseView,
+    HandshakeStatusView,
+)
 
 
 urlpatterns = [
@@ -80,6 +87,13 @@ urlpatterns = [
         {"relationship": "following"},
         name="profile-following",
     ),
+    path("handshakes/", HandshakeRequestCreateView.as_view(), name="handshake-request-create"),
+    path("handshakes/status/<str:username>/", HandshakeStatusView.as_view(), name="handshake-status"),
+    path("handshakes/incoming/", HandshakeListView.as_view(), {"list_type": "incoming"}, name="handshake-incoming"),
+    path("handshakes/outgoing/", HandshakeListView.as_view(), {"list_type": "outgoing"}, name="handshake-outgoing"),
+    path("handshakes/connections/", HandshakeListView.as_view(), {"list_type": "connections"}, name="handshake-connections"),
+    path("handshakes/requests/<uuid:handshake_id>/<str:decision>/", HandshakeResponseView.as_view(), name="handshake-request-action"),
+    path("handshakes/connections/<uuid:handshake_id>/", HandshakeConnectionDetailView.as_view(), name="handshake-connection-detail"),
     path(
         "notifications/",
         NotificationListView.as_view(),

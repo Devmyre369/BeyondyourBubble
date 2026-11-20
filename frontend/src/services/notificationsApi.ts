@@ -2,13 +2,23 @@ import api from './api'
 
 export interface NotificationItem {
   id: string
-  verb: 'like' | 'comment' | 'save' | 'share' | 'follow' | 'revibe'
+  verb:
+    | 'like'
+    | 'comment'
+    | 'save'
+    | 'share'
+    | 'follow'
+    | 'revibe'
+    | 'handshake_request'
+    | 'handshake_accepted'
   actor_username: string
   actor_first_name: string
   actor_last_name: string
   actor_profile_picture: string
   vibe_id: string | null
   moment_id: string | null
+  handshake_id: string | null
+  handshake_status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | null
   created_at: string
   read_at: string | null
 }

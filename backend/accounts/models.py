@@ -226,6 +226,103 @@ class Follow(models.Model):
         return f"{self.follower.username} follows {self.following.username}"
 
 
+class Handshake(models.Model):
+    """A private, auditable connection request between two BYB users."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+        REJECTED = "rejected", "Rejected"
+        CANCELLED = "cancelled", "Cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    requester = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="handshake_requests_sent",
+    )
+    recipient = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="handshake_requests_received",
+    )
+    # Canonical participant order gives the database a direction-independent
+    # uniqueness key for pending and accepted relationships.
+    user_low = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="handshake_pairs_low",
+        editable=False,
+    )
+    user_high = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="handshake_pairs_high",
+        editable=False,
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    responded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="handshake_responses",
+    )
+    responded_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="handshake_cancellations",
+    )
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(requester=models.F("recipient")),
+                name="accounts_handshake_no_self",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(user_low__lt=models.F("user_high")),
+                name="accounts_handshake_pair_order",
+            ),
+            models.UniqueConstraint(
+                fields=["user_low", "user_high"],
+                condition=models.Q(status__in=["pending", "accepted"]),
+                name="accounts_handshake_one_active_pair",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["recipient", "status", "created_at"],
+                name="accounts_handshake_in_idx",
+            ),
+            models.Index(
+                fields=["requester", "status", "created_at"],
+                name="accounts_handshake_out_idx",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.requester_id and self.recipient_id:
+            low, high = sorted((self.requester_id, self.recipient_id), key=str)
+            self.user_low_id = low
+            self.user_high_id = high
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.requester.username} → {self.recipient.username} ({self.status})"
+
+
 class Notification(models.Model):
     class Verb(models.TextChoices):
         LIKE = "like", "Liked your post"
@@ -234,6 +331,8 @@ class Notification(models.Model):
         SHARE = "share", "Shared your post"
         FOLLOW = "follow", "Started following you"
         REVIBE = "revibe", "Revibed your post"
+        HANDSHAKE_REQUEST = "handshake_request", "Sent you a Handshake request"
+        HANDSHAKE_ACCEPTED = "handshake_accepted", "Accepted your Handshake request"
 
     id = models.UUIDField(
         primary_key=True,
@@ -250,7 +349,7 @@ class Notification(models.Model):
         on_delete=models.CASCADE,
         related_name="notifications_sent",
     )
-    verb = models.CharField(max_length=16, choices=Verb.choices)
+    verb = models.CharField(max_length=24, choices=Verb.choices)
     vibe = models.ForeignKey(
         "vibespace.Vibe",
         on_delete=models.SET_NULL,
@@ -260,6 +359,13 @@ class Notification(models.Model):
     )
     moment = models.ForeignKey(
         "vibespace.Moment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+    handshake = models.ForeignKey(
+        "accounts.Handshake",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

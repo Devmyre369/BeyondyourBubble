@@ -22,7 +22,7 @@ class NotificationListView(APIView):
     def get(self, request):
         notifications = (
             Notification.objects.filter(recipient=request.user)
-            .select_related("actor", "actor__profile")
+            .select_related("actor", "actor__profile", "handshake")
             .order_by("-created_at")
         )
         paginator = NotificationPagination()

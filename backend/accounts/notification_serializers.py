@@ -10,6 +10,12 @@ class NotificationSerializer(serializers.ModelSerializer):
     actor_profile_picture = serializers.SerializerMethodField()
     vibe_id = serializers.UUIDField(read_only=True)
     moment_id = serializers.UUIDField(read_only=True)
+    handshake_id = serializers.UUIDField(read_only=True, allow_null=True)
+    handshake_status = serializers.CharField(
+        source="handshake.status",
+        read_only=True,
+        allow_null=True,
+    )
 
     class Meta:
         model = Notification
@@ -22,6 +28,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             "actor_profile_picture",
             "vibe_id",
             "moment_id",
+            "handshake_id",
+            "handshake_status",
             "created_at",
             "read_at",
         )

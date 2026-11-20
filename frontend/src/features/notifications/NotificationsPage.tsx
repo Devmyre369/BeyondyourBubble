@@ -14,9 +14,14 @@ const notificationMessages: Record<NotificationItem['verb'], string> = {
   share: 'shared your post',
   follow: 'started following you',
   revibe: 'revibed your post',
+  handshake_request: 'sent you a Handshake request',
+  handshake_accepted: 'accepted your Handshake request',
 }
 
 function getNotificationPath(notification: NotificationItem) {
+  if (notification.verb === 'handshake_request' || notification.verb === 'handshake_accepted') {
+    return '/handshakes'
+  }
   return notification.verb === 'follow'
     ? `/users/${encodeURIComponent(notification.actor_username)}`
     : '/profile'
@@ -161,7 +166,12 @@ export default function NotificationsPage() {
                   </span>
                 )}
                 <span className="byb-notification-copy">
-                  <span><strong>{displayName}</strong> {notificationMessages[notification.verb]}</span>
+                  <span>
+                    <strong>{displayName}</strong> {notificationMessages[notification.verb]}
+                    {notification.verb === 'handshake_request' && notification.handshake_status && notification.handshake_status !== 'pending' && (
+                      <span className="byb-notification-handshake-status"> ({notification.handshake_status})</span>
+                    )}
+                  </span>
                   <time dateTime={notification.created_at}>
                     {new Intl.DateTimeFormat(undefined, {
                       dateStyle: 'medium',

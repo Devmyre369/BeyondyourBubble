@@ -36,6 +36,7 @@ import HubReviewPage from './features/hubs/HubReviewPage'
 import SearchPage from './features/search/SearchPage'
 import PublicUserProfilePage from './features/search/PublicUserProfilePage'
 import NotificationsPage from './features/notifications/NotificationsPage'
+import HandshakesPage from './features/handshakes/HandshakesPage'
 
 import AppLayout from './components/layout/AppLayout'
 import SplashScreen from './components/SplashScreen'
@@ -172,6 +173,8 @@ export default function App() {
                   path="/notifications"
                   element={<NotificationsPage />}
                 />
+
+              <Route path="/handshakes" element={<HandshakesPage />} />
 
                 <Route path="/search" element={<SearchPage />} />
 

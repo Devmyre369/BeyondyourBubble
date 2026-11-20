@@ -10,6 +10,7 @@ import {
 } from '../../services/profileApi'
 import VibeSpaceContent from '../profile/components/VibeSpaceContent'
 import FollowButton from '../profile/components/FollowButton'
+import HandshakeButton from '../handshakes/HandshakeButton'
 import ProfileConnectionsList from '../profile/components/ProfileConnectionsList'
 import ProfileSections from '../profile/components/ProfileSections'
 import { resolveProfileSection } from '../profile/components/profileSectionUtils'
@@ -145,12 +146,15 @@ export default function PublicUserProfilePage() {
               {profile.profile_type && ` · ${profile.profile_type}`}
             </p>
           </div>
-          <FollowButton
-            username={profile.username}
-            initialFollowing={currentState.overview.is_following}
-            initialFollowersCount={statistics.followers_count}
-            className="public-profile-follow"
-          />
+          <div className="public-profile-actions">
+            <FollowButton
+              username={profile.username}
+              initialFollowing={currentState.overview.is_following}
+              initialFollowersCount={statistics.followers_count}
+              className="public-profile-follow"
+            />
+            <HandshakeButton username={profile.username} />
+          </div>
         </div>
         <div className="public-profile-body">
           {profile.byb_signature && (

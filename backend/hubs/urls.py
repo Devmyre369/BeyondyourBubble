@@ -3,6 +3,13 @@ from django.urls import path
 from .views import (
     HubDetailView,
     HubDiscoveryView,
+    HubApplicationSubmitView,
+    HubApplicationReviewQueueView,
+    HubApplicationReviewView,
+    HubMyApplicationsView,
+    HubVerificationRequestCreateView,
+    HubVerificationReviewQueueView,
+    HubVerificationReviewView,
     HubImageUploadView,
     HubMemberInviteView,
     HubMemberRemoveView,
@@ -16,6 +23,13 @@ from .views import (
 
 urlpatterns = [
     path("", HubDiscoveryView.as_view(), name="hub-list"),
+    path("applications/", HubApplicationSubmitView.as_view(), name="hub-application-submit"),
+    path("applications/mine/", HubMyApplicationsView.as_view(), name="hub-my-applications"),
+    path("applications/review/", HubApplicationReviewQueueView.as_view(), name="hub-application-review-queue"),
+    path("applications/review/<uuid:application_id>/", HubApplicationReviewView.as_view(), name="hub-application-review"),
+    path("verification-requests/review/", HubVerificationReviewQueueView.as_view(), name="hub-verification-review-queue"),
+    path("verification-requests/review/<uuid:verification_request_id>/", HubVerificationReviewView.as_view(), name="hub-verification-review"),
+    path("<uuid:hub_id>/verification-requests/", HubVerificationRequestCreateView.as_view(), name="hub-verification-request"),
     path(
         "<uuid:hub_id>/membership/",
         HubMembershipView.as_view(),

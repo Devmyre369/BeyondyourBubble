@@ -1,0 +1,29 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  <h1>{% translate "Reject Hub applications" %}</h1>
+  <p>{% translate "The rejection reason will be recorded for each selected application." %}</p>
+  {% if error %}<p class="errornote">{{ error }}</p>{% endif %}
+  <ul>
+    {% for application in applications %}
+      <li>{{ application.requested_name }} — {{ application.applicant }}</li>
+    {% endfor %}
+  </ul>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="reject_selected">
+    <input type="hidden" name="confirm_reject" value="yes">
+    {% for application in applications %}
+      <input type="hidden" name="_selected_action" value="{{ application.pk }}">
+    {% endfor %}
+    <fieldset>
+      <label for="id_review_notes">{% translate "Reason for rejection" %}</label>
+      <textarea id="id_review_notes" name="review_notes" rows="5" required maxlength="5000">{{ request.POST.review_notes }}</textarea>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" class="default" value="{% translate 'Reject selected applications' %}">
+      <a href="../">{% translate "Cancel" %}</a>
+    </div>
+  </form>
+{% endblock %}

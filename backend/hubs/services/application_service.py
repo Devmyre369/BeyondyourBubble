@@ -1,5 +1,5 @@
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -8,6 +8,7 @@ from rest_framework.exceptions import ValidationError, PermissionDenied
 from hubs.models import Hub, HubApplication, HubMembership
 
 
+@transaction.atomic
 def submit_application(applicant, data):
     """Create a pending HubApplication for the applicant.
 
@@ -22,6 +23,23 @@ def submit_application(applicant, data):
             "requested_slug": "A requested slug is required."
         })
 
+    requested_name = data.get("requested_name", "").strip()
+    if not requested_name:
+        raise ValidationError({"requested_name": "A Hub name is required."})
+
+    if Hub.objects.filter(slug=requested_slug).exists():
+        raise ValidationError({
+            "requested_slug": "A Hub already uses this slug."
+        })
+
+    if HubApplication.objects.filter(
+        requested_slug=requested_slug,
+        status=HubApplication.Status.PENDING,
+    ).exists():
+        raise ValidationError(
+            "A pending Hub application already uses this slug."
+        )
+
     existing_pending = HubApplication.objects.filter(
         applicant=applicant,
         requested_slug=requested_slug,
@@ -33,22 +51,36 @@ def submit_application(applicant, data):
             "You already have a pending application for this organisation."
         )
 
-    application = HubApplication.objects.create(
+    if HubApplication.objects.filter(
         applicant=applicant,
-        requested_name=data.get("requested_name", "").strip(),
         requested_slug=requested_slug,
-        hub_type=data.get("hub_type"),
-        organisation_description=data.get(
-            "organisation_description", ""
-        ).strip(),
-        college_or_parent_organisation=data.get(
-            "college_or_parent_organisation", ""
-        ).strip(),
-        city=data.get("city", "").strip(),
-        website=data.get("website", "").strip(),
-        contact_email=data.get("contact_email", "").strip(),
-        status=HubApplication.Status.PENDING,
-    )
+        status=HubApplication.Status.APPROVED,
+    ).exists():
+        raise ValidationError(
+            "This application has already been approved."
+        )
+
+    try:
+        application = HubApplication.objects.create(
+            applicant=applicant,
+            requested_name=requested_name,
+            requested_slug=requested_slug,
+            hub_type=data.get("hub_type"),
+            organisation_description=data.get(
+                "organisation_description", ""
+            ).strip(),
+            college_or_parent_organisation=data.get(
+                "college_or_parent_organisation", ""
+            ).strip(),
+            city=data.get("city", "").strip(),
+            website=data.get("website", "").strip(),
+            contact_email=data.get("contact_email", "").strip(),
+            status=HubApplication.Status.PENDING,
+        )
+    except IntegrityError as exc:
+        raise ValidationError(
+            "You already have a pending application for this organisation."
+        ) from exc
 
     return application
 
@@ -68,7 +100,7 @@ def _require_not_applicant(reviewer, applicant):
 
 
 @transaction.atomic
-def approve_application(application, reviewer):
+def approve_application(application, reviewer, review_notes=""):
     """Approve a pending application and create the Hub atomically."""
 
     _require_staff(reviewer)
@@ -99,11 +131,13 @@ def approve_application(application, reviewer):
     if existing_hub:
         application.status = HubApplication.Status.APPROVED
         application.reviewer = reviewer
+        application.review_notes = review_notes.strip()
         application.reviewed_at = timezone.now()
         application.save(
             update_fields=[
                 "status",
                 "reviewer",
+                "review_notes",
                 "reviewed_at",
                 "updated_at",
             ]
@@ -142,11 +176,13 @@ def approve_application(application, reviewer):
 
     application.status = HubApplication.Status.APPROVED
     application.reviewer = reviewer
+    application.review_notes = review_notes.strip()
     application.reviewed_at = timezone.now()
     application.save(
         update_fields=[
             "status",
             "reviewer",
+            "review_notes",
             "reviewed_at",
             "updated_at",
         ]
@@ -165,6 +201,11 @@ def reject_application(application, reviewer, review_notes=""):
 
     _require_staff(reviewer)
     _require_not_applicant(reviewer, application.applicant)
+
+    if not review_notes or not review_notes.strip():
+        raise ValidationError({
+            "review_notes": "A reason is required when rejecting an application."
+        })
 
     application = (
         HubApplication.objects

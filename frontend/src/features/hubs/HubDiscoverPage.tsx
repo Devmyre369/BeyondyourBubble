@@ -107,6 +107,11 @@ function HubCard({ hub }: { hub: HubListItem }) {
                     </svg>
                   </span>
                 )}
+                {!hub.is_verified && (hub.verification_status === 'pending' || hub.verification_status === 'rejected') && (
+                  <span className={`hub-card-verification-pending status-${hub.verification_status}`}>
+                    {hub.verification_status === 'pending' ? 'Verification pending' : 'Verification declined'}
+                  </span>
+                )}
               </div>
 
               <p className="hub-card-location">
@@ -301,6 +306,10 @@ export default function HubDiscoverPage() {
             </svg>
             Create Hub
           </button>
+          <div className="hub-application-shortcuts">
+            <Link to="/hubs/apply">Apply for a Hub</Link>
+            <Link to="/hubs/applications">Track applications</Link>
+          </div>
         </div>
         <div className="hub-discover-header-art" aria-hidden="true">
           <span className="hub-discover-orbit hub-discover-orbit-outer" />

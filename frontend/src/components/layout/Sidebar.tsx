@@ -89,7 +89,9 @@ export default function Sidebar({
 
           <nav className="byb-navigation" aria-label="Main navigation">
             {(user?.is_staff
-              ? [...navigationItems, { label: 'Event moderation', path: '/staff/events/moderation', icon: '\u2692', available: true }]
+              ? [...navigationItems,
+                { label: 'Event moderation', path: '/staff/events/moderation', icon: '\u2692', available: true },
+                { label: 'Hub review', path: '/staff/hubs/review', icon: '\u25C8', available: true }]
               : navigationItems).map((item) =>
               item.available ? (
                 <NavLink

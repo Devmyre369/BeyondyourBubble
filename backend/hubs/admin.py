@@ -1,8 +1,10 @@
 from django.contrib import admin
 from django.contrib import messages
+from django.template.response import TemplateResponse
 from django.utils.translation import gettext_lazy as _
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from .models import Hub, HubMembership, HubApplication
+from .models import Hub, HubMembership, HubApplication, HubVerificationRequest
 from .services.application_service import (
     approve_application,
     reject_application,
@@ -36,6 +38,7 @@ class HubAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     raw_id_fields = ("created_by", "owner")
     date_hierarchy = "created_at"
+    readonly_fields = ("is_verified",)
 
 
 @admin.register(HubMembership)
@@ -154,6 +157,30 @@ class HubApplicationAdmin(admin.ModelAdmin):
             )
             return
 
+        if request.POST.get("confirm_reject") != "yes":
+            return TemplateResponse(
+                request,
+                "admin/hubs/hubapplication/reject_selected_confirmation.html",
+                {"applications": queryset, "opts": self.model._meta},
+            )
+
+        review_notes = request.POST.get("review_notes", "").strip()
+        if not review_notes:
+            self.message_user(
+                request,
+                "A rejection reason is required.",
+                level=messages.ERROR,
+            )
+            return TemplateResponse(
+                request,
+                "admin/hubs/hubapplication/reject_selected_confirmation.html",
+                {
+                    "applications": queryset,
+                    "opts": self.model._meta,
+                    "error": "Enter a rejection reason.",
+                },
+            )
+
         rejected = 0
         skipped = 0
 
@@ -166,7 +193,7 @@ class HubApplicationAdmin(admin.ModelAdmin):
                 reject_application(
                     application,
                     request.user,
-                    review_notes="",
+                    review_notes=review_notes,
                 )
                 rejected += 1
             except (PermissionDenied, ValidationError):
@@ -179,3 +206,27 @@ class HubApplicationAdmin(admin.ModelAdmin):
             "(not pending or already reviewed).",
             level=messages.SUCCESS,
         )
+
+
+@admin.register(HubVerificationRequest)
+class HubVerificationRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "hub", "requested_by", "status", "reviewer", "requested_at", "reviewed_at",
+    )
+    list_filter = ("status", "requested_at", "reviewed_at")
+    search_fields = ("hub__name", "hub__slug", "requested_by__username")
+    raw_id_fields = ("hub", "requested_by", "reviewer")
+    readonly_fields = (
+        "hub", "requested_by", "request_notes", "status", "reviewer",
+        "review_notes", "requested_at", "reviewed_at",
+    )
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return bool(request.user.is_staff)
+
+    def has_delete_permission(self, request, obj=None):
+        return False

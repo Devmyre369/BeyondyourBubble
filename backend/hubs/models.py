@@ -279,3 +279,55 @@ class HubApplication(models.Model):
     def __str__(self):
         return f"{self.applicant.username} - {self.requested_name} ({self.status})"
 
+
+class HubVerificationRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending review"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    hub = models.ForeignKey(
+        Hub,
+        on_delete=models.CASCADE,
+        related_name="verification_requests",
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="hub_verification_requests",
+    )
+    request_notes = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_hub_verification_requests",
+    )
+    review_notes = models.TextField(blank=True)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-requested_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["hub"],
+                condition=Q(status="pending"),
+                name="unique_pending_hub_verification_request",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "requested_at"]),
+            models.Index(fields=["hub", "requested_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.hub.name} verification ({self.status})"
+

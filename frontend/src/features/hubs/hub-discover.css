@@ -86,6 +86,28 @@
   outline-offset: 3px;
 }
 
+.hub-application-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 13px;
+}
+
+.hub-application-shortcuts a {
+  color: var(--byb-text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-color: var(--byb-border);
+  text-underline-offset: 3px;
+}
+
+.hub-application-shortcuts a:hover,
+.hub-application-shortcuts a:focus-visible {
+  color: var(--byb-text);
+  text-decoration-color: var(--byb-crimson);
+}
+
 .hub-discover-header-art {
   position: relative;
   display: grid;
@@ -503,6 +525,27 @@
 .hub-card-verified svg {
   width: 12px;
   height: 12px;
+}
+
+.hub-card-verification-pending {
+  flex: 0 1 auto;
+  padding: 3px 7px;
+  border: 1px solid var(--byb-border);
+  border-radius: var(--byb-radius-full);
+  color: var(--byb-text-secondary);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.hub-card-verification-pending.status-pending {
+  color: #f5c66f;
+  border-color: rgba(245, 198, 111, 0.32);
+}
+
+.hub-card-verification-pending.status-rejected {
+  color: #ff9aa8;
+  border-color: var(--byb-crimson-border);
 }
 
 .hub-card-location {

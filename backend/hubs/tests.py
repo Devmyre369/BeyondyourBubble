@@ -13,7 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from accounts.models import Profile
 
-from .models import Hub, HubMembership, HubApplication
+from .models import Hub, HubMembership, HubApplication, HubVerificationRequest
 from .serializers import HubDetailSerializer
 
 User = get_user_model()
@@ -600,6 +600,303 @@ class HubApplicationServiceTests(TestCase):
     def test_uuid_primary_key(self):
         application = self.create_application()
         uuid_module.UUID(str(application.id))
+
+
+class HubApplicationAndVerificationAPITests(APITestCase):
+    def setUp(self):
+        self.applicant = self.make_user("workflow_applicant")
+        self.other_user = self.make_user("workflow_other")
+        self.staff = self.make_user("workflow_staff", is_staff=True)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(self.applicant).access_token}"
+        )
+
+    def make_user(self, username, is_staff=False):
+        return User.objects.create_user(
+            username=username,
+            email=f"{username}@example.com",
+            password="TestPassword123!",
+            is_staff=is_staff,
+        )
+
+    def authenticate(self, user):
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}"
+        )
+
+    def application_payload(self, **overrides):
+        return {
+            "requested_name": "BYB Robotics Club",
+            "requested_slug": "byb-robotics-club",
+            "hub_type": Hub.HubType.COLLEGE_CLUB,
+            "organisation_description": "A campus robotics team.",
+            "college_or_parent_organisation": "Example University",
+            "city": "Lucknow",
+            "website": "https://example.com/robotics",
+            "contact_email": "robotics@example.com",
+            **overrides,
+        }
+
+    def make_hub(self, owner, slug="verification-hub"):
+        hub = Hub.objects.create(
+            name="Verification Hub",
+            slug=slug,
+            hub_type=Hub.HubType.COMMUNITY,
+            created_by=owner,
+            owner=owner,
+        )
+        HubMembership.objects.create(
+            hub=hub,
+            user=owner,
+            role=HubMembership.Role.OWNER,
+            status=HubMembership.Status.APPROVED,
+            joined_at=timezone.now(),
+        )
+        return hub
+
+    def test_user_can_submit_and_track_hub_application(self):
+        response = self.client.post(
+            "/api/hubs/applications/", self.application_payload(), format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["status"], HubApplication.Status.PENDING)
+        self.assertEqual(response.data["applicant"], self.applicant.pk)
+        self.assertIsNone(response.data["reviewer"])
+        self.assertEqual(Hub.objects.count(), 0)
+
+        tracking = self.client.get("/api/hubs/applications/mine/")
+        self.assertEqual(tracking.status_code, 200)
+        self.assertEqual(tracking.data["count"], 1)
+        self.assertEqual(tracking.data["results"][0]["id"], response.data["id"])
+
+    def test_application_submission_rejects_duplicate_and_existing_slug(self):
+        first = self.client.post(
+            "/api/hubs/applications/", self.application_payload(), format="json",
+        )
+        duplicate = self.client.post(
+            "/api/hubs/applications/", self.application_payload(), format="json",
+        )
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertEqual(HubApplication.objects.count(), 1)
+
+        self.make_hub(self.other_user, slug="already-taken")
+        conflict = self.client.post(
+            "/api/hubs/applications/",
+            self.application_payload(requested_slug="already-taken"),
+            format="json",
+        )
+        self.assertEqual(conflict.status_code, 400)
+        self.assertIn("requested_slug", conflict.data)
+
+    def test_application_submission_requires_name_and_rejects_unknown_fields(self):
+        empty_name = self.client.post(
+            "/api/hubs/applications/",
+            self.application_payload(requested_name=" "),
+            format="json",
+        )
+        unknown = self.client.post(
+            "/api/hubs/applications/",
+            self.application_payload(status="approved", applicant=str(self.other_user.pk)),
+            format="json",
+        )
+        self.assertEqual(empty_name.status_code, 400)
+        self.assertEqual(unknown.status_code, 400)
+        self.assertEqual(HubApplication.objects.count(), 0)
+
+    def test_unauthenticated_user_cannot_submit_or_track_application(self):
+        self.client.credentials()
+        submit = self.client.post(
+            "/api/hubs/applications/", self.application_payload(), format="json",
+        )
+        track = self.client.get("/api/hubs/applications/mine/")
+        self.assertEqual(submit.status_code, 401)
+        self.assertEqual(track.status_code, 401)
+
+    def test_only_staff_can_view_or_review_applications(self):
+        application_response = self.client.post(
+            "/api/hubs/applications/", self.application_payload(), format="json",
+        )
+        application_id = application_response.data["id"]
+        denied_queue = self.client.get("/api/hubs/applications/review/")
+        denied_review = self.client.post(
+            f"/api/hubs/applications/review/{application_id}/",
+            {"decision": "approve"}, format="json",
+        )
+        self.assertEqual(denied_queue.status_code, 403)
+        self.assertEqual(denied_review.status_code, 403)
+
+    def test_staff_can_approve_application_and_create_hub_owner_membership(self):
+        application = self.client.post(
+            "/api/hubs/applications/", self.application_payload(), format="json",
+        ).data
+        self.authenticate(self.staff)
+        response = self.client.post(
+            f"/api/hubs/applications/review/{application['id']}/",
+            {"decision": "approve", "review_notes": "Organisation checked."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["application"]["status"], "approved")
+        self.assertEqual(response.data["application"]["review_notes"], "Organisation checked.")
+        hub = Hub.objects.get(pk=response.data["hub_id"])
+        self.assertEqual(hub.owner, self.applicant)
+        self.assertFalse(hub.is_verified)
+        membership = HubMembership.objects.get(hub=hub, user=self.applicant)
+        self.assertEqual(membership.role, HubMembership.Role.OWNER)
+        self.assertEqual(membership.status, HubMembership.Status.APPROVED)
+
+    def test_rejection_requires_reason_and_preserves_reviewer_audit(self):
+        application = self.client.post(
+            "/api/hubs/applications/", self.application_payload(), format="json",
+        ).data
+        self.authenticate(self.staff)
+        missing_reason = self.client.post(
+            f"/api/hubs/applications/review/{application['id']}/",
+            {"decision": "reject", "review_notes": "  "}, format="json",
+        )
+        self.assertEqual(missing_reason.status_code, 400)
+        rejected = self.client.post(
+            f"/api/hubs/applications/review/{application['id']}/",
+            {"decision": "reject", "review_notes": "Please add organisation details."},
+            format="json",
+        )
+        self.assertEqual(rejected.status_code, 200)
+        self.assertEqual(rejected.data["application"]["status"], "rejected")
+        self.assertEqual(rejected.data["application"]["reviewer"], self.staff.pk)
+        self.assertIsNotNone(rejected.data["application"]["reviewed_at"])
+        self.assertEqual(Hub.objects.count(), 0)
+
+    def test_staff_applicant_cannot_review_own_application(self):
+        self.authenticate(self.staff)
+        application = self.client.post(
+            "/api/hubs/applications/",
+            self.application_payload(requested_slug="staff-hub"),
+            format="json",
+        ).data
+        response = self.client.post(
+            f"/api/hubs/applications/review/{application['id']}/",
+            {"decision": "approve"}, format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(HubApplication.objects.get(pk=application["id"]).status, "pending")
+
+    def test_hub_owner_can_request_verification_once(self):
+        hub = self.make_hub(self.applicant)
+        response = self.client.post(
+            f"/api/hubs/{hub.id}/verification-requests/",
+            {"request_notes": "We are the official robotics club."},
+            format="json",
+        )
+        duplicate = self.client.post(
+            f"/api/hubs/{hub.id}/verification-requests/", {}, format="json",
+        )
+        detail = self.client.get(f"/api/hubs/{hub.id}/")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["status"], "pending")
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertEqual(detail.data["verification_status"], "pending")
+        self.assertFalse(detail.data["can_request_verification"])
+
+    def test_only_owner_can_request_verification(self):
+        hub = self.make_hub(self.applicant)
+        HubMembership.objects.create(
+            hub=hub,
+            user=self.other_user,
+            role=HubMembership.Role.ADMIN,
+            status=HubMembership.Status.APPROVED,
+        )
+        self.authenticate(self.other_user)
+        response = self.client.post(
+            f"/api/hubs/{hub.id}/verification-requests/", {}, format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(HubVerificationRequest.objects.count(), 0)
+
+    def test_only_staff_can_review_verification_requests(self):
+        hub = self.make_hub(self.applicant)
+        verification = HubVerificationRequest.objects.create(
+            hub=hub, requested_by=self.applicant,
+        )
+        denied_queue = self.client.get("/api/hubs/verification-requests/review/")
+        denied_review = self.client.post(
+            f"/api/hubs/verification-requests/review/{verification.id}/",
+            {"decision": "approve"}, format="json",
+        )
+        self.assertEqual(denied_queue.status_code, 403)
+        self.assertEqual(denied_review.status_code, 403)
+
+    def test_authorised_staff_can_approve_verification_and_record_audit(self):
+        hub = self.make_hub(self.applicant)
+        verification = HubVerificationRequest.objects.create(
+            hub=hub, requested_by=self.applicant,
+        )
+        self.authenticate(self.staff)
+        response = self.client.post(
+            f"/api/hubs/verification-requests/review/{verification.id}/",
+            {"decision": "approve", "review_notes": "Identity confirmed."},
+            format="json",
+        )
+        hub.refresh_from_db()
+        verification.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(hub.is_verified)
+        self.assertEqual(verification.status, HubVerificationRequest.Status.APPROVED)
+        self.assertEqual(verification.reviewer, self.staff)
+        self.assertEqual(verification.review_notes, "Identity confirmed.")
+        self.assertIsNotNone(verification.reviewed_at)
+
+    def test_hub_owner_or_admin_cannot_verify_their_own_hub(self):
+        for username, role in (
+            ("staff_hub_owner", HubMembership.Role.OWNER),
+            ("staff_hub_admin", HubMembership.Role.ADMIN),
+        ):
+            with self.subTest(role=role):
+                user = self.make_user(username, is_staff=True)
+                hub = self.make_hub(user, slug=f"{username}-hub")
+                if role == HubMembership.Role.ADMIN:
+                    hub.owner = self.applicant
+                    hub.save(update_fields=["owner"])
+                    HubMembership.objects.filter(hub=hub, user=user).update(
+                        role=HubMembership.Role.MEMBER,
+                    )
+                    HubMembership.objects.filter(hub=hub, user=user).update(role=role)
+                verification = HubVerificationRequest.objects.create(
+                    hub=hub, requested_by=hub.owner,
+                )
+                self.authenticate(user)
+                response = self.client.post(
+                    f"/api/hubs/verification-requests/review/{verification.id}/",
+                    {"decision": "approve"}, format="json",
+                )
+                self.assertEqual(response.status_code, 403)
+                verification.refresh_from_db()
+                self.assertEqual(verification.status, HubVerificationRequest.Status.PENDING)
+                hub.refresh_from_db()
+                self.assertFalse(hub.is_verified)
+
+    def test_verification_rejection_requires_reason_and_can_be_resubmitted(self):
+        hub = self.make_hub(self.applicant)
+        first_request = HubVerificationRequest.objects.create(hub=hub, requested_by=self.applicant)
+        self.authenticate(self.staff)
+        missing_reason = self.client.post(
+            f"/api/hubs/verification-requests/review/{first_request.id}/",
+            {"decision": "reject"}, format="json",
+        )
+        self.assertEqual(missing_reason.status_code, 400)
+        rejected = self.client.post(
+            f"/api/hubs/verification-requests/review/{first_request.id}/",
+            {"decision": "reject", "review_notes": "Please provide official details."},
+            format="json",
+        )
+        self.assertEqual(rejected.status_code, 200)
+        self.assertEqual(rejected.data["review_notes"], "Please provide official details.")
+        self.authenticate(self.applicant)
+        resubmitted = self.client.post(
+            f"/api/hubs/{hub.id}/verification-requests/", {}, format="json",
+        )
+        self.assertEqual(resubmitted.status_code, 201)
+        self.assertEqual(HubVerificationRequest.objects.filter(hub=hub).count(), 2)
 
 
 class HubVisibilityMigrationTests(TransactionTestCase):

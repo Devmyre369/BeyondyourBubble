@@ -31,6 +31,8 @@ import EventDetailPage from './features/events/EventDetailPage'
 import EventModerationPage from './features/events/EventModerationPage'
 import HubDiscoverPage from './features/hubs/HubDiscoverPage'
 import HubDetailPage from './features/hubs/HubDetailPage'
+import HubApplicationPage from './features/hubs/HubApplicationPage'
+import HubReviewPage from './features/hubs/HubReviewPage'
 import SearchPage from './features/search/SearchPage'
 import PublicUserProfilePage from './features/search/PublicUserProfilePage'
 import NotificationsPage from './features/notifications/NotificationsPage'
@@ -157,6 +159,9 @@ export default function App() {
                 <Route path="/events" element={<EventsPage />} />
                 <Route path="/events/:eventId" element={<EventDetailPage />} />
                 <Route path="/staff/events/moderation" element={<EventModerationPage />} />
+                <Route path="/hubs/apply" element={<HubApplicationPage />} />
+                <Route path="/hubs/applications" element={<HubApplicationPage />} />
+                <Route path="/staff/hubs/review" element={<HubReviewPage />} />
 
                 <Route
                   path="/hubs/:hubId/events/create"

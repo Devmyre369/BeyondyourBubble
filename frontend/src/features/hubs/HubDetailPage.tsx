@@ -10,6 +10,7 @@ import {
 import HubEditModal from './HubEditModal'
 import HubMembershipPanel from './HubMembershipPanel'
 import HubEventManagement from '../events/components/HubEventManagement'
+import HubVerificationPanel from './HubVerificationPanel'
 import './hub-detail.css'
 
 const CATEGORY_LABELS: Record<HubType, string> = {
@@ -361,6 +362,7 @@ export default function HubDetailPage() {
       {isCurrentState && state.status === 'success' && (
         <>
           <HubDetailContent hub={state.hub} />
+          <HubVerificationPanel key={`verification-${state.hub.id}`} hub={state.hub} />
           <HubMembershipPanel key={state.hub.id} hubId={state.hub.id} />
           {canHostEvent && <HubEventManagement key={`events-${state.hub.id}`} hubId={state.hub.id} />}
         </>

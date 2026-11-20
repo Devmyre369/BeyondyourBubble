@@ -14,6 +14,7 @@ const mobileNavigation = [
   { label: 'Hubs', path: '/hubs', icon: 'hubs', available: true },
   { label: 'Profile', path: '/profile', icon: 'profile', available: true },
   { label: 'Moderation', path: '/staff/events/moderation', icon: 'moderation', available: true },
+  { label: 'Hub review', path: '/staff/hubs/review', icon: 'hubs', available: true },
 ] as const
 
 type MobileNavigationIconName =
@@ -365,7 +366,7 @@ export default function AppLayout() {
         </div>
         {mobileNavigation
           .slice(2)
-          .filter((item) => item.path !== '/staff/events/moderation' || user?.is_staff)
+          .filter((item) => !item.path.startsWith('/staff/') || user?.is_staff)
           .map(renderNavigationItem)}
       </nav>
     </div>

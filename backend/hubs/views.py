@@ -3,14 +3,21 @@ from rest_framework import generics, status
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Hub, HubMembership
+from .models import Hub, HubApplication, HubMembership, HubVerificationRequest
 from .permissions import CanEditHub, can_edit_hub
 from .serializers import (
     HubCreateSerializer,
+    HubApplicationSerializer,
+    HubApplicationSubmitSerializer,
+    HubApplicationReviewInputSerializer,
+    HubReviewQueueQuerySerializer,
+    HubVerificationRequestInputSerializer,
+    HubVerificationRequestSerializer,
+    HubVerificationReviewInputSerializer,
     HubDetailSerializer,
     HubDiscoveryQuerySerializer,
     HubListSerializer,
@@ -20,6 +27,15 @@ from .serializers import (
     HubMembershipStateSerializer,
     StrictMembershipInputSerializer,
     HubUpdateSerializer,
+)
+from .services.application_service import (
+    approve_application,
+    reject_application,
+    submit_application,
+)
+from .services.verification_service import (
+    request_hub_verification,
+    review_hub_verification_request,
 )
 from .services.membership_service import (
     can_manage_hub_members,
@@ -372,3 +388,147 @@ class HubImageUploadView(APIView):
         ).data
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class HubApplicationSubmitView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = HubApplicationSubmitSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        application = submit_application(request.user, serializer.validated_data)
+        return Response(
+            HubApplicationSerializer(application).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class HubMyApplicationsView(APIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = HubPagination
+
+    def get(self, request):
+        applications = HubApplication.objects.filter(
+            applicant=request.user,
+        ).select_related("applicant", "reviewer").order_by("-created_at", "-id")
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(applications, request, view=self)
+        return paginator.get_paginated_response(
+            HubApplicationSerializer(page, many=True).data,
+        )
+
+
+class HubApplicationReviewQueueView(APIView):
+    permission_classes = [IsAdminUser]
+    pagination_class = HubPagination
+
+    def get(self, request):
+        query = HubReviewQueueQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        application_status = query.validated_data.get(
+            "status", HubApplication.Status.PENDING,
+        )
+        applications = HubApplication.objects.filter(
+            status=application_status,
+        ).exclude(applicant=request.user).select_related(
+            "applicant", "reviewer",
+        ).order_by("created_at", "id")
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(applications, request, view=self)
+        return paginator.get_paginated_response(
+            HubApplicationSerializer(page, many=True).data,
+        )
+
+
+class HubApplicationReviewView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, application_id):
+        serializer = HubApplicationReviewInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        application = HubApplication.objects.filter(pk=application_id).first()
+        if application is None:
+            raise NotFound("Hub application not found.")
+        values = serializer.validated_data
+        if values["decision"] == "approve":
+            result = approve_application(
+                application,
+                request.user,
+                review_notes=values.get("review_notes", ""),
+            )
+        else:
+            result = reject_application(
+                application,
+                request.user,
+                review_notes=values.get("review_notes", ""),
+            )
+        return Response({
+            "application": HubApplicationSerializer(result["application"]).data,
+            "hub_id": str(result["hub"].id) if result["hub"] else None,
+        })
+
+
+class HubVerificationRequestCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, hub_id):
+        serializer = HubVerificationRequestInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        verification_request = request_hub_verification(
+            hub_id=hub_id,
+            requester=request.user,
+            request_notes=serializer.validated_data.get("request_notes", ""),
+        )
+        return Response(
+            HubVerificationRequestSerializer(verification_request).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class HubVerificationReviewQueueView(APIView):
+    permission_classes = [IsAdminUser]
+    pagination_class = HubPagination
+
+    def get(self, request):
+        query = HubReviewQueueQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        verification_status = query.validated_data.get(
+            "status", HubVerificationRequest.Status.PENDING,
+        )
+        managed_roles = [HubMembership.Role.OWNER, HubMembership.Role.ADMIN]
+        requests = HubVerificationRequest.objects.filter(
+            status=verification_status,
+        ).exclude(hub__owner=request.user).exclude(
+            hub__memberships__user=request.user,
+            hub__memberships__role__in=managed_roles,
+            hub__memberships__status=HubMembership.Status.APPROVED,
+        ).select_related(
+            "hub", "requested_by", "reviewer",
+        ).order_by("requested_at", "id").distinct()
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(requests, request, view=self)
+        return paginator.get_paginated_response(
+            HubVerificationRequestSerializer(page, many=True).data,
+        )
+
+
+class HubVerificationReviewView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, verification_request_id):
+        serializer = HubVerificationReviewInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        verification_request = review_hub_verification_request(
+            request_id=verification_request_id,
+            reviewer=request.user,
+            decision=values["decision"],
+            review_notes=values.get("review_notes", ""),
+        )
+        verification_request = HubVerificationRequest.objects.select_related(
+            "hub", "requested_by", "reviewer",
+        ).get(pk=verification_request.pk)
+        return Response(HubVerificationRequestSerializer(verification_request).data)

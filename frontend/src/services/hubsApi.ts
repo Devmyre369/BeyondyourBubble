@@ -11,6 +11,8 @@ export type HubType =
 export type HubMembershipPolicy = 'open' | 'approval_required'
 export type HubMembershipRole = 'owner' | 'admin' | 'editor' | 'member'
 export type HubMembershipStatus = 'pending' | 'approved' | 'rejected'
+export type HubApplicationStatus = 'pending' | 'approved' | 'rejected'
+export type HubVerificationStatus = 'not_requested' | 'pending' | 'approved' | 'rejected'
 
 export interface HubDiscoveryParams {
   hub_type?: HubType
@@ -30,6 +32,7 @@ export interface HubListItem {
   city: string
   college_or_parent_organisation: string
   is_verified: boolean
+  verification_status: HubVerificationStatus
   created_at: string
 }
 
@@ -39,6 +42,60 @@ export interface HubDetail extends HubListItem {
   membership_policy: HubMembershipPolicy
   can_edit: boolean
   can_edit_membership_policy: boolean
+  can_request_verification: boolean
+  verification_review_notes: string
+  verification_reviewed_at: string | null
+}
+
+export interface HubApplication {
+  id: string
+  requested_name: string
+  requested_slug: string
+  hub_type: HubType
+  organisation_description: string
+  college_or_parent_organisation: string
+  city: string
+  website: string
+  contact_email: string
+  status: HubApplicationStatus
+  applicant: string
+  applicant_username: string
+  reviewer: string | null
+  reviewer_username: string | null
+  review_notes: string
+  created_at: string
+  reviewed_at: string | null
+  created_hub_id: string | null
+}
+
+export interface HubApplicationSubmitRequest {
+  requested_name: string
+  requested_slug: string
+  hub_type: HubType
+  organisation_description?: string
+  college_or_parent_organisation?: string
+  city?: string
+  website?: string
+  contact_email?: string
+}
+
+export interface HubVerificationRequest {
+  id: string
+  hub: string
+  hub_name: string
+  hub_slug: string
+  hub_type: HubType
+  hub_city: string
+  hub_is_verified: boolean
+  requested_by: string
+  requested_by_username: string
+  request_notes: string
+  status: HubApplicationStatus
+  reviewer: string | null
+  reviewer_username: string | null
+  review_notes: string
+  requested_at: string
+  reviewed_at: string | null
 }
 
 export interface HubUpdateRequest {
@@ -102,11 +159,11 @@ export interface HubCreateRequest {
   college_or_parent_organisation?: string
 }
 
-export interface HubDiscoveryResponse {
+export interface HubDiscoveryResponse<T = HubListItem> {
   count: number
   next: number | null
   previous: number | null
-  results: HubListItem[]
+  results: T[]
 }
 
 export const hubsApi = {
@@ -120,6 +177,70 @@ export const hubsApi = {
   getHub: async (hubId: string): Promise<HubDetail> => {
     const response = await api.get<HubDetail>(
       `/hubs/${encodeURIComponent(hubId)}/`,
+    )
+    return response.data
+  },
+
+  submitApplication: async (data: HubApplicationSubmitRequest): Promise<HubApplication> => {
+    const response = await api.post<HubApplication>('/hubs/applications/', data)
+    return response.data
+  },
+
+  getMyApplications: async (page = 1): Promise<HubDiscoveryResponse<HubApplication>> => {
+    const response = await api.get<HubDiscoveryResponse<HubApplication>>(
+      '/hubs/applications/mine/', { params: { page } },
+    )
+    return response.data
+  },
+
+  getApplicationReviewQueue: async (
+    status: HubApplicationStatus = 'pending',
+    page = 1,
+  ): Promise<HubDiscoveryResponse<HubApplication>> => {
+    const response = await api.get<HubDiscoveryResponse<HubApplication>>(
+      '/hubs/applications/review/', { params: { status, page } },
+    )
+    return response.data
+  },
+
+  reviewApplication: async (
+    applicationId: string,
+    decision: 'approve' | 'reject',
+    review_notes = '',
+  ): Promise<{ application: HubApplication; hub_id: string | null }> => {
+    const response = await api.post<{ application: HubApplication; hub_id: string | null }>(
+      `/hubs/applications/review/${encodeURIComponent(applicationId)}/`,
+      { decision, review_notes },
+    )
+    return response.data
+  },
+
+  requestVerification: async (
+    hubId: string,
+    request_notes = '',
+  ): Promise<HubVerificationRequest> => {
+    const response = await api.post<HubVerificationRequest>(
+      `/hubs/${encodeURIComponent(hubId)}/verification-requests/`,
+      { request_notes },
+    )
+    return response.data
+  },
+
+  getVerificationReviewQueue: async (page = 1, status: HubApplicationStatus = 'pending'): Promise<HubDiscoveryResponse<HubVerificationRequest>> => {
+    const response = await api.get<HubDiscoveryResponse<HubVerificationRequest>>(
+      '/hubs/verification-requests/review/', { params: { page, status } },
+    )
+    return response.data
+  },
+
+  reviewVerificationRequest: async (
+    requestId: string,
+    decision: 'approve' | 'reject',
+    review_notes = '',
+  ): Promise<HubVerificationRequest> => {
+    const response = await api.post<HubVerificationRequest>(
+      `/hubs/verification-requests/review/${encodeURIComponent(requestId)}/`,
+      { decision, review_notes },
     )
     return response.data
   },

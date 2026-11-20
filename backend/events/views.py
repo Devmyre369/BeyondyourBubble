@@ -1,7 +1,7 @@
 
 from django.db.models import Q
 
-from rest_framework import generics, status, status
+from rest_framework import generics, status
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated, IsAdminUser

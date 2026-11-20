@@ -186,6 +186,20 @@ export const eventsApi = {
     return response.data
   },
 
+  uploadEventCoverImage: async (
+    eventId: string,
+    image: File,
+  ): Promise<string> => {
+    const formData = new FormData()
+    formData.append('image', image)
+
+    const response = await api.post<{ cover_image_url: string }>(
+      `/events/manage/${encodeURIComponent(eventId)}/cover-image/`,
+      formData,
+    )
+    return response.data.cover_image_url
+  },
+
   getEventChoices: async (): Promise<EventChoice[]> => {
     const response = await api.get<EventChoice[]>(
       '/events/choices/',

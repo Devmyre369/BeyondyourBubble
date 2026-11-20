@@ -15,7 +15,6 @@ import {
 import {
   hubsApi,
   type HubDetail,
-  type HubMembershipState,
 } from '../../services/hubsApi'
 import './event-create.css'
 
@@ -72,7 +71,6 @@ export default function EventCreatePage() {
   const navigate = useNavigate()
 
   const [hub, setHub] = useState<HubDetail | null>(null)
-  const [membership, setMembership] = useState<HubMembershipState | null>(null)
   const [loading, setLoading] = useState(true)
   const [permissionError, setPermissionError] = useState('')
   const [values, setValues] = useState<Values>(INITIAL_VALUES)
@@ -81,6 +79,9 @@ export default function EventCreatePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [createdTitle, setCreatedTitle] = useState('')
+  const [createdEventId, setCreatedEventId] = useState('')
+  const [submissionWarning, setSubmissionWarning] = useState('')
+  const [isRetryingCoverUpload, setIsRetryingCoverUpload] = useState(false)
   const [step, setStep] = useState<'edit' | 'review'>('edit')
 
   const [coverFile, setCoverFile] = useState<File | null>(null)
@@ -121,7 +122,6 @@ export default function EventCreatePage() {
         }
 
         setHub(hubDetail)
-        setMembership(membershipState)
       } catch {
         if (active) {
           setPermissionError('Unable to load this Hub.')
@@ -298,11 +298,39 @@ export default function EventCreatePage() {
     try {
       const created = await eventsApi.submitEvent(payload)
       setCreatedTitle(created.title)
+      setCreatedEventId(created.id)
+      setSubmissionWarning('')
+      if (coverFile) {
+        try {
+          await eventsApi.uploadEventCoverImage(created.id, coverFile)
+        } catch {
+          setSubmissionWarning(
+            'The event was submitted, but its cover image could not be uploaded. You can retry the upload below.',
+          )
+        }
+      }
       setSubmitted(true)
     } catch {
       setGeneralError('We could not submit this event. Please try again.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function retryCoverUpload() {
+    if (!createdEventId || !coverFile || isRetryingCoverUpload) return
+
+    setIsRetryingCoverUpload(true)
+    try {
+      await eventsApi.uploadEventCoverImage(createdEventId, coverFile)
+      setSubmissionWarning('')
+      setCoverFile(null)
+    } catch {
+      setSubmissionWarning(
+        'The event was submitted, but its cover image could not be uploaded. Please try again.',
+      )
+    } finally {
+      setIsRetryingCoverUpload(false)
     }
   }
 
@@ -339,6 +367,20 @@ export default function EventCreatePage() {
             <strong>{createdTitle}</strong> has been submitted and is awaiting
             BYB moderation. It will appear publicly only after it is approved.
           </p>
+          {submissionWarning && (
+            <div role="status">
+              <p className="event-create-error">{submissionWarning}</p>
+              {coverFile && (
+                <button
+                  type="button"
+                  onClick={() => void retryCoverUpload()}
+                  disabled={isRetryingCoverUpload}
+                >
+                  {isRetryingCoverUpload ? 'Uploading...' : 'Retry cover upload'}
+                </button>
+              )}
+            </div>
+          )}
           <div className="event-create-success-actions">
             <button
               type="button"
@@ -350,6 +392,8 @@ export default function EventCreatePage() {
               type="button"
               onClick={() => {
                 setSubmitted(false)
+                setSubmissionWarning('')
+                setCreatedEventId('')
                 setValues(INITIAL_VALUES)
                 setStep('edit')
                 setCoverFile(null)

@@ -3,6 +3,7 @@ from django.urls import path
 
 from .views import (
     EventChoiceListView,
+    EventCoverImageUploadView,
     EventDiscoveryDetailView,
     EventDiscoveryListCreateView,
     EventModerationQueueView,
@@ -48,6 +49,11 @@ urlpatterns = [
         "manage/<uuid:event_id>/cancel/",
         EventManagementCancelView.as_view(),
         name="event-management-cancel",
+    ),
+    path(
+        "manage/<uuid:event_id>/cover-image/",
+        EventCoverImageUploadView.as_view(),
+        name="event-cover-image-upload",
     ),
     path(
         "<uuid:id>/",

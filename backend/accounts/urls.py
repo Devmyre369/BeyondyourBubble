@@ -107,7 +107,7 @@ urlpatterns = [
         name="public-profile",
     ),
 
-        path(
+    path(
         "profile/image/<str:image_type>/",
         ProfileImageView.as_view(),
         name="profile-image",

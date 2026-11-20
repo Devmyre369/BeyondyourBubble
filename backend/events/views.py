@@ -1,8 +1,9 @@
 
 from django.db.models import Q
 
-from rest_framework import generics
+from rest_framework import generics, status, status
 from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -23,6 +24,7 @@ from .serializers import (
 )
 from .services.event_service import update_event, cancel_event
 from .services.moderation_service import review_event
+from .services.event_image_service import EventImageError, upload_event_cover_image
 
 
 class EventDiscoveryListCreateView(generics.ListCreateAPIView):
@@ -300,3 +302,73 @@ class EventModerationReviewView(APIView):
             "review_notes": event.review_notes,
             "reviewed_at": event.reviewed_at,
         })
+
+
+class EventCoverImageUploadView(APIView):
+    """
+    Upload a cover image for an existing event.
+
+    POST /events/manage/<event_id>/cover-image/
+    Accepts a multipart/form-data request with an "image" file field.
+    Returns the updated managed event representation.
+    """
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, event_id):
+        event = (
+            Event.objects
+            .select_related("organising_hub")
+            .filter(
+                id=event_id,
+                organising_hub__is_active=True,
+            )
+            .first()
+        )
+
+        if event is None:
+            raise NotFound("Event not found.")
+
+        if not can_submit_hub_event(user=request.user, hub=event.organising_hub):
+            raise PermissionDenied(
+                "You do not have permission to manage this Hub event."
+            )
+
+        uploaded_file = request.FILES.get("image")
+
+        if not uploaded_file:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Please select an image to upload.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            image_url = upload_event_cover_image(
+                event_id=event.id,
+                uploaded_file=uploaded_file,
+            )
+        except EventImageError as exc:
+            return Response(
+                {
+                    "success": False,
+                    "message": str(exc),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        event.cover_image_url = image_url
+        event.save(update_fields=["cover_image_url"])
+
+        return Response(
+            {
+                "success": True,
+                "message": "Cover image uploaded successfully.",
+                "cover_image_url": image_url,
+                "event": HubEventManagementSerializer(event).data,
+            },
+            status=status.HTTP_200_OK,
+        )

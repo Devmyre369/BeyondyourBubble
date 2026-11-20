@@ -28,20 +28,6 @@
 .byb-splash-brand {
   display: grid;
   justify-items: center;
-  gap: 5px;
-}
-
-.byb-splash-wordmark {
-  color: transparent;
-  background: linear-gradient(90deg, #ff1478, #ff483b);
-  background-clip: text;
-  -webkit-background-clip: text;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 4px;
-  line-height: 1;
-  text-align: center;
-  user-select: none;
 }
 
 @keyframes byb-splash-animation {

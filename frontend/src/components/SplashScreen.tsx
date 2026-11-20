@@ -10,7 +10,6 @@ export default function SplashScreen() {
           alt="BYB logo"
           className="byb-splash-logo"
         />
-        <span className="byb-splash-wordmark" aria-hidden="true">BYB</span>
       </div>
     </div>
   )

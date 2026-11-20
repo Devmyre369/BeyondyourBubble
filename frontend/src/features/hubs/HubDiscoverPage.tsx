@@ -31,6 +31,7 @@ const CATEGORY_LABELS: Record<HubType, string> = {
 interface DiscoveryQuery {
   search: string
   hub_type: HubType | ''
+  city: string
   page: number
 }
 
@@ -121,6 +122,28 @@ function HubCard({ hub }: { hub: HubListItem }) {
                 </svg>
                 <span>{hub.city || 'Location not listed'}</span>
               </p>
+
+              {hub.college_or_parent_organisation?.trim() && (
+                <p className="hub-card-parent">
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path
+                      d="M3 17h14M4 17V7l6-3 6 3v10"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M8 17v-4h4v4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span>{hub.college_or_parent_organisation}</span>
+                </p>
+              )}
             </div>
           </div>
 
@@ -140,9 +163,11 @@ export default function HubDiscoverPage() {
   )
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [searchInput, setSearchInput] = useState('')
+  const [cityInput, setCityInput] = useState('')
   const [query, setQuery] = useState<DiscoveryQuery>({
     search: '',
     hub_type: '',
+    city: '',
     page: 1,
   })
   const [discovery, setDiscovery] = useState<HubDiscoveryResponse | null>(null)
@@ -153,21 +178,24 @@ export default function HubDiscoverPage() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       const search = searchInput.trim()
+      const city = cityInput.trim()
+
       setQuery((previous) =>
-        previous.search === search
+        previous.search === search && previous.city === city
           ? previous
-          : { ...previous, search, page: 1 },
+          : { ...previous, search, city, page: 1 },
       )
     }, 300)
 
     return () => window.clearTimeout(timeoutId)
-  }, [searchInput])
+  }, [searchInput, cityInput])
 
   useEffect(() => {
     let isCurrentRequest = true
     const requestKey = JSON.stringify([
       query.search,
       query.hub_type,
+      query.city,
       query.page,
       retryCount,
     ])
@@ -181,6 +209,7 @@ export default function HubDiscoverPage() {
         request = hubsApi.getHubs({
           search: query.search || undefined,
           hub_type: query.hub_type || undefined,
+          city: query.city || undefined,
           page: query.page,
         })
         pendingRequests.current.set(requestKey, request)
@@ -228,10 +257,15 @@ export default function HubDiscoverPage() {
 
   const clearFilters = () => {
     setSearchInput('')
-    setQuery({ search: '', hub_type: '', page: 1 })
+    setCityInput('')
+    setQuery({ search: '', hub_type: '', city: '', page: 1 })
   }
 
   const retry = () => setRetryCount((previous) => previous + 1)
+
+  const hasActiveFilters = Boolean(
+    query.search || query.hub_type || query.city,
+  )
 
   return (
     <section
@@ -331,6 +365,30 @@ export default function HubDiscoverPage() {
             ))}
           </select>
         </div>
+
+        <div className="hub-city-field">
+          <label htmlFor="hub-discover-city">City</label>
+          <input
+            id="hub-discover-city"
+            type="text"
+            value={cityInput}
+            onChange={(event) => setCityInput(event.currentTarget.value)}
+            placeholder="e.g. Lucknow"
+            autoComplete="off"
+          />
+        </div>
+
+        {hasActiveFilters && (
+          <div className="hub-tools-actions">
+            <button
+              className="hub-tools-clear"
+              type="button"
+              onClick={clearFilters}
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
       </section>
 
       <section
@@ -378,11 +436,11 @@ export default function HubDiscoverPage() {
               </span>
               <h3>No Hubs found</h3>
               <p>
-                {query.search || query.hub_type
+                {hasActiveFilters
                   ? 'Try another search or clear your filters to explore all Hubs.'
                   : 'There are no Hubs to show right now. Check back soon.'}
               </p>
-              {(query.search || query.hub_type) && (
+              {hasActiveFilters && (
                 <button type="button" onClick={clearFilters}>
                   Clear filters
                 </button>

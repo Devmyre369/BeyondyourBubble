@@ -1,5 +1,6 @@
 import axios from 'axios'
 import {
+  type ChangeEvent,
   type FormEvent,
   type SyntheticEvent,
   useEffect,
@@ -27,6 +28,14 @@ const HUB_CATEGORIES: { value: HubType; label: string }[] = [
 
 type EditableField = keyof HubUpdateRequest
 type FieldErrors = Partial<Record<EditableField, string>>
+type HubImageField = 'logo' | 'cover_image'
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+const IMAGE_MAX_SIZE: Record<HubImageField, number> = {
+  logo: 5 * 1024 * 1024,
+  cover_image: 10 * 1024 * 1024,
+}
 
 interface HubEditFormValues {
   name: string
@@ -174,6 +183,8 @@ export default function HubEditModal({
   const dialogRef = useRef<HTMLDialogElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const categorySelectRef = useRef<HTMLSelectElement>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
   const [values, setValues] = useState<HubEditFormValues>(() => ({
     name: hub.name,
     hub_type: hub.hub_type,
@@ -188,6 +199,8 @@ export default function HubEditModal({
   }))
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [generalError, setGeneralError] = useState('')
+  const [imageError, setImageError] = useState('')
+  const [uploadingField, setUploadingField] = useState<HubImageField | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
@@ -219,9 +232,56 @@ export default function HubEditModal({
     setGeneralError('')
   }
 
+  const handleImageSelected = async (
+    field: HubImageField,
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file || isSubmitting || uploadingField) return
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setImageError('Only JPG, PNG, or WEBP images are allowed.')
+      return
+    }
+
+    if (file.size > IMAGE_MAX_SIZE[field]) {
+      const maxMb = IMAGE_MAX_SIZE[field] / (1024 * 1024)
+      setImageError(`Image size must not exceed ${maxMb} MB.`)
+      return
+    }
+
+    setImageError('')
+    setUploadingField(field)
+
+    try {
+      const updatedHub = await hubsApi.uploadHubImage(hub.id, field, file)
+      setValues((previous) => ({
+        ...previous,
+        [field]: updatedHub[field],
+      }))
+      setFieldErrors((previous) => {
+        if (!previous[field]) return previous
+        const next = { ...previous }
+        delete next[field]
+        return next
+      })
+    } catch (requestError) {
+      const result = getRequestError(requestError)
+      setImageError(
+        result.fieldErrors[field] ||
+          result.generalError ||
+          'Unable to upload this image. Please try again.',
+      )
+      if (result.permissionChanged) onPermissionError()
+    } finally {
+      setUploadingField(null)
+    }
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (isSubmitting) return
+    if (isSubmitting || uploadingField) return
     if (!canEdit) {
       setGeneralError('You no longer have permission to edit this Hub.')
       return
@@ -281,7 +341,7 @@ export default function HubEditModal({
     onClose()
   }
 
-  const isDisabled = isSubmitting || !canEdit
+  const isDisabled = isSubmitting || !canEdit || uploadingField !== null
 
   return (
     <dialog
@@ -319,6 +379,12 @@ export default function HubEditModal({
             {generalError && (
               <p className="hub-edit-general-error" role="alert">
                 {generalError}
+              </p>
+            )}
+
+            {imageError && (
+              <p className="hub-edit-general-error" role="alert">
+                {imageError}
               </p>
             )}
 
@@ -484,36 +550,98 @@ export default function HubEditModal({
               </div>
 
               <div className="hub-edit-field">
-                <label htmlFor="hub-edit-logo">Logo URL</label>
-                <input
-                  id="hub-edit-logo"
-                  name="logo"
-                  type="url"
-                  maxLength={500}
-                  value={values.logo}
-                  onChange={(event) => updateField('logo', event.currentTarget.value)}
-                  aria-invalid={Boolean(fieldErrors.logo)}
-                  aria-describedby={fieldErrors.logo ? 'hub-edit-logo-error' : undefined}
-                  disabled={isDisabled}
-                />
+                <span className="hub-edit-media-label">Hub logo</span>
+                <div className="hub-edit-media-control">
+                  <div className="hub-edit-media-preview hub-edit-media-preview-logo">
+                    {values.logo ? (
+                      <img src={values.logo} alt="Current Hub logo" />
+                    ) : (
+                      <span className="hub-edit-media-empty">No logo</span>
+                    )}
+                  </div>
+                  <div className="hub-edit-media-actions">
+                    <input
+                      ref={logoInputRef}
+                      className="hub-edit-file-input"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(event) =>
+                        void handleImageSelected('logo', event)
+                      }
+                      disabled={isDisabled || Boolean(uploadingField)}
+                    />
+                    <button
+                      className="hub-edit-upload-button"
+                      type="button"
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={isDisabled || Boolean(uploadingField)}
+                    >
+                      {uploadingField === 'logo'
+                        ? 'Uploading...'
+                        : values.logo
+                          ? 'Change logo'
+                          : 'Upload logo'}
+                    </button>
+                    {values.logo && (
+                      <button
+                        className="hub-edit-remove-image"
+                        type="button"
+                        onClick={() => updateField('logo', '')}
+                        disabled={isDisabled || Boolean(uploadingField)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <FieldError id="hub-edit-logo-error" message={fieldErrors.logo} />
               </div>
 
-              <div className="hub-edit-field">
-                <label htmlFor="hub-edit-cover">Cover image URL</label>
-                <input
-                  id="hub-edit-cover"
-                  name="cover_image"
-                  type="url"
-                  maxLength={500}
-                  value={values.cover_image}
-                  onChange={(event) => updateField('cover_image', event.currentTarget.value)}
-                  aria-invalid={Boolean(fieldErrors.cover_image)}
-                  aria-describedby={
-                    fieldErrors.cover_image ? 'hub-edit-cover-error' : undefined
-                  }
-                  disabled={isDisabled}
-                />
+              <div className="hub-edit-field hub-edit-full">
+                <span className="hub-edit-media-label">Cover banner</span>
+                <div className="hub-edit-media-control">
+                  <div className="hub-edit-media-preview hub-edit-media-preview-cover">
+                    {values.cover_image ? (
+                      <img src={values.cover_image} alt="Current Hub cover" />
+                    ) : (
+                      <span className="hub-edit-media-empty">No cover banner</span>
+                    )}
+                  </div>
+                  <div className="hub-edit-media-actions">
+                    <input
+                      ref={coverInputRef}
+                      className="hub-edit-file-input"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(event) =>
+                        void handleImageSelected('cover_image', event)
+                      }
+                      disabled={isDisabled || Boolean(uploadingField)}
+                    />
+                    <button
+                      className="hub-edit-upload-button"
+                      type="button"
+                      onClick={() => coverInputRef.current?.click()}
+                      disabled={isDisabled || Boolean(uploadingField)}
+                    >
+                      {uploadingField === 'cover_image'
+                        ? 'Uploading...'
+                        : values.cover_image
+                          ? 'Change banner'
+                          : 'Upload banner'}
+                    </button>
+                    {values.cover_image && (
+                      <button
+                        className="hub-edit-remove-image"
+                        type="button"
+                        onClick={() => updateField('cover_image', '')}
+                        disabled={isDisabled || Boolean(uploadingField)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <FieldError
                   id="hub-edit-cover-error"
                   message={fieldErrors.cover_image}

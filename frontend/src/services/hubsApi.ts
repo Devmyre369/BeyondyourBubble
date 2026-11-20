@@ -140,6 +140,21 @@ export const hubsApi = {
     return response.data
   },
 
+  uploadHubImage: async (
+    hubId: string,
+    imageType: 'logo' | 'cover_image',
+    file: File,
+  ): Promise<HubDetail> => {
+    const formData = new FormData()
+    formData.append('image', file)
+
+    const response = await api.post<HubDetail>(
+      `/hubs/${encodeURIComponent(hubId)}/images/${imageType}/`,
+      formData,
+    )
+    return response.data
+  },
+
   getMembership: async (hubId: string): Promise<HubMembershipState> => {
     const response = await api.get<HubMembershipState>(
       `/hubs/${encodeURIComponent(hubId)}/membership/`,

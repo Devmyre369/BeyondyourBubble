@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     HubDetailView,
     HubDiscoveryView,
+    HubImageUploadView,
     HubMemberInviteView,
     HubMemberRemoveView,
     HubMemberRoleView,
@@ -56,6 +57,11 @@ urlpatterns = [
         "<uuid:hub_id>/members/<uuid:membership_id>/",
         HubMemberRemoveView.as_view(),
         name="hub-member-remove",
+    ),
+    path(
+        "<uuid:hub_id>/images/<str:image_type>/",
+        HubImageUploadView.as_view(),
+        name="hub-image-upload",
     ),
     path("<uuid:hub_id>/", HubDetailView.as_view(), name="hub-detail"),
 ]

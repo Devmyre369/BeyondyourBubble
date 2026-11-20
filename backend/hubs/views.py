@@ -2,12 +2,13 @@ from django.db.models import Q
 from rest_framework import generics, status
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Hub, HubMembership
-from .permissions import CanEditHub
+from .permissions import CanEditHub, can_edit_hub
 from .serializers import (
     HubCreateSerializer,
     HubDetailSerializer,
@@ -30,6 +31,7 @@ from .services.membership_service import (
     remove_member,
     review_membership_request,
 )
+from .services.hub_image_service import HubImageError, upload_hub_image
 
 
 class HubPagination(PageNumberPagination):
@@ -311,3 +313,62 @@ class HubMemberRoleView(APIView):
             .get(pk=membership.pk)
         )
         return Response(HubMemberSerializer(membership).data)
+
+
+class HubImageUploadView(APIView):
+    """
+    Upload a Hub logo or cover image directly to Cloudinary.
+    """
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    allowed_image_types = {"logo", "cover_image"}
+
+    def post(self, request, hub_id, image_type):
+        hub = (
+            Hub.objects
+            .filter(id=hub_id, is_active=True)
+            .first()
+        )
+
+        if hub is None:
+            raise NotFound("Hub not found.")
+
+        if not can_edit_hub(request.user, hub):
+            raise PermissionDenied(
+                "You do not have permission to edit this Hub."
+            )
+
+        if image_type not in self.allowed_image_types:
+            raise NotFound("Image type not found.")
+
+        uploaded_file = request.FILES.get("image")
+
+        if not uploaded_file:
+            return Response(
+                {"message": "Please select an image to upload."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            image_url = upload_hub_image(
+                hub_id=hub.id,
+                image_type=image_type,
+                uploaded_file=uploaded_file,
+            )
+        except HubImageError as exc:
+            return Response(
+                {"message": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        setattr(hub, image_type, image_url)
+        hub.save(update_fields=[image_type])
+
+        response_data = HubDetailSerializer(
+            hub,
+            context={"request": request},
+        ).data
+
+        return Response(response_data, status=status.HTTP_200_OK)

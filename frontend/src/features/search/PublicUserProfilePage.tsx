@@ -126,15 +126,6 @@ export default function PublicUserProfilePage() {
         ← Back to BYB
       </Link>
       <article className="public-profile-card">
-        <div
-          className="public-profile-cover"
-          style={
-            profile.cover_image
-              ? { backgroundImage: `url("${profile.cover_image}")` }
-              : undefined
-          }
-          aria-hidden="true"
-        />
         <div className="public-profile-identity">
           {profile.profile_picture ? (
             <img

@@ -177,21 +177,3 @@
   display: block;
   object-fit: cover;
 }
-
-.cover-image-preview {
-  width: 100%;
-  max-width: 480px;
-  aspect-ratio: 16 / 6;
-  margin-top: 10px;
-  overflow: hidden;
-  border: 1px solid var(--byb-border);
-  border-radius: 10px;
-  background: var(--byb-surface);
-}
-
-.cover-image-preview img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-}

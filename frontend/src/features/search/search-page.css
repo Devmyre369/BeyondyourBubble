@@ -432,21 +432,11 @@ a.search-result-card:hover {
   border-radius: var(--byb-radius-xl);
 }
 
-.public-profile-cover {
-  height: 190px;
-  background:
-    radial-gradient(ellipse at 70% 20%, rgba(229, 57, 79, 0.3), transparent 52%),
-    linear-gradient(120deg, #191920, #28202a 60%, #17171e);
-  background-position: center;
-  background-size: cover;
-}
-
 .public-profile-identity {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 16px;
-  padding: 0 22px;
-  margin-top: -39px;
+  padding: 22px 22px 0;
 }
 
 .public-profile-avatar,
@@ -535,10 +525,6 @@ a.search-result-card:hover {
 
   .search-results-heading h2 {
     font-size: 17px;
-  }
-
-  .public-profile-cover {
-    height: 145px;
   }
 }
 

@@ -353,7 +353,8 @@
 .hub-card-cover {
   position: relative;
   display: flex;
-  min-height: 132px;
+  aspect-ratio: 16 / 6;
+  min-height: 168px;
   align-items: flex-start;
   justify-content: space-between;
   overflow: hidden;
@@ -372,12 +373,25 @@
 }
 
 .hub-card-cover-image {
+  display: block;
   object-fit: cover;
-  opacity: 0.58;
+  object-position: center;
+  opacity: 1;
+}
+
+.hub-card-cover-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.22);
+  font-size: clamp(44px, 6vw, 68px);
+  font-weight: 850;
+  letter-spacing: -2px;
 }
 
 .hub-card-cover-shade {
-  background: linear-gradient(180deg, rgba(13, 13, 18, 0.08), rgba(13, 13, 18, 0.48));
+  background: linear-gradient(180deg, transparent 62%, rgba(13, 13, 18, 0.45));
   pointer-events: none;
 }
 

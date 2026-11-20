@@ -85,7 +85,8 @@
 
 .hub-detail-cover {
   position: relative;
-  height: clamp(190px, 28vw, 330px);
+  height: clamp(230px, 32vw, 380px);
+  min-height: 200px;
   overflow: hidden;
   background:
     radial-gradient(ellipse at 82% 26%, rgba(229, 57, 79, 0.34), transparent 38%),
@@ -101,11 +102,13 @@
 }
 
 .hub-detail-cover > img {
+  display: block;
   object-fit: cover;
+  object-position: center;
 }
 
 .hub-detail-cover-shade {
-  background: linear-gradient(180deg, rgba(13, 13, 18, 0.08), rgba(13, 13, 18, 0.62));
+  background: linear-gradient(180deg, transparent 48%, rgba(13, 13, 18, 0.5));
   pointer-events: none;
 }
 
@@ -406,7 +409,8 @@
   }
 
   .hub-detail-cover {
-    height: 180px;
+    height: 200px;
+    min-height: 200px;
   }
 
   .hub-detail-body {

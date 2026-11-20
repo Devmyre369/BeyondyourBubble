@@ -46,7 +46,7 @@ function HubCard({ hub }: { hub: HubListItem }) {
     <Link className="hub-card-link" to={`/hubs/${hub.id}`}>
       <article className="hub-card" aria-labelledby={titleId}>
         <div className="hub-card-cover">
-          {hub.cover_image && (
+          {hub.cover_image ? (
             <img
               className="hub-card-cover-image"
               src={hub.cover_image}
@@ -56,6 +56,10 @@ function HubCard({ hub }: { hub: HubListItem }) {
                 event.currentTarget.style.visibility = 'hidden'
               }}
             />
+          ) : (
+            <span className="hub-card-cover-fallback" aria-hidden="true">
+              {hub.name.trim().charAt(0).toUpperCase() || 'H'}
+            </span>
           )}
           <div className="hub-card-cover-shade" />
           <span className="hub-card-category">

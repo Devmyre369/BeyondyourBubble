@@ -398,8 +398,8 @@
 
 .hub-edit-media-preview-cover {
   width: 100%;
-  max-width: 300px;
-  aspect-ratio: 16 / 7;
+  max-width: none;
+  aspect-ratio: 16 / 6;
 }
 
 .hub-edit-media-preview img {

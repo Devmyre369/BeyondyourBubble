@@ -171,6 +171,7 @@ export default function HubDetailPage() {
   const pendingRequests = useRef(new Map<string, Promise<HubDetail>>())
   const [retryCount, setRetryCount] = useState(0)
   const [isEditOpen, setIsEditOpen] = useState(false)
+  const [canHostEvent, setCanHostEvent] = useState(false)
   const [state, setState] = useState<HubDetailState>({
     status: 'loading',
     hubId,
@@ -221,6 +222,39 @@ export default function HubDetailPage() {
       isCurrentRequest = false
     }
   }, [hubId, retryCount])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadMembership() {
+      if (!hubId) {
+        setCanHostEvent(false)
+        return
+      }
+
+      try {
+        const membershipState = await hubsApi.getMembership(hubId)
+        if (!active) return
+
+        const role = membershipState.membership?.role
+        const status = membershipState.membership?.status
+        setCanHostEvent(
+          status === 'approved' &&
+            (role === 'owner' ||
+              role === 'admin' ||
+              role === 'editor'),
+        )
+      } catch {
+        if (active) setCanHostEvent(false)
+      }
+    }
+
+    void loadMembership()
+
+    return () => {
+      active = false
+    }
+  }, [hubId])
 
   const isCurrentState = state.hubId === hubId
 
@@ -276,6 +310,16 @@ export default function HubDetailPage() {
             >
               Edit Hub
             </button>
+          )}
+        {isCurrentState &&
+          state.status === 'success' &&
+          canHostEvent && (
+            <Link
+              className="hub-detail-edit-button"
+              to={`/hubs/${state.hub.id}/events/create`}
+            >
+              + Host an Event
+            </Link>
           )}
       </div>
 

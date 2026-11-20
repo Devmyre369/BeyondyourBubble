@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from accounts.models import Profile
 from accounts.services.follow_service import annotate_content_follow_state
+from events.models import Event
 
 from .feed_serializers import FeedEntrySerializer
 from .models import Vibe, Moment, SavedContent
@@ -20,11 +21,12 @@ class FeedPagination(PageNumberPagination):
     page_query_param = "page"
 
 
-def build_feed_entries(vibes, moments):
+def build_feed_entries(vibes, moments, events=()):
     combined = []
 
     for vibe in vibes:
         profile = getattr(vibe.author, "profile", None)
+        visible_event = _visible_event(vibe.event)
         combined.append({
             "id": vibe.id,
             "content_type": "vibe",
@@ -36,8 +38,16 @@ def build_feed_entries(vibes, moments):
             ),
             "author_byb_signature": profile.byb_signature if profile else None,
             "is_following": getattr(vibe, "viewer_follows_author", False),
-            "event_id": vibe.event_id,
-            "event_title": vibe.event.title if vibe.event else None,
+            "event_id": visible_event.id if visible_event else None,
+            "event_title": visible_event.title if visible_event else None,
+            "event_hub_id": None,
+            "event_hub_name": None,
+            "event_cover_image_url": "",
+            "event_starts_at": None,
+            "event_venue": "",
+            "event_city": "",
+            "event_category": "",
+            "event_format": "",
             "content_text": vibe.text,
             "image_url": "",
             "created_at": vibe.created_at,
@@ -50,6 +60,7 @@ def build_feed_entries(vibes, moments):
 
     for moment in moments:
         profile = getattr(moment.author, "profile", None)
+        visible_event = _visible_event(moment.event)
         combined.append({
             "id": moment.id,
             "content_type": "moment",
@@ -61,8 +72,16 @@ def build_feed_entries(vibes, moments):
             ),
             "author_byb_signature": profile.byb_signature if profile else None,
             "is_following": getattr(moment, "viewer_follows_author", False),
-            "event_id": moment.event_id,
-            "event_title": moment.event.title if moment.event else None,
+            "event_id": visible_event.id if visible_event else None,
+            "event_title": visible_event.title if visible_event else None,
+            "event_hub_id": None,
+            "event_hub_name": None,
+            "event_cover_image_url": "",
+            "event_starts_at": None,
+            "event_venue": "",
+            "event_city": "",
+            "event_category": "",
+            "event_format": "",
             "content_text": moment.caption or "",
             "image_url": moment.image_url,
             "created_at": moment.created_at,
@@ -71,6 +90,48 @@ def build_feed_entries(vibes, moments):
             "revibe_count": moment.revibe_count,
             "save_count": moment.save_count,
             "share_count": moment.share_count,
+        })
+
+    for event in events:
+        profile = getattr(event.created_by, "profile", None)
+        public_profile = bool(
+            profile
+            and profile.visibility == Profile.Visibility.PUBLIC
+            and event.created_by.is_active
+            and event.created_by.email_verified
+        )
+        venue = "Online event" if event.format == Event.Format.ONLINE else event.venue_name
+        combined.append({
+            "id": event.id,
+            "content_type": "event",
+            "author_username": event.created_by.username,
+            "author_first_name": event.created_by.first_name if public_profile else "",
+            "author_last_name": event.created_by.last_name if public_profile else "",
+            "author_profile_picture": (
+                profile.profile_picture
+                if public_profile and profile.profile_picture
+                else ""
+            ),
+            "author_byb_signature": profile.byb_signature if public_profile else None,
+            "is_following": getattr(event, "viewer_follows_author", False),
+            "event_id": event.id,
+            "event_title": event.title,
+            "event_hub_id": event.organising_hub_id,
+            "event_hub_name": event.organising_hub.name,
+            "event_cover_image_url": event.cover_image_url,
+            "event_starts_at": event.starts_at,
+            "event_venue": venue,
+            "event_city": event.city,
+            "event_category": event.category,
+            "event_format": event.format,
+            "content_text": event.description,
+            "image_url": "",
+            "created_at": event.created_at,
+            "like_count": 0,
+            "comment_count": 0,
+            "revibe_count": 0,
+            "save_count": 0,
+            "share_count": 0,
         })
 
     combined.sort(
@@ -84,6 +145,17 @@ def build_feed_entries(vibes, moments):
     return combined
 
 
+def _visible_event(event):
+    if (
+        event
+        and event.status == Event.Status.PUBLISHED
+        and event.moderation_status == Event.ModerationStatus.APPROVED
+        and event.organising_hub.is_active
+    ):
+        return event
+    return None
+
+
 class FeedView(APIView):
     permission_classes = [IsAuthenticated]
     pagination_class = FeedPagination
@@ -92,9 +164,10 @@ class FeedView(APIView):
         user = request.user
 
         # Public-profile content plus the authenticated user's own content.
-        visibility_filter = (
-            Q(author__profile__visibility=Profile.Visibility.PUBLIC)
-            | Q(author=user)
+        visibility_filter = Q(author=user) | Q(
+            author__profile__visibility=Profile.Visibility.PUBLIC,
+            author__is_active=True,
+            author__email_verified=True,
         )
 
         vibes = annotate_content_follow_state(
@@ -123,8 +196,20 @@ class FeedView(APIView):
             share_count=Count("shares", distinct=True),
         ).order_by("-created_at", "-id")
 
+        events = annotate_content_follow_state(
+            Event.objects.filter(
+                status=Event.Status.PUBLISHED,
+                moderation_status=Event.ModerationStatus.APPROVED,
+                organising_hub__is_active=True,
+            ).select_related(
+                "created_by", "created_by__profile", "organising_hub",
+            ),
+            user,
+            author_field="created_by_id",
+        ).order_by("-created_at", "-id")
+
         # Calculate total feed entries.
-        total_count = vibes.count() + moments.count()
+        total_count = vibes.count() + moments.count() + events.count()
 
         paginator = self.pagination_class()
         page_number = request.query_params.get("page", "1")
@@ -144,9 +229,11 @@ class FeedView(APIView):
 
         # Fetch only enough entries from each content type
         # to construct the requested combined page.
-        vibes = list(vibes[:end])
-        moments = list(moments[:end])
-        combined = build_feed_entries(vibes, moments)
+        combined = build_feed_entries(
+            list(vibes[:end]),
+            list(moments[:end]),
+            list(events[:end]),
+        )
         page_items = combined[start:end]
 
         serializer = FeedEntrySerializer(page_items, many=True)
@@ -180,7 +267,11 @@ class ProfilePostsView(APIView):
         ):
             raise Http404
 
-        visibility_filter = Q(author=profile.user)
+        visibility_filter = Q(
+            author=profile.user,
+            author__is_active=True,
+            author__email_verified=True,
+        )
         vibes = annotate_content_follow_state(
             Vibe.objects
             .filter(visibility_filter)

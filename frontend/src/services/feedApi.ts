@@ -4,7 +4,7 @@ import type { PostCounts } from './vibespaceApi'
 
 export interface FeedEntry extends PostCounts {
   id: string
-  content_type: 'vibe' | 'moment'
+  content_type: 'vibe' | 'moment' | 'event'
   author_username: string
   author_first_name: string
   author_last_name: string
@@ -13,6 +13,14 @@ export interface FeedEntry extends PostCounts {
   is_following: boolean
   event_id: string | null
   event_title: string | null
+  event_hub_id: string | null
+  event_hub_name: string | null
+  event_cover_image_url: string
+  event_starts_at: string | null
+  event_venue: string
+  event_city: string
+  event_category: string
+  event_format: string
   content_text: string
   image_url: string
   created_at: string

@@ -41,13 +41,13 @@ def is_following(follower, following):
     ).exists()
 
 
-def annotate_content_follow_state(queryset, viewer):
+def annotate_content_follow_state(queryset, viewer, author_field="author_id"):
     if viewer and viewer.is_authenticated:
         return queryset.annotate(
             viewer_follows_author=Exists(
                 Follow.objects.filter(
                     follower_id=viewer.pk,
-                    following_id=OuterRef("author_id"),
+                    following_id=OuterRef(author_field),
                 )
             )
         )

@@ -4,13 +4,13 @@ from rest_framework import serializers
 
 class FeedEntrySerializer(serializers.Serializer):
     """
-    Standard response structure for both Vibes and Moments.
+    Shared response structure for Vibes, Moments, and Events.
     """
 
     id = serializers.UUIDField(read_only=True)
 
     content_type = serializers.ChoiceField(
-        choices=["vibe", "moment"],
+        choices=["vibe", "moment", "event"],
         read_only=True,
     )
 
@@ -39,6 +39,15 @@ class FeedEntrySerializer(serializers.Serializer):
         read_only=True,
         allow_null=True,
     )
+
+    event_hub_id = serializers.UUIDField(read_only=True, allow_null=True)
+    event_hub_name = serializers.CharField(read_only=True, allow_null=True)
+    event_cover_image_url = serializers.CharField(read_only=True, allow_blank=True)
+    event_starts_at = serializers.DateTimeField(read_only=True, allow_null=True)
+    event_venue = serializers.CharField(read_only=True, allow_blank=True)
+    event_city = serializers.CharField(read_only=True, allow_blank=True)
+    event_category = serializers.CharField(read_only=True, allow_blank=True)
+    event_format = serializers.CharField(read_only=True, allow_blank=True)
 
     content_text = serializers.CharField(
         read_only=True,

@@ -21,6 +21,13 @@ import './feed.css'
 const getKey = (entry: FeedEntry) =>
   `${entry.content_type}:${entry.id}`
 
+type SocialFeedEntry = Omit<FeedEntry, 'content_type'> & {
+  content_type: 'vibe' | 'moment'
+}
+
+const isSocialFeedEntry = (entry: FeedEntry): entry is SocialFeedEntry =>
+  entry.content_type !== 'event'
+
 const createCountsMap = (items: FeedEntry[]): Record<string, PostCounts> =>
   Object.fromEntries(
     items.map((entry) => [
@@ -62,7 +69,13 @@ export default function FeedPage() {
     append = false,
   ) => {
     setEntries((previous) =>
-      append ? [...previous, ...response.results] : response.results
+      append
+        ? Array.from(
+            new Map(
+              [...previous, ...response.results].map((entry) => [getKey(entry), entry]),
+            ).values(),
+          )
+        : response.results,
     )
     setCounts((previous) =>
       append
@@ -119,7 +132,8 @@ export default function FeedPage() {
   }, [applyFeedResponse])
 
   useEffect(() => {
-    if (!isAuthenticated || entries.length === 0) return
+    const posts = entries.filter(isSocialFeedEntry)
+    if (!isAuthenticated || posts.length === 0) return
 
     let cancelled = false
 
@@ -141,7 +155,7 @@ export default function FeedPage() {
       }
 
       const results = await Promise.all(
-        entries.map(async (entry) => {
+        posts.map(async (entry) => {
           const [likeResult, revibeResult] = await Promise.allSettled([
             vibespaceApi.getLikeState(entry.content_type, entry.id),
             entry.content_type === 'vibe'
@@ -199,6 +213,7 @@ export default function FeedPage() {
   }, [entries, isAuthenticated])
 
   const handleLike = async (entry: FeedEntry) => {
+    if (!isSocialFeedEntry(entry)) return
     const key = getKey(entry)
     setLikeLoading((previous) => ({ ...previous, [key]: true }))
 
@@ -222,6 +237,7 @@ export default function FeedPage() {
   }
 
   const handleRevibe = async (entry: FeedEntry) => {
+    if (!isSocialFeedEntry(entry)) return
     const key = getKey(entry)
     const hadRevibe = Boolean(revibes[key])
     setRevibeLoading((previous) => ({ ...previous, [key]: true }))
@@ -262,6 +278,7 @@ export default function FeedPage() {
   }
 
   const handleSave = async (entry: FeedEntry) => {
+    if (!isSocialFeedEntry(entry)) return
     const key = getKey(entry)
     const wasSaved = Boolean(savedItems[key])
     setSaveLoading((previous) => ({ ...previous, [key]: true }))
@@ -301,6 +318,7 @@ export default function FeedPage() {
   }
 
   const toggleComments = async (entry: FeedEntry) => {
+    if (!isSocialFeedEntry(entry)) return
     const key = getKey(entry)
     const opening = !openComments[key]
     setOpenComments((previous) => ({ ...previous, [key]: opening }))
@@ -325,6 +343,7 @@ export default function FeedPage() {
     entry: FeedEntry,
   ) => {
     event.preventDefault()
+    if (!isSocialFeedEntry(entry)) return
     const key = getKey(entry)
     const text = commentInputs[key]?.trim()
     if (!text) return
@@ -356,6 +375,7 @@ export default function FeedPage() {
   }
 
   const handleShare = async (entry: FeedEntry) => {
+    if (!isSocialFeedEntry(entry)) return
     const url = `${window.location.origin}${window.location.pathname}#${entry.content_type}-${entry.id}`
     let shared = false
 
@@ -394,6 +414,7 @@ export default function FeedPage() {
   }
 
   const goToDelete = (entry: FeedEntry) => {
+    if (!isSocialFeedEntry(entry)) return
     const post = {
       contentType: entry.content_type,
       text: entry.content_type === 'vibe' ? entry.content_text : undefined,
@@ -420,6 +441,16 @@ export default function FeedPage() {
     })
   }
 
+  const formatEventDate = (date: string | null) => {
+    if (!date) return 'Date to be announced'
+    const parsed = new Date(date)
+    if (Number.isNaN(parsed.getTime())) return 'Date to be announced'
+    return parsed.toLocaleString('en-IN', {
+      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    })
+  }
+
   return (
     <div className="feed-page">
       <header className="feed-header">
@@ -428,6 +459,14 @@ export default function FeedPage() {
           <h1>Find what moves you.</h1>
           <p>Find people, posts, Vibes, events, and Hubs using the search above.</p>
         </div>
+        <button
+          className="feed-refresh"
+          type="button"
+          onClick={() => void loadFeed(1)}
+          disabled={loading || loadingMore}
+        >
+          Refresh feed
+        </button>
       </header>
 
       <section
@@ -463,8 +502,14 @@ export default function FeedPage() {
       )}
 
       {loading && (
-        <div className="feed-status">
-          Loading your feed...
+        <div className="feed-skeleton-list" aria-label="Loading feed" aria-live="polite">
+          {[0, 1, 2].map((item) => (
+            <div className="feed-skeleton" key={item}>
+              <div className="feed-skeleton-heading"><span /><div><i /><i /></div></div>
+              <i className="feed-skeleton-line" />
+              <i className="feed-skeleton-line short" />
+            </div>
+          ))}
         </div>
       )}
 
@@ -481,7 +526,7 @@ export default function FeedPage() {
         <div className="feed-empty">
           <h2>Your feed starts here.</h2>
           <p>
-            Vibes and Moments shared by the BYB community will appear here.
+            Events, Vibes and Moments shared by the BYB community will appear here.
           </p>
         </div>
       )}
@@ -527,30 +572,63 @@ export default function FeedPage() {
                   <span>{formatDate(entry.created_at)}</span>
                 </div>
 
-                <span className="feed-content-type">
-                  {entry.content_type === 'vibe' ? 'VIBE' : 'MOMENT'}
+                <span className={`feed-content-type type-${entry.content_type}`}>
+                  {entry.content_type.toUpperCase()}
                 </span>
-                <FollowButton
-                  username={entry.author_username}
-                  initialFollowing={entry.is_following}
-                  className="feed-author-follow"
-                />
+                {entry.content_type !== 'event' && (
+                  <FollowButton
+                    username={entry.author_username}
+                    initialFollowing={entry.is_following}
+                    className="feed-author-follow"
+                  />
+                )}
               </div>
 
-              {entry.event_title && (
+              {entry.content_type === 'event' ? (
+                <div className="feed-event-card">
+                  {entry.event_cover_image_url ? (
+                    <img
+                      className="feed-event-cover"
+                      src={entry.event_cover_image_url}
+                      alt=""
+                      loading="lazy"
+                    />
+                  ) : <div className="feed-event-cover-fallback">BYB EVENT</div>}
+                  <div className="feed-event-card-body">
+                    {entry.event_hub_id && (
+                      <Link className="feed-event-hub" to={`/hubs/${entry.event_hub_id}`}>
+                        {entry.event_hub_name}
+                      </Link>
+                    )}
+                    <h2>{entry.event_title}</h2>
+                    <div className="feed-event-details">
+                      <span>{formatEventDate(entry.event_starts_at)}</span>
+                      <span>{[entry.event_venue, entry.event_city].filter(Boolean).join(', ')}</span>
+                      <span>{[entry.event_category, entry.event_format].filter(Boolean).join(' · ')}</span>
+                    </div>
+                    {entry.content_text && <p>{entry.content_text}</p>}
+                    <Link className="feed-event-link" to={`/events/${encodeURIComponent(entry.event_id || entry.id)}`}>
+                      View event details <span aria-hidden="true">→</span>
+                    </Link>
+                  </div>
+                </div>
+              ) : entry.event_title && (
                 <div className="feed-event">
                   <span>EVENT</span>
-                  <strong>{entry.event_title}</strong>
+                  <Link to={`/events/${encodeURIComponent(entry.event_id || '')}`}>
+                    {entry.event_title}
+                  </Link>
                 </div>
               )}
 
               {entry.content_type === 'vibe' && entry.content_text && (
-                <div className="feed-vibe-content">
-                  {entry.content_text}
-                </div>
+                <Link className="feed-content-permalink" to={entry.author_username === user?.username ? '/profile' : `/users/${encodeURIComponent(entry.author_username)}`}>
+                  <div className="feed-vibe-content">{entry.content_text}</div>
+                </Link>
               )}
 
               {entry.content_type === 'moment' && (
+                <Link className="feed-content-permalink" to={entry.author_username === user?.username ? '/profile' : `/users/${encodeURIComponent(entry.author_username)}`}>
                 <div className="feed-moment-content">
                   {entry.image_url && (
                     <img
@@ -565,8 +643,10 @@ export default function FeedPage() {
                     <p>{entry.content_text}</p>
                   )}
                 </div>
+                </Link>
               )}
 
+              {entry.content_type !== 'event' && <>
               <div className="feed-post-actions">
                 <button
                   type="button"
@@ -693,6 +773,7 @@ export default function FeedPage() {
                   )}
                 </div>
               )}
+              </>}
             </article>
             )
           })}

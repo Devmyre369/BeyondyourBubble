@@ -28,12 +28,18 @@ def get_visible_vibe(user, vibe_id):
 
     if user.is_authenticated:
         queryset = queryset.filter(
-            Q(author__profile__visibility=Profile.Visibility.PUBLIC)
-            | Q(author=user)
+            Q(author=user)
+            | Q(
+                author__profile__visibility=Profile.Visibility.PUBLIC,
+                author__is_active=True,
+                author__email_verified=True,
+            )
         )
     else:
         queryset = queryset.filter(
-            author__profile__visibility=Profile.Visibility.PUBLIC
+            author__profile__visibility=Profile.Visibility.PUBLIC,
+            author__is_active=True,
+            author__email_verified=True,
         )
 
     return get_object_or_404(queryset, id=vibe_id)
@@ -48,12 +54,18 @@ def get_visible_moment(user, moment_id):
 
     if user.is_authenticated:
         queryset = queryset.filter(
-            Q(author__profile__visibility=Profile.Visibility.PUBLIC)
-            | Q(author=user)
+            Q(author=user)
+            | Q(
+                author__profile__visibility=Profile.Visibility.PUBLIC,
+                author__is_active=True,
+                author__email_verified=True,
+            )
         )
     else:
         queryset = queryset.filter(
-            author__profile__visibility=Profile.Visibility.PUBLIC
+            author__profile__visibility=Profile.Visibility.PUBLIC,
+            author__is_active=True,
+            author__email_verified=True,
         )
 
     return get_object_or_404(queryset, id=moment_id)

@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from rest_framework.exceptions import ValidationError
 
-from events.models import Event
+from events.models import Event, EventModerationReview
 
 
 @transaction.atomic
@@ -69,5 +69,16 @@ def review_event(*, event_id, reviewer, decision, review_notes=""):
         "review_notes",
         "updated_at",
     ])
+
+    EventModerationReview.objects.create(
+        event=event,
+        reviewer=reviewer,
+        decision=(
+            EventModerationReview.Decision.APPROVED
+            if decision == "approve"
+            else EventModerationReview.Decision.REJECTED
+        ),
+        review_notes=event.review_notes,
+    )
 
     return event

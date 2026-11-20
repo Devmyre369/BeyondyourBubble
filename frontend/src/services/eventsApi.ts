@@ -114,6 +114,15 @@ export interface ManagedEvent extends Omit<
   review_notes: string
   reviewed_at: string | null
   updated_at: string
+  moderation_history: EventModerationHistoryItem[]
+}
+
+export interface EventModerationHistoryItem {
+  id: number
+  decision: 'approved' | 'rejected'
+  review_notes: string
+  reviewed_at: string
+  reviewer_username: string | null
 }
 
 export interface EventModerationItem {
@@ -209,9 +218,11 @@ export const eventsApi = {
 
   getHubEvents: async (
     hubId: string,
+    page = 1,
   ): Promise<PaginatedResponse<ManagedEvent>> => {
     const response = await api.get<PaginatedResponse<ManagedEvent>>(
       `/events/hubs/${encodeURIComponent(hubId)}/`,
+      { params: { page } },
     )
     return response.data
   },
@@ -246,12 +257,12 @@ export const eventsApi = {
     return response.data
   },
 
-  getModerationQueue: async (): Promise<
+  getModerationQueue: async (page = 1): Promise<
     PaginatedResponse<EventModerationItem>
   > => {
     const response = await api.get<
       PaginatedResponse<EventModerationItem>
-    >('/events/moderation/')
+    >('/events/moderation/', { params: { page } })
     return response.data
   },
 

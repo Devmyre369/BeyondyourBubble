@@ -27,6 +27,8 @@ import CreatePostPage from './features/feed/CreatePostPage'
 import DeletePostPage from './features/vibespace/pages/DeletePostPage'
 import EventsPage from './features/events/EventsPage'
 import EventCreatePage from './features/events/EventCreatePage'
+import EventDetailPage from './features/events/EventDetailPage'
+import EventModerationPage from './features/events/EventModerationPage'
 import HubDiscoverPage from './features/hubs/HubDiscoverPage'
 import HubDetailPage from './features/hubs/HubDetailPage'
 import SearchPage from './features/search/SearchPage'
@@ -153,6 +155,8 @@ export default function App() {
                 />
 
                 <Route path="/events" element={<EventsPage />} />
+                <Route path="/events/:eventId" element={<EventDetailPage />} />
+                <Route path="/staff/events/moderation" element={<EventModerationPage />} />
 
                 <Route
                   path="/hubs/:hubId/events/create"

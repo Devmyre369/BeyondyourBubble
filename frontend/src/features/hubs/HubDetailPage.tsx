@@ -9,6 +9,7 @@ import {
 } from '../../services/hubsApi'
 import HubEditModal from './HubEditModal'
 import HubMembershipPanel from './HubMembershipPanel'
+import HubEventManagement from '../events/components/HubEventManagement'
 import './hub-detail.css'
 
 const CATEGORY_LABELS: Record<HubType, string> = {
@@ -361,6 +362,7 @@ export default function HubDetailPage() {
         <>
           <HubDetailContent hub={state.hub} />
           <HubMembershipPanel key={state.hub.id} hubId={state.hub.id} />
+          {canHostEvent && <HubEventManagement key={`events-${state.hub.id}`} hubId={state.hub.id} />}
         </>
       )}
       {isCurrentState &&

@@ -93,9 +93,8 @@ def update_event(*, event_id, user, validated_data):
     ]:
         event.status = Event.Status.DRAFT
         event.moderation_status = Event.ModerationStatus.PENDING
-        event.reviewed_by = None
-        event.reviewed_at = None
-        event.review_notes = ""
+        # Keep the most recent decision visible while this revision is
+        # pending. Each decision also has an immutable history record.
 
     event.save()
 

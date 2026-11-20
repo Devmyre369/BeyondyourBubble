@@ -13,6 +13,7 @@ export interface AuthUser {
   username: string
   email: string
   email_verified: boolean
+  is_staff: boolean
 }
 
 export interface AuthResponse {

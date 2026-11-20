@@ -1,5 +1,6 @@
 
 import type { Event } from '../../../services/eventsApi'
+import { Link } from 'react-router-dom'
 import './event-card.css'
 
 export interface EventCardProps {
@@ -137,6 +138,12 @@ export default function EventCard({ event, onSelect }: EventCardProps) {
         <p className="event-card-organiser">
           Organised by {event.organising_hub_name}
         </p>
+
+        {!onSelect && (
+          <Link className="event-card-action" to={`/events/${encodeURIComponent(event.id)}`} aria-label={`View ${event.title}`}>
+            View event <span aria-hidden="true">→</span>
+          </Link>
+        )}
 
         {onSelect && (
           <button

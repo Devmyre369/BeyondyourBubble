@@ -155,6 +155,8 @@ class HubEventManagementListView(generics.ListAPIView):
             "organising_hub",
             "created_by",
             "reviewed_by",
+        ).prefetch_related(
+            "moderation_history__reviewer",
         ).order_by("-created_at")
 
 

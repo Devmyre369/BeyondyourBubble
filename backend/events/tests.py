@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from events.models import Event
+from events.models import Event, EventModerationReview
 from hubs.models import Hub, HubMembership
 
 
@@ -216,6 +216,24 @@ class EventDiscoveryAPITests(APITestCase):
             Event.ModerationStatus.PENDING,
         )
         self.assertEqual(event.status, Event.Status.DRAFT)
+
+    def test_hub_manager_cannot_review_an_event(self):
+        event = self.create_event(
+            status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.PENDING,
+        )
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/moderation/{event.id}/review/",
+            {"decision": "approve"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        event.refresh_from_db()
+        self.assertEqual(event.moderation_status, Event.ModerationStatus.PENDING)
+        self.assertFalse(EventModerationReview.objects.filter(event=event).exists())
 
     def test_client_cannot_override_moderation_fields(self):
         self.authenticate(self.owner)
@@ -525,6 +543,25 @@ class EventDiscoveryAPITests(APITestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_approved_event_can_be_retrieved_by_authenticated_user(self):
+        event = self.create_event()
+        self.authenticate(self.non_member)
+
+        response = self.client.get(f"/api/events/{event.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], str(event.id))
+
+    def test_inactive_hub_event_is_not_publicly_visible(self):
+        event = self.create_event()
+        self.hub.is_active = False
+        self.hub.save(update_fields=["is_active"])
+        self.authenticate(self.non_member)
+
+        response = self.client.get(f"/api/events/{event.id}/")
+
+        self.assertEqual(response.status_code, 404)
+
     # --------------------------------------------------
     # STAFF MODERATION TESTS
     # --------------------------------------------------
@@ -593,6 +630,10 @@ class EventDiscoveryAPITests(APITestCase):
             event.review_notes,
             "Event details verified.",
         )
+        review = EventModerationReview.objects.get(event=event)
+        self.assertEqual(review.reviewer, self.staff)
+        self.assertEqual(review.decision, EventModerationReview.Decision.APPROVED)
+        self.assertEqual(review.review_notes, "Event details verified.")
 
     def test_staff_can_reject_pending_event(self):
         event = self.create_event(
@@ -626,6 +667,14 @@ class EventDiscoveryAPITests(APITestCase):
         self.assertEqual(
             event.review_notes,
             "Insufficient event information.",
+        )
+        self.assertTrue(
+            EventModerationReview.objects.filter(
+                event=event,
+                reviewer=self.staff,
+                decision=EventModerationReview.Decision.REJECTED,
+                review_notes="Insufficient event information.",
+            ).exists()
         )
 
     def test_rejection_requires_review_reason(self):
@@ -731,6 +780,15 @@ class EventDiscoveryAPITests(APITestCase):
             title="Rejected Event",
             status=Event.Status.DRAFT,
             moderation_status=Event.ModerationStatus.REJECTED,
+            reviewed_by=self.staff,
+            reviewed_at=timezone.now(),
+            review_notes="Needs changes",
+        )
+        rejected_event = Event.objects.get(title="Rejected Event")
+        EventModerationReview.objects.create(
+            event=rejected_event,
+            reviewer=self.staff,
+            decision=EventModerationReview.Decision.REJECTED,
             review_notes="Needs changes",
         )
 
@@ -757,6 +815,11 @@ class EventDiscoveryAPITests(APITestCase):
         self.assertEqual(
             rejected_event["review_notes"],
             "Needs changes",
+        )
+        self.assertEqual(len(rejected_event["moderation_history"]), 1)
+        self.assertEqual(
+            rejected_event["moderation_history"][0]["reviewer_username"],
+            self.staff.username,
         )
 
     def test_hub_event_management_supports_page_size(self):
@@ -854,6 +917,12 @@ class EventDiscoveryAPITests(APITestCase):
             reviewed_at=timezone.now(),
             review_notes="Approved",
         )
+        EventModerationReview.objects.create(
+            event=event,
+            reviewer=self.staff,
+            decision=EventModerationReview.Decision.APPROVED,
+            review_notes="Approved",
+        )
 
         self.authenticate(self.owner)
 
@@ -872,9 +941,10 @@ class EventDiscoveryAPITests(APITestCase):
             event.moderation_status,
             Event.ModerationStatus.PENDING,
         )
-        self.assertIsNone(event.reviewed_by)
-        self.assertIsNone(event.reviewed_at)
-        self.assertEqual(event.review_notes, "")
+        self.assertEqual(event.reviewed_by, self.staff)
+        self.assertIsNotNone(event.reviewed_at)
+        self.assertEqual(event.review_notes, "Approved")
+        self.assertEqual(event.moderation_history.count(), 1)
 
     def test_editing_rejected_event_resubmits_for_moderation(self):
         event = self.create_event(
@@ -882,6 +952,12 @@ class EventDiscoveryAPITests(APITestCase):
             moderation_status=Event.ModerationStatus.REJECTED,
             reviewed_by=self.staff,
             reviewed_at=timezone.now(),
+            review_notes="Please correct the event details.",
+        )
+        EventModerationReview.objects.create(
+            event=event,
+            reviewer=self.staff,
+            decision=EventModerationReview.Decision.REJECTED,
             review_notes="Please correct the event details.",
         )
 
@@ -902,9 +978,68 @@ class EventDiscoveryAPITests(APITestCase):
             event.moderation_status,
             Event.ModerationStatus.PENDING,
         )
-        self.assertIsNone(event.reviewed_by)
-        self.assertIsNone(event.reviewed_at)
-        self.assertEqual(event.review_notes, "")
+        self.assertEqual(event.reviewed_by, self.staff)
+        self.assertIsNotNone(event.reviewed_at)
+        self.assertEqual(event.review_notes, "Please correct the event details.")
+        self.assertEqual(event.moderation_history.count(), 1)
+
+    def test_edit_then_reapprove_keeps_both_moderation_decisions(self):
+        event = self.create_event(
+            status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
+            reviewed_by=self.staff,
+            reviewed_at=timezone.now(),
+            review_notes="First approval",
+        )
+        EventModerationReview.objects.create(
+            event=event,
+            reviewer=self.staff,
+            decision=EventModerationReview.Decision.APPROVED,
+            review_notes="First approval",
+        )
+
+        self.authenticate(self.owner)
+        update_response = self.client.patch(
+            f"/api/events/manage/{event.id}/",
+            {"title": "Revised event"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.data["moderation_status"], "pending")
+        self.assertEqual(len(update_response.data["moderation_history"]), 1)
+
+        self.authenticate(self.staff)
+        review_response = self.client.post(
+            f"/api/events/moderation/{event.id}/review/",
+            {"decision": "approve", "review_notes": "Updated details checked."},
+            format="json",
+        )
+        self.assertEqual(review_response.status_code, 200)
+        event.refresh_from_db()
+        self.assertEqual(event.moderation_status, Event.ModerationStatus.APPROVED)
+        self.assertEqual(event.moderation_history.count(), 2)
+
+    def test_hub_manager_cannot_publish_event_through_update_api(self):
+        event = self.create_event(
+            status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.PENDING,
+        )
+        self.authenticate(self.owner)
+
+        response = self.client.patch(
+            f"/api/events/manage/{event.id}/",
+            {
+                "title": "Attempt to bypass moderation",
+                "status": Event.Status.PUBLISHED,
+                "moderation_status": Event.ModerationStatus.APPROVED,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        event.refresh_from_db()
+        self.assertEqual(event.status, Event.Status.DRAFT)
+        self.assertEqual(event.moderation_status, Event.ModerationStatus.PENDING)
 
     def test_editing_pending_event_keeps_it_pending(self):
         event = self.create_event(

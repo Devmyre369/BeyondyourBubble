@@ -1,11 +1,19 @@
 
 from django.contrib import admin
 
-from .models import Event
+from .models import Event, EventModerationReview
+
+
+class EventModerationReviewInline(admin.TabularInline):
+    model = EventModerationReview
+    extra = 0
+    can_delete = False
+    readonly_fields = ("reviewer", "decision", "review_notes", "reviewed_at")
 
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
+    inlines = (EventModerationReviewInline,)
     list_display = (
         "title",
         "organising_hub",

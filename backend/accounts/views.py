@@ -60,6 +60,7 @@ def generate_auth_response(user, message):
             "username": user.username,
             "email": user.email,
             "email_verified": user.email_verified,
+            "is_staff": user.is_staff,
         },
         "tokens": {
             "access": str(refresh.access_token),

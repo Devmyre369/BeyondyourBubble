@@ -3,7 +3,20 @@ from rest_framework import serializers
 
 from hubs.models import Hub
 
-from .models import Event
+from .models import Event, EventModerationReview
+
+
+class EventModerationHistorySerializer(serializers.ModelSerializer):
+    reviewer_username = serializers.CharField(
+        source="reviewer.username",
+        read_only=True,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = EventModerationReview
+        fields = ["id", "decision", "review_notes", "reviewed_at", "reviewer_username"]
+        read_only_fields = fields
 
 
 class EventChoiceSerializer(serializers.ModelSerializer):
@@ -202,6 +215,7 @@ class HubEventManagementSerializer(serializers.ModelSerializer):
         read_only=True,
         allow_null=True,
     )
+    moderation_history = EventModerationHistorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Event
@@ -231,6 +245,7 @@ class HubEventManagementSerializer(serializers.ModelSerializer):
             "reviewed_at",
             "created_at",
             "updated_at",
+            "moderation_history",
         ]
         read_only_fields = fields
 

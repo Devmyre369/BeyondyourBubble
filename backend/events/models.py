@@ -163,3 +163,33 @@ class Event(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class EventModerationReview(models.Model):
+    """Immutable audit entry for each BYB moderation decision."""
+
+    class Decision(models.TextChoices):
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="moderation_history",
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="event_moderation_reviews",
+    )
+    decision = models.CharField(max_length=10, choices=Decision.choices)
+    review_notes = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-reviewed_at"]
+
+    def __str__(self):
+        return f"{self.event.title}: {self.get_decision_display()}"

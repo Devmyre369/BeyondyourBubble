@@ -13,6 +13,7 @@ const mobileNavigation = [
   { label: 'Events', path: '/events', icon: 'events', available: true },
   { label: 'Hubs', path: '/hubs', icon: 'hubs', available: true },
   { label: 'Profile', path: '/profile', icon: 'profile', available: true },
+  { label: 'Moderation', path: '/staff/events/moderation', icon: 'moderation', available: true },
 ] as const
 
 type MobileNavigationIconName =
@@ -62,12 +63,13 @@ function MobileNavigationIcon({
           <path d="M5 21c.7-3.7 3.2-5.5 7-5.5s6.3 1.8 7 5.5" />
         </>
       )}
+      {name === 'moderation' && <path d="m4 20 9-9m-2-2 6-6 4 4-6 6m-7 0 3 3-7 2 2-7Z" />}
     </svg>
   )
 }
 
 export default function AppLayout() {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [isMobile, setIsMobile] = useState(() =>
@@ -361,7 +363,10 @@ export default function AppLayout() {
             </button>
           </div>
         </div>
-        {mobileNavigation.slice(2).map(renderNavigationItem)}
+        {mobileNavigation
+          .slice(2)
+          .filter((item) => item.path !== '/staff/events/moderation' || user?.is_staff)
+          .map(renderNavigationItem)}
       </nav>
     </div>
   )

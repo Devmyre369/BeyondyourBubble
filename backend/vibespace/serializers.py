@@ -280,11 +280,16 @@ class CommentSerializer(serializers.ModelSerializer):
         allow_blank=False
     )
 
+    parent_id = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    reply_to = serializers.UUIDField(source="parent_id", read_only=True)
+
     class Meta:
         model = Comment
         fields = [
             "id",
             "author_username",
+            "parent_id",
+            "reply_to",
             "text",
             "created_at",
             "updated_at",
@@ -292,6 +297,7 @@ class CommentSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "author_username",
+            "reply_to",
             "created_at",
             "updated_at",
         ]

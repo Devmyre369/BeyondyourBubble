@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 
 import { eventsApi, type Event } from '../../services/eventsApi'
 import './event-detail.css'
@@ -19,9 +20,12 @@ function label(value: string) {
 
 export default function EventDetailPage() {
   const { eventId } = useParams<{ eventId: string }>()
+  const { isAuthenticated } = useAuth()
   const [event, setEvent] = useState<Event | null>(null)
   const [loadedEventId, setLoadedEventId] = useState('')
   const [state, setState] = useState<'ready' | 'not-found' | 'error'>('ready')
+  const [registrationBusy, setRegistrationBusy] = useState(false)
+  const [registrationError, setRegistrationError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -54,6 +58,24 @@ export default function EventDetailPage() {
   const dateOptions: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }
   const timeOptions: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
 
+  async function toggleRegistration() {
+    if (!event || registrationBusy) return
+    setRegistrationBusy(true)
+    setRegistrationError('')
+    try {
+      const result = event.is_registered
+        ? await eventsApi.cancelRegistration(event.id)
+        : await eventsApi.registerForEvent(event.id)
+      setEvent((previous) => previous ? { ...previous, is_registered: result.is_registered } : previous)
+    } catch (error) {
+      setRegistrationError(axios.isAxiosError(error) && error.response?.status === 401
+        ? 'Please sign in again to manage your registration.'
+        : 'Your registration could not be updated. Please try again.')
+    } finally {
+      setRegistrationBusy(false)
+    }
+  }
+
   return (
     <main className="event-detail-page">
       <Link className="event-detail-back" to="/events">← Back to events</Link>
@@ -71,6 +93,16 @@ export default function EventDetailPage() {
             Organised by <Link to={`/hubs/${encodeURIComponent(event.organising_hub)}`}>{event.organising_hub_name}</Link>
             {event.created_by_username && <> · hosted by <Link to={`/users/${encodeURIComponent(event.created_by_username)}`}>@{event.created_by_username}</Link></>}
           </p>
+          {event.status === 'published' && event.starts_at && new Date(event.starts_at) > new Date() && (
+            <div className="event-detail-registration">
+              {isAuthenticated ? (
+                <button type="button" onClick={() => void toggleRegistration()} disabled={registrationBusy}>
+                  {registrationBusy ? 'Updating…' : event.is_registered ? 'Cancel registration' : 'Join event'}
+                </button>
+              ) : <Link to="/login">Sign in to join this event</Link>}
+              {registrationError && <p role="alert">{registrationError}</p>}
+            </div>
+          )}
           <dl className="event-detail-facts">
             <div><dt>Starts</dt><dd>{formatDateTime(event.starts_at, dateOptions)}{event.starts_at && ` · ${formatDateTime(event.starts_at, timeOptions)}`}</dd></div>
             <div><dt>Ends</dt><dd>{formatDateTime(event.ends_at, dateOptions)}{event.ends_at && ` · ${formatDateTime(event.ends_at, timeOptions)}`}</dd></div>

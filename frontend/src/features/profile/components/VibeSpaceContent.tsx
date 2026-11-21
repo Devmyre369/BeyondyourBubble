@@ -73,6 +73,8 @@ export default function VibeSpaceContent({
 
   const [comments, setComments] = useState<CommentState>({})
   const [commentInputs, setCommentInputs] = useState<TextState>({})
+  const [replyInputs, setReplyInputs] = useState<TextState>({})
+  const [replyingTo, setReplyingTo] = useState<Record<string, boolean>>({})
   const [commentLoading, setCommentLoading] = useState<LoadingState>({})
   const [commentSubmitting, setCommentSubmitting] = useState<LoadingState>({})
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
@@ -451,11 +453,12 @@ export default function VibeSpaceContent({
     event: FormEvent<HTMLFormElement>,
     type: ContentType,
     id: string,
+    parentId?: string,
   ) => {
     event.preventDefault()
 
     const key = getKey(type, id)
-    const text = commentInputs[key]?.trim()
+    const text = (parentId ? replyInputs[parentId] : commentInputs[key])?.trim()
 
     if (!text || !isAuthenticated) return
 
@@ -467,8 +470,8 @@ export default function VibeSpaceContent({
     try {
       const newComment =
         type === 'vibe'
-          ? await vibespaceApi.createVibeComment(id, text)
-          : await vibespaceApi.createMomentComment(id, text)
+          ? await vibespaceApi.createVibeComment(id, text, parentId)
+          : await vibespaceApi.createMomentComment(id, text, parentId)
 
       setComments((previous) => ({
         ...previous,
@@ -476,10 +479,12 @@ export default function VibeSpaceContent({
       }))
       adjustCount(type, id, 'comment_count', 1)
 
-      setCommentInputs((previous) => ({
-        ...previous,
-        [key]: '',
-      }))
+      if (parentId) {
+        setReplyInputs((previous) => ({ ...previous, [parentId]: '' }))
+        setReplyingTo((previous) => ({ ...previous, [parentId]: false }))
+      } else {
+        setCommentInputs((previous) => ({ ...previous, [key]: '' }))
+      }
     } catch {
       setError('Unable to publish your comment. Please try again.')
     } finally {
@@ -543,15 +548,18 @@ export default function VibeSpaceContent({
     }))
 
     try {
+      const removedCount = (comments[contentKey] || []).filter(
+        (comment) => comment.id === commentId || comment.reply_to === commentId,
+      ).length
       await vibespaceApi.deleteComment(commentId)
 
       setComments((previous) => ({
         ...previous,
         [contentKey]: (previous[contentKey] || []).filter(
-          (comment) => comment.id !== commentId,
+          (comment) => comment.id !== commentId && comment.reply_to !== commentId,
         ),
       }))
-      adjustCount(type, contentId, 'comment_count', -1)
+      adjustCount(type, contentId, 'comment_count', -removedCount)
     } catch {
       setError('Unable to delete this comment. Please try again.')
     } finally {
@@ -944,7 +952,7 @@ export default function VibeSpaceContent({
               </p>
             ) : (
               <div className="vibespace-comment-list">
-                {(comments[key] || []).map((comment) => {
+                {(comments[key] || []).filter((comment) => !comment.reply_to).map((comment) => {
                   const isCommentAuthor =
                     isAuthenticated &&
                     comment.author_username === currentUsername
@@ -1000,6 +1008,15 @@ export default function VibeSpaceContent({
                       ) : (
                         <p>{comment.text}</p>
                       )}
+
+                      {(comments[key] || []).filter((reply) => reply.reply_to === comment.id).map((reply) => (
+                        <div className="vibespace-comment-reply" key={reply.id}>
+                          <div className="vibespace-comment-header"><strong>@{reply.author_username}</strong><span>{formatDate(reply.created_at)}</span></div>
+                          <p>{reply.text}</p>
+                        </div>
+                      ))}
+                      {isAuthenticated && <button className="vibespace-reply-toggle" type="button" onClick={() => setReplyingTo((previous) => ({ ...previous, [comment.id]: !previous[comment.id] }))}>Reply</button>}
+                      {replyingTo[comment.id] && <form className="vibespace-comment-form vibespace-reply-form" onSubmit={(event) => void handleCommentSubmit(event, type, id, comment.id)}><textarea value={replyInputs[comment.id] || ''} onChange={(event) => setReplyInputs((previous) => ({ ...previous, [comment.id]: event.target.value }))} placeholder={`Reply to @${comment.author_username}...`} maxLength={1000} required /><button type="submit" disabled={commentSubmitting[key] || !replyInputs[comment.id]?.trim()}>{commentSubmitting[key] ? 'Posting...' : 'Reply'}</button></form>}
 
                       {isCommentAuthor && !editingComments[comment.id] && (
                         <div className="vibespace-comment-actions">

@@ -78,6 +78,7 @@ export interface VibeSpacePage<T> {
 
 export interface Comment {
   id: string
+  reply_to: string | null
   author_username: string
   text: string
   created_at: string
@@ -286,10 +287,11 @@ export const vibespaceApi = {
   createVibeComment: async (
     vibeId: string,
     text: string,
+    parentId?: string,
   ): Promise<Comment> => {
     const response = await api.post<CommentCreateResponse>(
       `/vibespace/vibe/${vibeId}/comments/`,
-      { text },
+      { text, parent_id: parentId },
     )
 
     return response.data.comment
@@ -298,10 +300,11 @@ export const vibespaceApi = {
   createMomentComment: async (
     momentId: string,
     text: string,
+    parentId?: string,
   ): Promise<Comment> => {
     const response = await api.post<CommentCreateResponse>(
       `/vibespace/moment/${momentId}/comments/`,
-      { text },
+      { text, parent_id: parentId },
     )
 
     return response.data.comment

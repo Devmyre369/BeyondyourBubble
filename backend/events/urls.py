@@ -8,6 +8,7 @@ from .views import (
     EventDiscoveryListCreateView,
     EventModerationQueueView,
     EventModerationReviewView,
+    EventRegistrationView,
     HubEventManagementListView,
     EventManagementDetailView,
     EventManagementCancelView,
@@ -24,6 +25,11 @@ urlpatterns = [
         "choices/",
         EventChoiceListView.as_view(),
         name="event-choices",
+    ),
+    path(
+        "<uuid:event_id>/registration/",
+        EventRegistrationView.as_view(),
+        name="event-registration",
     ),
     path(
         "moderation/",

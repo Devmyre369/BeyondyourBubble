@@ -100,6 +100,14 @@ class Comment(models.Model):
         related_name="vibespace_comments"
     )
 
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="replies",
+    )
+
     vibe = models.ForeignKey(
         Vibe,
         on_delete=models.CASCADE,

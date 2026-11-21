@@ -39,6 +39,8 @@ export interface EventDiscoveryParams {
   city?: string
   format?: EventFormat
   page?: number
+  upcoming?: boolean
+  hub_id?: string
 }
 
 export interface Event {
@@ -56,6 +58,7 @@ export interface Event {
   online_join_url: string
   online_access_instructions: string
   status: EventStatus
+  is_registered: boolean
   organising_hub: string
   organising_hub_name: string
   created_by_username: string
@@ -104,7 +107,7 @@ export interface EventUpdateRequest {
 
 export interface ManagedEvent extends Omit<
   Event,
-  'created_by_username'
+  'created_by_username' | 'is_registered'
 > {
   moderation_status: EventModerationStatus
   created_by: string
@@ -158,6 +161,11 @@ export interface EventCancellationResponse {
   moderation_status: EventModerationStatus
 }
 
+export interface EventRegistrationResponse {
+  event_id: string
+  is_registered: boolean
+}
+
 export interface EventModerationReviewResponse {
   message: string
   event_id: string
@@ -181,6 +189,21 @@ export const eventsApi = {
   getEvent: async (eventId: string): Promise<Event> => {
     const response = await api.get<Event>(
       `/events/${encodeURIComponent(eventId)}/`,
+    )
+    return response.data
+  },
+
+  registerForEvent: async (eventId: string): Promise<EventRegistrationResponse> => {
+    const response = await api.post<EventRegistrationResponse>(
+      `/events/${encodeURIComponent(eventId)}/registration/`,
+      {},
+    )
+    return response.data
+  },
+
+  cancelRegistration: async (eventId: string): Promise<EventRegistrationResponse> => {
+    const response = await api.delete<EventRegistrationResponse>(
+      `/events/${encodeURIComponent(eventId)}/registration/`,
     )
     return response.data
   },

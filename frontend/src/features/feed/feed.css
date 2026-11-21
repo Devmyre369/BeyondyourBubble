@@ -615,6 +615,25 @@
   overflow-wrap: anywhere;
 }
 
+.feed-comment-reply {
+  margin: 9px 0 0 14px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--byb-border);
+}
+
+.feed-comment-reply p { margin: 4px 0 0; color: #d7d7de; font-size: 12px; }
+
+.feed-reply-toggle,
+.vibespace-reply-toggle {
+  margin-top: 6px;
+  padding: 0;
+  color: var(--byb-muted);
+  background: none;
+  border: 0;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 .feed-comments-empty {
   color: var(--byb-muted);
   font-size: 12px;

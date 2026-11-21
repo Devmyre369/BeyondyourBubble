@@ -11,6 +11,7 @@ import HubEditModal from './HubEditModal'
 import HubMembershipPanel from './HubMembershipPanel'
 import HubEventManagement from '../events/components/HubEventManagement'
 import HubVerificationPanel from './HubVerificationPanel'
+import UpcomingEventsSection from '../events/components/UpcomingEventsSection'
 import './hub-detail.css'
 
 const CATEGORY_LABELS: Record<HubType, string> = {
@@ -362,6 +363,12 @@ export default function HubDetailPage() {
       {isCurrentState && state.status === 'success' && (
         <>
           <HubDetailContent hub={state.hub} />
+          <UpcomingEventsSection
+            key={`public-events-${state.hub.id}`}
+            hubId={state.hub.id}
+            title={`${state.hub.name} events`}
+            description={`Upcoming events hosted by ${state.hub.name}.`}
+          />
           <HubVerificationPanel key={`verification-${state.hub.id}`} hub={state.hub} />
           <HubMembershipPanel key={state.hub.id} hubId={state.hub.id} />
           {canHostEvent && <HubEventManagement key={`events-${state.hub.id}`} hubId={state.hub.id} />}

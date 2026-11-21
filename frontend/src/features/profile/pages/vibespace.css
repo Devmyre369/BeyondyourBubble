@@ -1116,6 +1116,7 @@
 
 .vibespace-interaction-actions button,
 .vibespace-comment-actions button,
+.vibespace-reply-toggle,
 .vibespace-comment-edit button,
 .vibespace-existing-revibe button,
 .vibespace-quote-footer button {
@@ -1240,6 +1241,24 @@
   font-size: 0.88rem;
   line-height: 1.65;
   overflow-wrap: anywhere;
+}
+
+.vibespace-comment-reply {
+  margin: 10px 0 0 16px;
+  padding: 8px 11px;
+  border-left: 2px solid var(--byb-border);
+}
+
+.vibespace-comment-reply > p {
+  margin: 0;
+  color: var(--byb-text);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.vibespace-reply-form {
+  margin: 10px 0 0 16px;
 }
 
 .vibespace-comment-actions {

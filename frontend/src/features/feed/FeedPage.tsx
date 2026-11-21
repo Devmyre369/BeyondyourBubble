@@ -16,6 +16,7 @@ import vibespaceApi, {
 } from '../../services/vibespaceApi'
 import PostActionIcon from '../vibespace/components/PostActionIcon'
 import FollowButton from '../profile/components/FollowButton'
+import UpcomingEventsSection from '../events/components/UpcomingEventsSection'
 import './feed.css'
 
 const getKey = (entry: FeedEntry) =>
@@ -58,6 +59,8 @@ export default function FeedPage() {
   const [saveLoading, setSaveLoading] = useState<Record<string, boolean>>({})
   const [comments, setComments] = useState<Record<string, Comment[]>>({})
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
+  const [replyInputs, setReplyInputs] = useState<Record<string, string>>({})
+  const [replyingTo, setReplyingTo] = useState<Record<string, boolean>>({})
   const [commentLoading, setCommentLoading] = useState<Record<string, boolean>>({})
   const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({})
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
@@ -341,24 +344,30 @@ export default function FeedPage() {
   const handleCommentSubmit = async (
     event: FormEvent<HTMLFormElement>,
     entry: FeedEntry,
+    parentId?: string,
   ) => {
     event.preventDefault()
     if (!isSocialFeedEntry(entry)) return
     const key = getKey(entry)
-    const text = commentInputs[key]?.trim()
+    const text = (parentId ? replyInputs[parentId] : commentInputs[key])?.trim()
     if (!text) return
 
     setCommentSubmitting((previous) => ({ ...previous, [key]: true }))
     try {
       const comment =
         entry.content_type === 'vibe'
-          ? await vibespaceApi.createVibeComment(entry.id, text)
-          : await vibespaceApi.createMomentComment(entry.id, text)
+          ? await vibespaceApi.createVibeComment(entry.id, text, parentId)
+          : await vibespaceApi.createMomentComment(entry.id, text, parentId)
       setComments((previous) => ({
         ...previous,
         [key]: [...(previous[key] || []), comment],
       }))
-      setCommentInputs((previous) => ({ ...previous, [key]: '' }))
+      if (parentId) {
+        setReplyInputs((previous) => ({ ...previous, [parentId]: '' }))
+        setReplyingTo((previous) => ({ ...previous, [parentId]: false }))
+      } else {
+        setCommentInputs((previous) => ({ ...previous, [key]: '' }))
+      }
       setCounts((previous) => ({
         ...previous,
         [key]: {
@@ -494,6 +503,8 @@ export default function FeedPage() {
           </div>
         </div>
       </section>
+
+      <UpcomingEventsSection />
 
       {actionError && (
         <p className="feed-action-error" role="alert">
@@ -728,12 +739,23 @@ export default function FeedPage() {
                   {commentLoading[getKey(entry)] ? (
                     <p className="feed-comments-empty">Loading comments...</p>
                   ) : comments[getKey(entry)]?.length ? (
-                    comments[getKey(entry)].map((comment) => (
-                      <div className="feed-comment" key={comment.id}>
-                        <strong>@{comment.author_username}</strong>
-                        <p>{comment.text}</p>
-                      </div>
-                    ))
+                    comments[getKey(entry)]
+                      .filter((comment) => !comment.reply_to)
+                      .map((comment) => (
+                        <div className="feed-comment" key={comment.id}>
+                          <strong>@{comment.author_username}</strong>
+                          <p>{comment.text}</p>
+                          {comments[getKey(entry)]
+                            .filter((reply) => reply.reply_to === comment.id)
+                            .map((reply) => (
+                              <div className="feed-comment-reply" key={reply.id}>
+                                <strong>@{reply.author_username}</strong><p>{reply.text}</p>
+                              </div>
+                            ))}
+                          {isAuthenticated && <button className="feed-reply-toggle" type="button" onClick={() => setReplyingTo((previous) => ({ ...previous, [comment.id]: !previous[comment.id] }))}>Reply</button>}
+                          {replyingTo[comment.id] && <form className="feed-comment-form" onSubmit={(event) => void handleCommentSubmit(event, entry, comment.id)}><input value={replyInputs[comment.id] || ''} onChange={(event) => setReplyInputs((previous) => ({ ...previous, [comment.id]: event.target.value }))} maxLength={1000} placeholder={`Reply to @${comment.author_username}...`} aria-label="Write a reply" required /><button type="submit" disabled={commentSubmitting[getKey(entry)] || !replyInputs[comment.id]?.trim()}>{commentSubmitting[getKey(entry)] ? 'Posting...' : 'Reply'}</button></form>}
+                        </div>
+                      ))
                   ) : (
                     <p className="feed-comments-empty">No comments yet.</p>
                   )}

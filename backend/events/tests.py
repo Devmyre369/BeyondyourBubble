@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from accounts.models import Notification
-from events.models import Event, EventModerationReview
+from events.models import Event, EventModerationReview, EventRegistration
 from hubs.models import Hub, HubMembership
 
 
@@ -630,6 +630,59 @@ class EventDiscoveryAPITests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["id"], str(event.id))
+
+    def test_upcoming_discovery_filters_to_public_events_for_one_hub(self):
+        upcoming = self.create_event(title="Upcoming approved")
+        self.create_event(
+            title="Past published",
+            starts_at=timezone.now() - timedelta(days=1),
+            ends_at=timezone.now() - timedelta(hours=20),
+        )
+        self.create_event(
+            title="Pending upcoming", status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.PENDING,
+        )
+        other_hub = Hub.objects.create(
+            name="Other events hub", slug="other-events-hub",
+            hub_type=Hub.HubType.COMMUNITY, created_by=self.owner,
+            owner=self.owner,
+        )
+        self.create_event(title="Other Hub upcoming", organising_hub=other_hub)
+
+        response = self.client.get(
+            f"/api/events/?upcoming=true&hub_id={self.hub.id}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["id"], str(upcoming.id))
+        self.assertFalse(response.data["results"][0]["is_registered"])
+
+    def test_event_registration_is_idempotent_and_can_be_cancelled(self):
+        event = self.create_event()
+        self.authenticate(self.non_member)
+        url = f"/api/events/{event.id}/registration/"
+
+        first = self.client.post(url, {}, format="json")
+        second = self.client.post(url, {}, format="json")
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(EventRegistration.objects.filter(event=event).count(), 1)
+        self.assertTrue(second.data["is_registered"])
+
+        cancelled = self.client.delete(url)
+        self.assertEqual(cancelled.status_code, 200)
+        self.assertFalse(cancelled.data["is_registered"])
+        registration = EventRegistration.objects.get(event=event)
+        self.assertEqual(registration.status, EventRegistration.Status.CANCELLED)
+
+    def test_event_registration_requires_authentication(self):
+        event = self.create_event()
+        response = self.client.post(
+            f"/api/events/{event.id}/registration/", {}, format="json",
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(EventRegistration.objects.filter(event=event).exists())
 
     def test_inactive_hub_event_is_not_publicly_visible(self):
         event = self.create_event()

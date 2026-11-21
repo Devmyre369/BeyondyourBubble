@@ -193,3 +193,31 @@ class EventModerationReview(models.Model):
 
     def __str__(self):
         return f"{self.event.title}: {self.get_decision_display()}"
+
+
+class EventRegistration(models.Model):
+    class Status(models.TextChoices):
+        REGISTERED = "registered", "Registered"
+        CANCELLED = "cancelled", "Cancelled"
+
+    event = models.ForeignKey(
+        Event, on_delete=models.CASCADE, related_name="registrations",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name="event_registrations",
+    )
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.REGISTERED,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "user"], name="unique_event_registration",
+            ),
+        ]
+        indexes = [models.Index(fields=["user", "status"], name="evt_reg_user_status_idx")]
+

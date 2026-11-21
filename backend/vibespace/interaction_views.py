@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
 from rest_framework import generics, status
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -112,17 +112,36 @@ class ContentCommentListCreateView(APIView):
         serializer = CommentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        parent_id = serializer.validated_data.pop("parent_id", None)
+        parent = None
+        if parent_id:
+            parent = get_object_or_404(Comment, id=parent_id)
+            same_content = (
+                parent.vibe_id == content.id if content_type == "vibe"
+                else parent.moment_id == content.id
+            )
+            if not same_content:
+                raise ValidationError({"parent_id": "The reply target must belong to this post."})
+            if parent.parent_id:
+                raise ValidationError({"parent_id": "Replies can only be added to a comment."})
+            if content_type == "vibe":
+                get_visible_vibe(request.user, parent.vibe_id)
+            else:
+                get_visible_moment(request.user, parent.moment_id)
+
         if content_type == "vibe":
             comment = serializer.save(
                 author=request.user,
                 vibe=content,
                 moment=None,
+                parent=parent,
             )
         else:
             comment = serializer.save(
                 author=request.user,
                 moment=content,
                 vibe=None,
+                parent=parent,
             )
 
         create_notification(
@@ -131,6 +150,13 @@ class ContentCommentListCreateView(APIView):
             Notification.Verb.COMMENT,
             **{content_type: content},
         )
+        if parent and parent.author_id != content.author_id:
+            create_notification(
+                request.user,
+                parent.author,
+                Notification.Verb.COMMENT,
+                **{content_type: content},
+            )
 
         return Response(
             {

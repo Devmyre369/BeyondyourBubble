@@ -6,9 +6,13 @@ import './event-card.css'
 export interface EventCardProps {
   event: Event
   onSelect?: (event: Event) => void
+  showRegistration?: boolean
+  isAuthenticated?: boolean
+  registrationLoading?: boolean
+  onToggleRegistration?: (event: Event) => void
 }
 
-function getEventDateTime(startsAt: string | null) {
+function getEventDateTime(startsAt: string | null, endsAt: string | null) {
   if (!startsAt) {
     return { date: 'Date to be announced', time: '' }
   }
@@ -19,6 +23,15 @@ function getEventDateTime(startsAt: string | null) {
     return { date: 'Date to be announced', time: '' }
   }
 
+  const timeFormat = new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+  const startTime = timeFormat.format(date)
+  const endDate = endsAt ? new Date(endsAt) : null
+  const time = endDate && !Number.isNaN(endDate.getTime())
+    ? `${startTime} – ${timeFormat.format(endDate)}`
+    : startTime
   return {
     date: new Intl.DateTimeFormat(undefined, {
       weekday: 'short',
@@ -26,10 +39,7 @@ function getEventDateTime(startsAt: string | null) {
       day: 'numeric',
       year: 'numeric',
     }).format(date),
-    time: new Intl.DateTimeFormat(undefined, {
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(date),
+    time,
   }
 }
 
@@ -40,8 +50,8 @@ function formatLabel(value: string) {
     .join(' ')
 }
 
-export default function EventCard({ event, onSelect }: EventCardProps) {
-  const { date, time } = getEventDateTime(event.starts_at)
+export default function EventCard({ event, onSelect, showRegistration = false, isAuthenticated = false, registrationLoading = false, onToggleRegistration }: EventCardProps) {
+  const { date, time } = getEventDateTime(event.starts_at, event.ends_at)
 
   const location =
     event.format === 'online'
@@ -144,6 +154,19 @@ export default function EventCard({ event, onSelect }: EventCardProps) {
             View event <span aria-hidden="true">→</span>
           </Link>
         )}
+
+        {showRegistration && (isAuthenticated ? (
+          <button
+            className="event-registration-action"
+            type="button"
+            disabled={registrationLoading}
+            onClick={() => onToggleRegistration?.(event)}
+          >
+            {registrationLoading ? 'Updating…' : event.is_registered ? 'Cancel registration' : 'Join event'}
+          </button>
+        ) : (
+          <Link className="event-registration-action" to="/login">Sign in to join</Link>
+        ))}
 
         {onSelect && (
           <button

@@ -1,16 +1,18 @@
 
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import BooleanField, Exists, OuterRef, Q, Value
+from django.utils import timezone
 
 from rest_framework import generics, status
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from hubs.models import Hub
 
-from .models import Event
+from .models import Event, EventRegistration
 from .pagination import EventPagination
 from .permissions import can_submit_hub_event
 from .serializers import (
@@ -33,7 +35,7 @@ class EventDiscoveryListCreateView(generics.ListCreateAPIView):
     POST: Submit an event through an eligible Hub.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = EventPagination
 
     def get_queryset(self):
@@ -46,10 +48,30 @@ class EventDiscoveryListCreateView(generics.ListCreateAPIView):
             "created_by",
         )
 
+        user = self.request.user
+        if user.is_authenticated:
+            queryset = queryset.annotate(
+                is_registered=Exists(EventRegistration.objects.filter(
+                    event_id=OuterRef("pk"), user=user,
+                    status=EventRegistration.Status.REGISTERED,
+                )),
+            )
+        else:
+            queryset = queryset.annotate(
+                is_registered=Value(False, output_field=BooleanField()),
+            )
+
         search = self.request.query_params.get("search")
         category = self.request.query_params.get("category")
         city = self.request.query_params.get("city")
         event_format = self.request.query_params.get("format")
+        hub_id = self.request.query_params.get("hub_id")
+        upcoming = self.request.query_params.get("upcoming")
+
+        if hub_id:
+            queryset = queryset.filter(organising_hub_id=hub_id)
+        if upcoming in ("1", "true", "yes"):
+            queryset = queryset.filter(starts_at__gte=timezone.now())
 
         if search:
             queryset = queryset.filter(
@@ -76,6 +98,11 @@ class EventDiscoveryListCreateView(generics.ListCreateAPIView):
 
         return EventDiscoverySerializer
 
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated()]
+        return [AllowAny()]
+
 
 class EventDiscoveryDetailView(generics.RetrieveAPIView):
     """
@@ -83,11 +110,11 @@ class EventDiscoveryDetailView(generics.RetrieveAPIView):
     """
 
     serializer_class = EventDiscoverySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     lookup_field = "id"
 
     def get_queryset(self):
-        return Event.objects.filter(
+        queryset = Event.objects.filter(
             status=Event.Status.PUBLISHED,
             moderation_status=Event.ModerationStatus.APPROVED,
             organising_hub__is_active=True,
@@ -95,6 +122,62 @@ class EventDiscoveryDetailView(generics.RetrieveAPIView):
             "organising_hub",
             "created_by",
         )
+        user = self.request.user
+        if user.is_authenticated:
+            return queryset.annotate(
+                is_registered=Exists(EventRegistration.objects.filter(
+                    event_id=OuterRef("pk"), user=user,
+                    status=EventRegistration.Status.REGISTERED,
+                )),
+            )
+        return queryset.annotate(
+            is_registered=Value(False, output_field=BooleanField()),
+        )
+
+
+class EventRegistrationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_event(self, event_id):
+        event = Event.objects.filter(
+            id=event_id,
+            status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
+            organising_hub__is_active=True,
+        ).first()
+        if event is None:
+            raise NotFound("Event not found.")
+        return event
+
+    def get(self, request, event_id):
+        event = self.get_event(event_id)
+        registered = EventRegistration.objects.filter(
+            event=event, user=request.user,
+            status=EventRegistration.Status.REGISTERED,
+        ).exists()
+        return Response({"event_id": str(event.id), "is_registered": registered})
+
+    def post(self, request, event_id):
+        event = self.get_event(event_id)
+        if not event.starts_at or event.starts_at <= timezone.now():
+            return Response({"detail": "Registration is closed for this event."}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            registration, created = EventRegistration.objects.get_or_create(
+                event=event, user=request.user,
+                defaults={"status": EventRegistration.Status.REGISTERED},
+            )
+            if not created and registration.status != EventRegistration.Status.REGISTERED:
+                registration.status = EventRegistration.Status.REGISTERED
+                registration.save(update_fields=["status", "updated_at"])
+        return Response({"event_id": str(event.id), "is_registered": True}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def delete(self, request, event_id):
+        event = self.get_event(event_id)
+        EventRegistration.objects.filter(
+            event=event, user=request.user,
+            status=EventRegistration.Status.REGISTERED,
+        ).update(status=EventRegistration.Status.CANCELLED, updated_at=timezone.now())
+        return Response({"event_id": str(event.id), "is_registered": False})
 
 
 class EventChoiceListView(generics.ListAPIView):

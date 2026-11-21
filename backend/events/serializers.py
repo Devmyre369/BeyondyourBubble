@@ -168,6 +168,7 @@ class EventDiscoverySerializer(serializers.ModelSerializer):
         source="created_by.username",
         read_only=True,
     )
+    is_registered = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Event
@@ -186,6 +187,7 @@ class EventDiscoverySerializer(serializers.ModelSerializer):
             "online_join_url",
             "online_access_instructions",
             "status",
+            "is_registered",
             "organising_hub",
             "organising_hub_name",
             "created_by_username",

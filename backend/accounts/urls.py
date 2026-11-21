@@ -1,9 +1,11 @@
-
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.views import (
     ProfileImageView,
+    UserSettingsView,
+    ChangePasswordView,
+    DeleteAccountView,
     SignupView,
     VerifySignupView,
     LoginView,
@@ -125,5 +127,21 @@ urlpatterns = [
         "profile/image/<str:image_type>/",
         ProfileImageView.as_view(),
         name="profile-image",
+    ),
+
+    path(
+        "me/settings/",
+        UserSettingsView.as_view(),
+        name="my-settings",
+    ),
+    path(
+        "me/change-password/",
+        ChangePasswordView.as_view(),
+        name="change-password",
+    ),
+    path(
+        "me/delete-account/",
+        DeleteAccountView.as_view(),
+        name="delete-account",
     ),
 ]

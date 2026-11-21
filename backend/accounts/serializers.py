@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 
 from rest_framework import serializers
 
-from accounts.models import Profile
+from accounts.models import Profile, UserSettings
 
 
 User = get_user_model()
@@ -390,3 +390,4 @@ class ProfileSerializer(serializers.ModelSerializer):
             )
 
         return value
+\n\n# ==================================================\n# USER SETTINGS SERIALIZER\n# ==================================================\n\nclass UserSettingsSerializer(serializers.ModelSerializer):\n    class Meta:\n        model = UserSettings\n        fields = [\n            "theme",\n            "mute_optional_notifications",\n            "in_app_notifications",\n            "email_notifications",\n            "push_notifications",\n            "event_updates",\n            "event_registration_updates",\n            "event_reminders",\n            "event_cancellations",\n            "hub_announcements",\n            "hub_activity",\n            "handshake_requests",\n            "vibe_interactions",\n            "likes_and_comments",\n            "byb_announcements",\n            "profile_visibility",\n            "discoverable",\n            "handshake_permission",\n            "vibe_interaction_permission",\n            "preferred_city",\n            "language",\n            "density",\n            "updated_at",\n        ]\n        read_only_fields = ["updated_at"]\n

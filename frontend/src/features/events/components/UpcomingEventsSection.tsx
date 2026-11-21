@@ -46,23 +46,9 @@ export default function UpcomingEventsSection({
   }, [hubId])
 
   useEffect(() => {
-    let active = true
-    setLoading(true)
-    setError('')
-    eventsApi.getEvents({ upcoming: true, hub_id: hubId }).then((response) => {
-      if (!active) return
-      setEvents(response.results)
-      setNextPage(response.next
-        ? Number(new URL(response.next, window.location.origin).searchParams.get('page')) || 2
-        : null)
-    }).catch((loadError: unknown) => {
-      if (!active) return
-      setError(axios.isAxiosError(loadError) && loadError.response?.status === 401
-        ? 'Sign in to view upcoming events.'
-        : 'Upcoming events could not be loaded. Please try again.')
-    }).finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [hubId, retry])
+    const timer = setTimeout(() => { void load(1) }, 0)
+    return () => clearTimeout(timer)
+  }, [load, retry])
 
   async function toggleRegistration(event: Event) {
     if (busyIds[event.id]) return

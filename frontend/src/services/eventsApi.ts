@@ -169,6 +169,7 @@ export interface EventModerationParams {
   category?: EventCategory
   format?: EventFormat
   city?: string
+  hub?: string
   hub_id?: string
   submitted_after?: string
   submitted_before?: string

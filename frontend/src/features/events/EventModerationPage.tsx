@@ -61,7 +61,10 @@ export default function EventModerationPage() {
     }
   }, [activeFilters])
 
-  useEffect(() => { void loadQueue(1) }, [loadQueue])
+  useEffect(() => {
+    const timer = setTimeout(() => { void loadQueue(1) }, 0)
+    return () => clearTimeout(timer)
+  }, [loadQueue])
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

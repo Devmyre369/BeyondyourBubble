@@ -41,6 +41,7 @@ export interface EventDiscoveryParams {
   page?: number
   upcoming?: boolean
   hub_id?: string
+  hub?: string
 }
 
 export interface Event {
@@ -115,6 +116,7 @@ export interface ManagedEvent extends Omit<
   reviewed_by: string | null
   reviewed_by_username: string | null
   review_notes: string
+  review_category: EventRejectionCategory | ''
   reviewed_at: string | null
   updated_at: string
   moderation_history: EventModerationHistoryItem[]
@@ -124,6 +126,7 @@ export interface EventModerationHistoryItem {
   id: number
   decision: 'approved' | 'rejected'
   review_notes: string
+  review_category: EventRejectionCategory | ''
   reviewed_at: string
   reviewer_username: string | null
 }
@@ -147,11 +150,34 @@ export interface EventModerationItem {
   created_by: string
   created_by_username: string
   created_at: string
+  review_category: EventRejectionCategory | ''
+  review_notes: string
+  moderation_history: EventModerationHistoryItem[]
+}
+
+export type EventRejectionCategory =
+  | 'incomplete'
+  | 'unverifiable'
+  | 'duplicate'
+  | 'misleading'
+  | 'policy_violation'
+  | 'inappropriate'
+  | 'other'
+
+export interface EventModerationParams {
+  search?: string
+  category?: EventCategory
+  format?: EventFormat
+  city?: string
+  hub_id?: string
+  submitted_after?: string
+  submitted_before?: string
 }
 
 export interface EventModerationReviewRequest {
   decision: 'approve' | 'reject'
   review_notes?: string
+  review_category?: EventRejectionCategory
 }
 
 export interface EventCancellationResponse {
@@ -172,6 +198,7 @@ export interface EventModerationReviewResponse {
   status: EventStatus
   moderation_status: EventModerationStatus
   review_notes: string
+  review_category: EventRejectionCategory | ''
   reviewed_at: string | null
 }
 
@@ -280,12 +307,12 @@ export const eventsApi = {
     return response.data
   },
 
-  getModerationQueue: async (page = 1): Promise<
+  getModerationQueue: async (page = 1, params: EventModerationParams = {}): Promise<
     PaginatedResponse<EventModerationItem>
   > => {
     const response = await api.get<
       PaginatedResponse<EventModerationItem>
-    >('/events/moderation/', { params: { page } })
+    >('/events/moderation/', { params: { page, ...params } })
     return response.data
   },
 

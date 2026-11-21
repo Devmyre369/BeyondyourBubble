@@ -35,6 +35,15 @@ class Event(models.Model):
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
 
+    class RejectionCategory(models.TextChoices):
+        INCOMPLETE = "incomplete", "Incomplete information"
+        UNVERIFIABLE = "unverifiable", "Invalid or unverifiable details"
+        DUPLICATE = "duplicate", "Duplicate event"
+        MISLEADING = "misleading", "Misleading information"
+        POLICY = "policy_violation", "Policy violation"
+        INAPPROPRIATE = "inappropriate", "Inappropriate content"
+        OTHER = "other", "Other"
+
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -138,6 +147,11 @@ class Event(models.Model):
     )
 
     review_notes = models.TextField(blank=True)
+    review_category = models.CharField(
+        max_length=24,
+        choices=RejectionCategory.choices,
+        blank=True,
+    )
 
     reviewed_at = models.DateTimeField(
         null=True,
@@ -172,6 +186,15 @@ class EventModerationReview(models.Model):
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
 
+    class RejectionCategory(models.TextChoices):
+        INCOMPLETE = "incomplete", "Incomplete information"
+        UNVERIFIABLE = "unverifiable", "Invalid or unverifiable details"
+        DUPLICATE = "duplicate", "Duplicate event"
+        MISLEADING = "misleading", "Misleading information"
+        POLICY = "policy_violation", "Policy violation"
+        INAPPROPRIATE = "inappropriate", "Inappropriate content"
+        OTHER = "other", "Other"
+
     event = models.ForeignKey(
         Event,
         on_delete=models.CASCADE,
@@ -186,6 +209,11 @@ class EventModerationReview(models.Model):
     )
     decision = models.CharField(max_length=10, choices=Decision.choices)
     review_notes = models.TextField(blank=True)
+    review_category = models.CharField(
+        max_length=24,
+        choices=RejectionCategory.choices,
+        blank=True,
+    )
     reviewed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

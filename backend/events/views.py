@@ -1,16 +1,20 @@
 
+import uuid
+
 from django.db import transaction
 from django.db.models import BooleanField, Exists, OuterRef, Q, Value
+from django.utils.dateparse import parse_date
 from django.utils import timezone
 
 from rest_framework import generics, status
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from hubs.models import Hub
+from hubs.models import HubMembership
 
 from .models import Event, EventRegistration
 from .pagination import EventPagination
@@ -55,10 +59,21 @@ class EventDiscoveryListCreateView(generics.ListCreateAPIView):
                     event_id=OuterRef("pk"), user=user,
                     status=EventRegistration.Status.REGISTERED,
                 )),
+                can_manage_event=Exists(HubMembership.objects.filter(
+                    hub_id=OuterRef("organising_hub_id"),
+                    user=user,
+                    status=HubMembership.Status.APPROVED,
+                    role__in=(
+                        HubMembership.Role.OWNER,
+                        HubMembership.Role.ADMIN,
+                        HubMembership.Role.EDITOR,
+                    ),
+                )),
             )
         else:
             queryset = queryset.annotate(
                 is_registered=Value(False, output_field=BooleanField()),
+                can_manage_event=Value(False, output_field=BooleanField()),
             )
 
         search = self.request.query_params.get("search")
@@ -129,9 +144,16 @@ class EventDiscoveryDetailView(generics.RetrieveAPIView):
                     event_id=OuterRef("pk"), user=user,
                     status=EventRegistration.Status.REGISTERED,
                 )),
+                can_manage_event=Exists(HubMembership.objects.filter(
+                    hub_id=OuterRef("organising_hub_id"),
+                    user=user,
+                    status=HubMembership.Status.APPROVED,
+                    role__in=(HubMembership.Role.OWNER, HubMembership.Role.ADMIN, HubMembership.Role.EDITOR),
+                )),
             )
         return queryset.annotate(
             is_registered=Value(False, output_field=BooleanField()),
+            can_manage_event=Value(False, output_field=BooleanField()),
         )
 
 
@@ -159,7 +181,11 @@ class EventRegistrationView(APIView):
 
     def post(self, request, event_id):
         event = self.get_event(event_id)
-        if not event.starts_at or event.starts_at <= timezone.now():
+        if (
+            not event.starts_at
+            or event.starts_at <= timezone.now()
+            or (event.ends_at and event.ends_at <= timezone.now())
+        ):
             return Response({"detail": "Registration is closed for this event."}, status=status.HTTP_400_BAD_REQUEST)
         with transaction.atomic():
             registration, created = EventRegistration.objects.get_or_create(
@@ -343,13 +369,50 @@ class EventModerationQueueView(generics.ListAPIView):
     pagination_class = EventPagination
 
     def get_queryset(self):
-        return Event.objects.filter(
+        queryset = Event.objects.filter(
             moderation_status=Event.ModerationStatus.PENDING,
             organising_hub__is_active=True,
         ).select_related(
             "organising_hub",
             "created_by",
-        ).order_by("created_at")
+        )
+        params = self.request.query_params
+        search = params.get("search", "").strip()
+        category = params.get("category")
+        event_format = params.get("format")
+        city = params.get("city", "").strip()
+        hub_id = params.get("hub_id")
+        hub = params.get("hub", "").strip()
+        submitted_after = params.get("submitted_after")
+        submitted_before = params.get("submitted_before")
+
+        if search:
+            queryset = queryset.filter(title__icontains=search)
+        if category:
+            queryset = queryset.filter(category=category)
+        if event_format:
+            queryset = queryset.filter(format=event_format)
+        if city:
+            queryset = queryset.filter(city__icontains=city)
+        if hub_id:
+            queryset = queryset.filter(organising_hub_id=hub_id)
+        if hub:
+            try:
+                hub_uuid = uuid.UUID(hub)
+            except ValueError:
+                queryset = queryset.filter(
+                    Q(organising_hub__name__icontains=hub)
+                    | Q(organising_hub__slug__icontains=hub)
+                )
+            else:
+                queryset = queryset.filter(organising_hub_id=hub_uuid)
+        for param, lookup in ((submitted_after, "created_at__date__gte"), (submitted_before, "created_at__date__lte")):
+            if param:
+                parsed = parse_date(param)
+                if not parsed:
+                    raise ValidationError({"date": "Submission dates must use YYYY-MM-DD."})
+                queryset = queryset.filter(**{lookup: parsed})
+        return queryset.order_by("created_at")
 
 
 class EventModerationReviewView(APIView):
@@ -373,6 +436,7 @@ class EventModerationReviewView(APIView):
                 "review_notes",
                 "",
             ),
+            review_category=serializer.validated_data.get("review_category", ""),
         )
 
         return Response({
@@ -385,6 +449,7 @@ class EventModerationReviewView(APIView):
             "status": event.status,
             "moderation_status": event.moderation_status,
             "review_notes": event.review_notes,
+            "review_category": event.review_category,
             "reviewed_at": event.reviewed_at,
         })
 
@@ -445,8 +510,11 @@ class EventCoverImageUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        event.cover_image_url = image_url
-        event.save(update_fields=["cover_image_url"])
+        event = update_event(
+            event_id=event.id,
+            user=request.user,
+            validated_data={"cover_image_url": image_url},
+        )
 
         return Response(
             {

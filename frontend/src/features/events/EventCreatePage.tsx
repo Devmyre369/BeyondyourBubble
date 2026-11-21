@@ -234,6 +234,26 @@ export default function EventCreatePage() {
     ) {
       errors.endTime = 'Event end must be after its start.'
     }
+    if (startsAt && !Number.isNaN(startsAt.getTime())) {
+      if (
+        startsAt.getFullYear() !== Number(values.startDate.slice(0, 4)) ||
+        startsAt.getMonth() + 1 !== Number(values.startDate.slice(5, 7)) ||
+        startsAt.getDate() !== Number(values.startDate.slice(8, 10))
+      ) {
+        errors.startTime = 'This local start time does not exist.'
+      } else if (startsAt <= new Date()) {
+        errors.startTime = 'An event must start in the future.'
+      }
+    }
+    if (endsAt && !Number.isNaN(endsAt.getTime()) && values.endDate) {
+      if (
+        endsAt.getFullYear() !== Number(values.endDate.slice(0, 4)) ||
+        endsAt.getMonth() + 1 !== Number(values.endDate.slice(5, 7)) ||
+        endsAt.getDate() !== Number(values.endDate.slice(8, 10))
+      ) {
+        errors.endTime = 'This local end time does not exist.'
+      }
+    }
 
     const format = values.format
 

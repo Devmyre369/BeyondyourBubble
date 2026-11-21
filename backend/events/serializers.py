@@ -1,5 +1,6 @@
 
 from rest_framework import serializers
+from django.utils import timezone
 
 from hubs.models import Hub
 
@@ -15,7 +16,7 @@ class EventModerationHistorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EventModerationReview
-        fields = ["id", "decision", "review_notes", "reviewed_at", "reviewer_username"]
+        fields = ["id", "decision", "review_category", "review_notes", "reviewed_at", "reviewer_username"]
         read_only_fields = fields
 
 
@@ -97,6 +98,10 @@ class EventSubmissionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 "ends_at": "Event end must be after its start."
             })
+        if starts_at <= timezone.now():
+            raise serializers.ValidationError({
+                "starts_at": "New events must start in the future."
+            })
 
         venue_name = attrs.get("venue_name", "").strip()
         venue_address = attrs.get("venue_address", "").strip()
@@ -156,7 +161,8 @@ class EventSubmissionSerializer(serializers.ModelSerializer):
 class EventDiscoverySerializer(serializers.ModelSerializer):
     """
     Public representation of an approved event.
-    Online joining details are publicly visible in V1.
+    Online joining details are only visible to eligible participants,
+    Hub event managers, and BYB staff.
     """
 
     organising_hub_name = serializers.CharField(
@@ -194,6 +200,20 @@ class EventDiscoverySerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        private_access = bool(
+            getattr(instance, "is_registered", False)
+            or getattr(instance, "can_manage_event", False)
+            or (user and user.is_authenticated and user.is_staff)
+        )
+        if not private_access:
+            data.pop("online_join_url", None)
+            data.pop("online_access_instructions", None)
+        return data
 
 
 class HubEventManagementSerializer(serializers.ModelSerializer):
@@ -244,6 +264,7 @@ class HubEventManagementSerializer(serializers.ModelSerializer):
             "reviewed_by",
             "reviewed_by_username",
             "review_notes",
+            "review_category",
             "reviewed_at",
             "created_at",
             "updated_at",
@@ -330,6 +351,20 @@ class EventUpdateSerializer(serializers.ModelSerializer):
                 "ends_at": "Event end must be after its start."
             })
 
+        if (
+            instance
+            and "starts_at" in attrs
+            # datetime-local controls preserve whole seconds, while API
+            # timestamps may include fractional seconds. Compare at the
+            # precision managers can edit so saving an unchanged date does
+            # not accidentally resubmit a past event.
+            and starts_at.replace(microsecond=0) != instance.starts_at.replace(microsecond=0)
+            and starts_at <= timezone.now()
+        ):
+            raise serializers.ValidationError({
+                "starts_at": "A rescheduled event must start in the future."
+            })
+
         if event_format in [
             Event.Format.OFFLINE,
             Event.Format.HYBRID,
@@ -383,6 +418,7 @@ class EventModerationQueueSerializer(serializers.ModelSerializer):
         source="created_by.username",
         read_only=True,
     )
+    moderation_history = EventModerationHistorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Event
@@ -405,6 +441,9 @@ class EventModerationQueueSerializer(serializers.ModelSerializer):
             "created_by",
             "created_by_username",
             "created_at",
+            "review_category",
+            "review_notes",
+            "moderation_history",
         ]
         read_only_fields = fields
 
@@ -426,6 +465,11 @@ class EventModerationReviewSerializer(serializers.Serializer):
         allow_blank=True,
         max_length=5000,
     )
+    review_category = serializers.ChoiceField(
+        choices=Event.RejectionCategory.choices,
+        required=False,
+        allow_blank=True,
+    )
 
     def validate(self, attrs):
         if (
@@ -436,6 +480,14 @@ class EventModerationReviewSerializer(serializers.Serializer):
                 "review_notes": (
                     "Please provide a reason when rejecting an event."
                 )
+            })
+        if attrs["decision"] == "reject" and not attrs.get("review_category"):
+            raise serializers.ValidationError({
+                "review_category": "Choose a rejection category."
+            })
+        if attrs["decision"] == "approve" and attrs.get("review_category"):
+            raise serializers.ValidationError({
+                "review_category": "Rejection categories are only valid for rejections."
             })
 
         return attrs

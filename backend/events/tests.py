@@ -1,9 +1,11 @@
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from accounts.models import Notification
 from events.models import Event, EventModerationReview, EventRegistration
@@ -433,6 +435,16 @@ class EventDiscoveryAPITests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("ends_at", response.data)
 
+    def test_new_event_start_must_be_in_the_future(self):
+        self.authenticate(self.owner)
+        response = self.client.post(
+            "/api/events/",
+            self.event_payload(starts_at=(timezone.now() - timedelta(minutes=1)).isoformat()),
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("starts_at", response.data)
+
     # --------------------------------------------------
     # PUBLIC EVENT DISCOVERY TESTS
     # --------------------------------------------------
@@ -585,7 +597,7 @@ class EventDiscoveryAPITests(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["id"], str(event.id))
 
-    def test_online_join_details_are_public_in_v1(self):
+    def test_online_join_details_are_hidden_until_registration(self):
         event = self.create_event(
             format=Event.Format.ONLINE,
             venue_name="",
@@ -600,6 +612,10 @@ class EventDiscoveryAPITests(APITestCase):
         response = self.client.get(f"/api/events/{event.id}/")
 
         self.assertEqual(response.status_code, 200)
+        self.assertNotIn("online_join_url", response.data)
+        self.assertNotIn("online_access_instructions", response.data)
+        self.client.post(f"/api/events/{event.id}/registration/", {}, format="json")
+        response = self.client.get(f"/api/events/{event.id}/")
         self.assertEqual(
             response.data["online_join_url"],
             "https://example.com/meeting",
@@ -608,6 +624,18 @@ class EventDiscoveryAPITests(APITestCase):
             response.data["online_access_instructions"],
             "Join at the scheduled time.",
         )
+
+    def test_online_join_details_are_available_to_event_hub_manager(self):
+        event = self.create_event(
+            format=Event.Format.ONLINE,
+            venue_name="", venue_address="", city="",
+            online_join_url="https://example.com/private",
+            online_access_instructions="Participants only.",
+        )
+        self.authenticate(self.owner)
+        response = self.client.get(f"/api/events/{event.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["online_join_url"], "https://example.com/private")
 
     def test_pending_event_cannot_be_retrieved_publicly(self):
         event = self.create_event(
@@ -683,6 +711,31 @@ class EventDiscoveryAPITests(APITestCase):
         )
         self.assertEqual(response.status_code, 401)
         self.assertFalse(EventRegistration.objects.filter(event=event).exists())
+
+    def test_cancelled_and_completed_events_cannot_be_registered_for(self):
+        cancelled = self.create_event(status=Event.Status.CANCELLED)
+        completed = self.create_event(status=Event.Status.COMPLETED)
+        self.authenticate(self.non_member)
+        for event in (cancelled, completed):
+            response = self.client.post(
+                f"/api/events/{event.id}/registration/", {}, format="json",
+            )
+            self.assertEqual(response.status_code, 404)
+        self.assertFalse(EventRegistration.objects.exists())
+
+    def test_cancelled_registration_loses_private_online_access(self):
+        event = self.create_event(
+            format=Event.Format.ONLINE,
+            venue_name="", venue_address="", city="",
+            online_join_url="https://example.com/private",
+            online_access_instructions="Participants only.",
+        )
+        self.authenticate(self.non_member)
+        self.client.post(f"/api/events/{event.id}/registration/", {}, format="json")
+        self.client.delete(f"/api/events/{event.id}/registration/")
+        response = self.client.get(f"/api/events/{event.id}/")
+        self.assertNotIn("online_join_url", response.data)
+        self.assertNotIn("online_access_instructions", response.data)
 
     def test_inactive_hub_event_is_not_publicly_visible(self):
         event = self.create_event()
@@ -780,6 +833,7 @@ class EventDiscoveryAPITests(APITestCase):
             f"/api/events/moderation/{event.id}/review/",
             {
                 "decision": "reject",
+                "review_category": Event.RejectionCategory.INCOMPLETE,
                 "review_notes": "Insufficient event information.",
             },
             format="json",
@@ -800,11 +854,13 @@ class EventDiscoveryAPITests(APITestCase):
             event.review_notes,
             "Insufficient event information.",
         )
+        self.assertEqual(event.review_category, Event.RejectionCategory.INCOMPLETE)
         self.assertTrue(
             EventModerationReview.objects.filter(
                 event=event,
                 reviewer=self.staff,
                 decision=EventModerationReview.Decision.REJECTED,
+                review_category=Event.RejectionCategory.INCOMPLETE,
                 review_notes="Insufficient event information.",
             ).exists()
         )
@@ -834,6 +890,34 @@ class EventDiscoveryAPITests(APITestCase):
             event.moderation_status,
             Event.ModerationStatus.PENDING,
         )
+
+    def test_rejection_requires_category_and_explanatory_comment(self):
+        event = self.create_event(
+            status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.PENDING,
+        )
+        self.authenticate(self.staff)
+        response = self.client.post(
+            f"/api/events/moderation/{event.id}/review/",
+            {"decision": "reject", "review_category": Event.RejectionCategory.DUPLICATE},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("review_notes", response.data)
+        self.assertEqual(event.moderation_history.count(), 0)
+
+    def test_moderation_queue_can_filter_by_hub_and_submission_date(self):
+        pending = self.create_event(
+            status=Event.Status.DRAFT,
+            moderation_status=Event.ModerationStatus.PENDING,
+        )
+        self.authenticate(self.staff)
+        response = self.client.get(
+            f"/api/events/moderation/?hub={self.hub.name}&submitted_after={(timezone.now() - timedelta(days=1)).date()}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["id"], str(pending.id))
 
     def test_non_staff_cannot_review_event(self):
         event = self.create_event(
@@ -882,6 +966,7 @@ class EventDiscoveryAPITests(APITestCase):
             f"/api/events/moderation/{event.id}/review/",
             {
                 "decision": "reject",
+                "review_category": Event.RejectionCategory.INCOMPLETE,
                 "review_notes": "Trying to reverse the decision.",
             },
             format="json",
@@ -1201,6 +1286,26 @@ class EventDiscoveryAPITests(APITestCase):
             event.moderation_status,
             Event.ModerationStatus.PENDING,
         )
+
+    def test_replacing_cover_image_on_approved_event_resubmits_for_moderation(self):
+        event = self.create_event(
+            status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
+            cover_image_url="https://example.com/old.jpg",
+        )
+        self.authenticate(self.owner)
+        upload = SimpleUploadedFile("cover.png", b"fake-image", content_type="image/png")
+        with patch("events.views.upload_event_cover_image", return_value="https://example.com/new.jpg"):
+            response = self.client.post(
+                f"/api/events/manage/{event.id}/cover-image/",
+                {"image": upload},
+                format="multipart",
+            )
+        self.assertEqual(response.status_code, 200)
+        event.refresh_from_db()
+        self.assertEqual(event.cover_image_url, "https://example.com/new.jpg")
+        self.assertEqual(event.moderation_status, Event.ModerationStatus.PENDING)
+        self.assertEqual(event.status, Event.Status.DRAFT)
 
     # --------------------------------------------------
     # EVENT CANCELLATION TESTS

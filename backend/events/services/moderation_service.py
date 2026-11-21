@@ -13,7 +13,7 @@ from accounts.services.notification_service import (
 
 
 @transaction.atomic
-def review_event(*, event_id, reviewer, decision, review_notes=""):
+def review_event(*, event_id, reviewer, decision, review_notes="", review_category=""):
     """
     Approve or reject an event submitted for BYB moderation.
 
@@ -55,9 +55,15 @@ def review_event(*, event_id, reviewer, decision, review_notes=""):
             "decision": "Decision must be approve or reject."
         })
 
+    if decision == "approve" and event.starts_at and event.starts_at <= timezone.now():
+        raise ValidationError({
+            "starts_at": "An event that has already started cannot be published."
+        })
+
     event.reviewed_by = reviewer
     event.reviewed_at = timezone.now()
     event.review_notes = review_notes.strip()
+    event.review_category = review_category if decision == "reject" else ""
 
     if decision == "approve":
         event.moderation_status = Event.ModerationStatus.APPROVED
@@ -72,6 +78,7 @@ def review_event(*, event_id, reviewer, decision, review_notes=""):
         "reviewed_by",
         "reviewed_at",
         "review_notes",
+        "review_category",
         "updated_at",
     ])
 
@@ -84,6 +91,7 @@ def review_event(*, event_id, reviewer, decision, review_notes=""):
             else EventModerationReview.Decision.REJECTED
         ),
         review_notes=event.review_notes,
+        review_category=event.review_category,
     )
 
     approved = decision == "approve"

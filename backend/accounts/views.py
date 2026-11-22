@@ -495,5 +495,163 @@ class ProfileImageView(APIView):
                     "message": str(error),
                 },
                 status=status.HTTP_502_BAD_GATEWAY,
-\n\n# ==================================================\n# USER SETTINGS VIEWS\n# ==================================================\n\nclass UserSettingsView(APIView):\n    permission_classes = [IsAuthenticated]\n\n    def get(self, request):\n        settings_obj, _ = UserSettings.objects.get_or_create(\n            user=request.user\n        )\n        serializer = UserSettingsSerializer(settings_obj)\n        return Response(\n            {\n                "success": True,\n                "settings": serializer.data,\n            },\n            status=status.HTTP_200_OK,\n        )\n\n    def patch(self, request):\n        settings_obj, _ = UserSettings.objects.get_or_create(\n            user=request.user\n        )\n        serializer = UserSettingsSerializer(\n            settings_obj,\n            data=request.data,\n            partial=True,\n        )\n        serializer.is_valid(raise_exception=True)\n        serializer.save()\n        return Response(\n            {\n                "success": True,\n                "settings": serializer.data,\n            },\n            status=status.HTTP_200_OK,\n        )\n\n\nclass ChangePasswordView(APIView):\n    permission_classes = [IsAuthenticated]\n\n    def post(self, request):\n        current_password = request.data.get(\"current_password\", \"\")\n        new_password = request.data.get(\"new_password\", \"\")\n        confirm_password = request.data.get(\"confirm_password\", \"\")\n\n        if not request.user.check_password(current_password):\n            return Response(\n                {\n                    "success": False,\n                    "message": "Current password is incorrect.",\n                },\n                status=status.HTTP_400_BAD_REQUEST,\n            )\n\n        if new_password != confirm_password:\n            return Response(\n                {\n                    "success": False,\n                    "message": "New passwords do not match.",\n                },\n                status=status.HTTP_400_BAD_REQUEST,\n            )\n\n        from django.contrib.auth.password_validation import validate_password\n        from django.core.exceptions import ValidationError as DjangoValidationError\n\n        try:\n            validate_password(new_password, user=request.user)\n        except DjangoValidationError as error:\n            return Response(\n                {\n                    "success": False,\n                    "message": list(error.messages),\n                },\n                status=status.HTTP_400_BAD_REQUEST,\n            )\n\n        request.user.set_password(new_password)\n        request.user.save(update_fields=[\"password\"])\n\n        return Response(\n            {\n                "success": True,\n                "message": "Password changed successfully.",\n            },\n            status=status.HTTP_200_OK,\n        )\n\n\nclass DeleteAccountView(APIView):\n    permission_classes = [IsAuthenticated]\n\n    def post(self, request):\n        password = request.data.get(\"password\", \"\")\n        confirmation = request.data.get(\"confirmation\", \"\")\n\n        if confirmation != \"DELETE\":\n            return Response(\n                {\n                    "success": False,\n                    "message": "Type DELETE to confirm account deletion.",\n                },\n                status=status.HTTP_400_BAD_REQUEST,\n            )\n\n        if not request.user.check_password(password):\n            return Response(\n                {\n                    "success": False,\n                    "message": "Password is incorrect.",\n                },\n                status=status.HTTP_400_BAD_REQUEST,\n            )\n\n        # Block deletion if the user owns hubs/events to avoid\n        # cascading destruction of shared resources.\n        from hubs.models import Hub\n        from events.models import Event\n\n        if Hub.objects.filter(owner=request.user).exists():\n            return Response(\n                {\n                    "success": False,\n                    "message": (\n                        "You own one or more Hubs. Transfer or delete "\n                        "them before deleting your account."\n                    ),\n                },\n                status=status.HTTP_409_CONFLICT,\n            )\n\n        if Event.objects.filter(created_by=request.user).exists():\n            return Response(\n                {\n                    "success": False,\n                    "message": (\n                        "You have created events. Remove them before "\n                        "deleting your account."\n                    ),\n                },\n                status=status.HTTP_409_CONFLICT,\n            )\n\n        user = request.user\n        user.delete()\n\n        return Response(\n            {\n                "success": True,\n                "message": "Account deleted.",\n            },\n            status=status.HTTP_200_OK,\n        )\n
             )
+
+
+
+# ==================================================
+# USER SETTINGS VIEWS
+# ==================================================
+
+class UserSettingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        settings_obj, _ = UserSettings.objects.get_or_create(
+            user=request.user
+        )
+        serializer = UserSettingsSerializer(settings_obj)
+        return Response(
+            {
+                "success": True,
+                "settings": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request):
+        settings_obj, _ = UserSettings.objects.get_or_create(
+            user=request.user
+        )
+        serializer = UserSettingsSerializer(
+            settings_obj,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {
+                "success": True,
+                "settings": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        current_password = request.data.get("current_password", "")
+        new_password = request.data.get("new_password", "")
+        confirm_password = request.data.get("confirm_password", "")
+
+        if not request.user.check_password(current_password):
+            return Response(
+                {
+                    "success": False,
+                    "message": "Current password is incorrect.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if new_password != confirm_password:
+            return Response(
+                {
+                    "success": False,
+                    "message": "New passwords do not match.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        try:
+            validate_password(new_password, user=request.user)
+        except DjangoValidationError as error:
+            return Response(
+                {
+                    "success": False,
+                    "message": list(error.messages),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request.user.set_password(new_password)
+        request.user.save(update_fields=["password"])
+
+        return Response(
+            {
+                "success": True,
+                "message": "Password changed successfully.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class DeleteAccountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        password = request.data.get("password", "")
+        confirmation = request.data.get("confirmation", "")
+
+        if confirmation != "DELETE":
+            return Response(
+                {
+                    "success": False,
+                    "message": "Type DELETE to confirm account deletion.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not request.user.check_password(password):
+            return Response(
+                {
+                    "success": False,
+                    "message": "Password is incorrect.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Block deletion if the user owns hubs/events to avoid
+        # cascading destruction of shared resources.
+        from hubs.models import Hub
+        from events.models import Event
+
+        if Hub.objects.filter(owner=request.user).exists():
+            return Response(
+                {
+                    "success": False,
+                    "message": (
+                        "You own one or more Hubs. Transfer or delete "
+                        "them before deleting your account."
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if Event.objects.filter(created_by=request.user).exists():
+            return Response(
+                {
+                    "success": False,
+                    "message": (
+                        "You have created events. Remove them before "
+                        "deleting your account."
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        user = request.user
+        user.delete()
+
+        return Response(
+            {
+                "success": True,
+                "message": "Account deleted.",
+            },
+            status=status.HTTP_200_OK,
+        )

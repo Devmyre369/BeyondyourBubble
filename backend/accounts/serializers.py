@@ -390,4 +390,38 @@ class ProfileSerializer(serializers.ModelSerializer):
             )
 
         return value
-\n\n# ==================================================\n# USER SETTINGS SERIALIZER\n# ==================================================\n\nclass UserSettingsSerializer(serializers.ModelSerializer):\n    class Meta:\n        model = UserSettings\n        fields = [\n            "theme",\n            "mute_optional_notifications",\n            "in_app_notifications",\n            "email_notifications",\n            "push_notifications",\n            "event_updates",\n            "event_registration_updates",\n            "event_reminders",\n            "event_cancellations",\n            "hub_announcements",\n            "hub_activity",\n            "handshake_requests",\n            "vibe_interactions",\n            "likes_and_comments",\n            "byb_announcements",\n            "profile_visibility",\n            "discoverable",\n            "handshake_permission",\n            "vibe_interaction_permission",\n            "preferred_city",\n            "language",\n            "density",\n            "updated_at",\n        ]\n        read_only_fields = ["updated_at"]\n
+
+
+# ==================================================
+# USER SETTINGS SERIALIZER
+# ==================================================
+
+class UserSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserSettings
+        fields = [
+            "theme",
+            "mute_optional_notifications",
+            "in_app_notifications",
+            "email_notifications",
+            "push_notifications",
+            "event_updates",
+            "event_registration_updates",
+            "event_reminders",
+            "event_cancellations",
+            "hub_announcements",
+            "hub_activity",
+            "handshake_requests",
+            "vibe_interactions",
+            "likes_and_comments",
+            "byb_announcements",
+            "profile_visibility",
+            "discoverable",
+            "handshake_permission",
+            "vibe_interaction_permission",
+            "preferred_city",
+            "language",
+            "density",
+            "updated_at",
+        ]
+        read_only_fields = ["updated_at"]

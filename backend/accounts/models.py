@@ -487,4 +487,107 @@ class EmailOTP(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.purpose}"
-\n\n# ==================================================\n# USER SETTINGS\n# ==================================================\n\nclass UserSettings(models.Model):\n    \"\"\"Persisted, per-user application settings.\"\"\"\n\n    class Theme(models.TextChoices):\n        DARK = "dark", "Dark"\n        LIGHT = "light", "Light"\n        SYSTEM = "system", "System default"\n\n    class ProfileVisibility(models.TextChoices):\n        EVERYONE = "everyone", "Everyone"\n        REGISTERED = "registered", "Registered BYB users"\n        CONNECTIONS = "connections", "Approved connections"\n\n    class HandshakePermission(models.TextChoices):\n        EVERYONE = "everyone", "Everyone"\n        REGISTERED = "registered", "Registered BYB users"\n        CONNECTIONS = "connections", "Approved connections"\n\n    class VibeInteractionPermission(models.TextChoices):\n        EVERYONE = "everyone", "Everyone"\n        REGISTERED = "registered", "Registered BYB users"\n        CONNECTIONS = "connections", "Approved connections"\n\n    class Density(models.TextChoices):\n        COMFORTABLE = "comfortable", "Comfortable"\n        COMPACT = "compact", "Compact"\n\n    class Language(models.TextChoices):\n        EN = "en", "English"\n\n    id = models.UUIDField(\n        primary_key=True,\n        default=uuid.uuid4,\n        editable=False,\n    )\n\n    user = models.OneToOneField(\n        User,\n        on_delete=models.CASCADE,\n        related_name="settings",\n    )\n\n    theme = models.CharField(\n        max_length=10,\n        choices=Theme.choices,\n        default=Theme.DARK,\n    )\n\n    mute_optional_notifications = models.BooleanField(default=False)\n    in_app_notifications = models.BooleanField(default=True)\n    email_notifications = models.BooleanField(default=False)\n    push_notifications = models.BooleanField(default=False)\n\n    event_updates = models.BooleanField(default=True)\n    event_registration_updates = models.BooleanField(default=True)\n    event_reminders = models.BooleanField(default=True)\n    event_cancellations = models.BooleanField(default=True)\n    hub_announcements = models.BooleanField(default=True)\n    hub_activity = models.BooleanField(default=True)\n    handshake_requests = models.BooleanField(default=True)\n    vibe_interactions = models.BooleanField(default=True)\n    likes_and_comments = models.BooleanField(default=True)\n    byb_announcements = models.BooleanField(default=True)\n\n    profile_visibility = models.CharField(\n        max_length=20,\n        choices=ProfileVisibility.choices,\n        default=ProfileVisibility.REGISTERED,\n    )\n    discoverable = models.BooleanField(default=True)\n    handshake_permission = models.CharField(\n        max_length=20,\n        choices=HandshakePermission.choices,\n        default=HandshakePermission.REGISTERED,\n    )\n    vibe_interaction_permission = models.CharField(\n        max_length=20,\n        choices=VibeInteractionPermission.choices,\n        default=VibeInteractionPermission.REGISTERED,\n    )\n\n    preferred_city = models.CharField(max_length=100, blank=True)\n    language = models.CharField(\n        max_length=10,\n        choices=Language.choices,\n        default=Language.EN,\n    )\n    density = models.CharField(\n        max_length=20,\n        choices=Density.choices,\n        default=Density.COMFORTABLE,\n    )\n\n    created_at = models.DateTimeField(auto_now_add=True)\n    updated_at = models.DateTimeField(auto_now=True)\n\n    def __str__(self):\n        return f"Settings for {self.user.username}"\n
+
+
+# ==================================================
+# USER SETTINGS
+# ==================================================
+
+class UserSettings(models.Model):
+    """Persisted, per-user application settings."""
+
+    class Theme(models.TextChoices):
+        DARK = "dark", "Dark"
+        LIGHT = "light", "Light"
+        SYSTEM = "system", "System default"
+
+    class ProfileVisibility(models.TextChoices):
+        EVERYONE = "everyone", "Everyone"
+        REGISTERED = "registered", "Registered BYB users"
+        CONNECTIONS = "connections", "Approved connections"
+
+    class HandshakePermission(models.TextChoices):
+        EVERYONE = "everyone", "Everyone"
+        REGISTERED = "registered", "Registered BYB users"
+        CONNECTIONS = "connections", "Approved connections"
+
+    class VibeInteractionPermission(models.TextChoices):
+        EVERYONE = "everyone", "Everyone"
+        REGISTERED = "registered", "Registered BYB users"
+        CONNECTIONS = "connections", "Approved connections"
+
+    class Density(models.TextChoices):
+        COMFORTABLE = "comfortable", "Comfortable"
+        COMPACT = "compact", "Compact"
+
+    class Language(models.TextChoices):
+        EN = "en", "English"
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="settings",
+    )
+
+    theme = models.CharField(
+        max_length=10,
+        choices=Theme.choices,
+        default=Theme.DARK,
+    )
+
+    mute_optional_notifications = models.BooleanField(default=False)
+    in_app_notifications = models.BooleanField(default=True)
+    email_notifications = models.BooleanField(default=False)
+    push_notifications = models.BooleanField(default=False)
+
+    event_updates = models.BooleanField(default=True)
+    event_registration_updates = models.BooleanField(default=True)
+    event_reminders = models.BooleanField(default=True)
+    event_cancellations = models.BooleanField(default=True)
+    hub_announcements = models.BooleanField(default=True)
+    hub_activity = models.BooleanField(default=True)
+    handshake_requests = models.BooleanField(default=True)
+    vibe_interactions = models.BooleanField(default=True)
+    likes_and_comments = models.BooleanField(default=True)
+    byb_announcements = models.BooleanField(default=True)
+
+    profile_visibility = models.CharField(
+        max_length=20,
+        choices=ProfileVisibility.choices,
+        default=ProfileVisibility.REGISTERED,
+    )
+    discoverable = models.BooleanField(default=True)
+    handshake_permission = models.CharField(
+        max_length=20,
+        choices=HandshakePermission.choices,
+        default=HandshakePermission.REGISTERED,
+    )
+    vibe_interaction_permission = models.CharField(
+        max_length=20,
+        choices=VibeInteractionPermission.choices,
+        default=VibeInteractionPermission.REGISTERED,
+    )
+
+    preferred_city = models.CharField(max_length=100, blank=True)
+    language = models.CharField(
+        max_length=10,
+        choices=Language.choices,
+        default=Language.EN,
+    )
+    density = models.CharField(
+        max_length=20,
+        choices=Density.choices,
+        default=Density.COMFORTABLE,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Settings for {self.user.username}"

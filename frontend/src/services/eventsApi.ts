@@ -300,10 +300,11 @@ export const eventsApi = {
 
   cancelEvent: async (
     eventId: string,
+    reason: string,
   ): Promise<EventCancellationResponse> => {
     const response = await api.post<EventCancellationResponse>(
       `/events/manage/${encodeURIComponent(eventId)}/cancel/`,
-      {},
+      { reason },
     )
     return response.data
   },

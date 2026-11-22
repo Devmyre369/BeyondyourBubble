@@ -1,12 +1,12 @@
 
 from datetime import timedelta
 from unittest.mock import patch
-
+from accounts.models import Notification, UserSettings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
-
+from vibespace.models import Vibe, Moment
 from accounts.models import Notification
 from events.models import Event, EventModerationReview, EventRegistration
 from hubs.models import Hub, HubMembership
@@ -1319,6 +1319,11 @@ class EventDiscoveryAPITests(APITestCase):
     # EVENT CANCELLATION TESTS
     # --------------------------------------------------
 
+    
+    # --------------------------------------------------
+    # EVENT CANCELLATION TESTS
+    # --------------------------------------------------
+
     def test_owner_can_cancel_published_event(self):
         event = self.create_event(
             status=Event.Status.PUBLISHED,
@@ -1328,7 +1333,9 @@ class EventDiscoveryAPITests(APITestCase):
         self.authenticate(self.owner)
 
         response = self.client.post(
-            f"/api/events/manage/{event.id}/cancel/"
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "The venue is unavailable."},
+            format="json",
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1337,32 +1344,415 @@ class EventDiscoveryAPITests(APITestCase):
 
         self.assertEqual(event.status, Event.Status.CANCELLED)
         self.assertEqual(
-            event.moderation_status,
-            Event.ModerationStatus.APPROVED,
+            event.cancellation_reason,
+            "The venue is unavailable.",
         )
-        self.assertTrue(Notification.objects.filter(
-            recipient=self.editor,
-            event=event,
-            verb=Notification.Verb.EVENT_CANCELLED,
-        ).exists())
+        self.assertIsNotNone(event.cancelled_at)
+        self.assertEqual(event.cancelled_by, self.owner)
 
-    def test_member_cannot_cancel_published_event(self):
-        event = self.create_event(
-            status=Event.Status.PUBLISHED,
-            moderation_status=Event.ModerationStatus.APPROVED,
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.editor,
+                event=event,
+                verb=Notification.Verb.EVENT_CANCELLED,
+            ).count(),
+            1,
         )
 
-        self.authenticate(self.member)
+    def test_cancellation_requires_a_reason(self):
+        event = self.create_event()
+
+        self.authenticate(self.owner)
 
         response = self.client.post(
-            f"/api/events/manage/{event.id}/cancel/"
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "   "},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("reason", response.data)
+
+        event.refresh_from_db()
+        self.assertEqual(event.status, Event.Status.PUBLISHED)
+        self.assertIsNone(event.cancelled_at)
+
+    def test_cancellation_reason_cannot_exceed_1000_characters(self):
+        event = self.create_event()
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "x" * 1001},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("reason", response.data)
+
+        event.refresh_from_db()
+        self.assertEqual(event.status, Event.Status.PUBLISHED)
+
+    def test_only_actual_hub_owner_can_cancel_event(self):
+        event = self.create_event()
+
+        self.authenticate(self.editor)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "Cancellation test."},
+            format="json",
         )
 
         self.assertEqual(response.status_code, 403)
 
         event.refresh_from_db()
-
         self.assertEqual(event.status, Event.Status.PUBLISHED)
+
+    def test_member_cannot_cancel_published_event(self):
+        event = self.create_event()
+
+        self.authenticate(self.member)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "Cancellation test."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+        event.refresh_from_db()
+        self.assertEqual(event.status, Event.Status.PUBLISHED)
+
+    def test_event_that_has_already_started_cannot_be_cancelled(self):
+        event = self.create_event(
+            starts_at=timezone.now() - timedelta(minutes=5),
+            ends_at=timezone.now() + timedelta(hours=2),
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "The event has already started."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+        event.refresh_from_db()
+        self.assertEqual(event.status, Event.Status.PUBLISHED)
+
+    def test_completed_event_cannot_be_cancelled(self):
+        event = self.create_event(
+            status=Event.Status.COMPLETED,
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "Cancellation test."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+        event.refresh_from_db()
+        self.assertEqual(event.status, Event.Status.COMPLETED)
+
+    def test_event_without_start_time_cannot_be_cancelled(self):
+        event = self.create_event(starts_at=None)
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "Cancellation test."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+        event.refresh_from_db()
+        self.assertEqual(event.status, Event.Status.PUBLISHED)
+
+    def test_already_cancelled_event_cannot_be_cancelled_again(self):
+        event = self.create_event(
+            status=Event.Status.CANCELLED,
+            cancellation_reason="Previously cancelled.",
+            cancelled_at=timezone.now(),
+            cancelled_by=self.owner,
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "Another cancellation attempt."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+        event.refresh_from_db()
+        self.assertEqual(
+            event.cancellation_reason,
+            "Previously cancelled.",
+        )
+
+    def test_cancellation_notifies_registered_users_but_not_cancelled_registrations(self):
+        active_user = self.create_user("active_attendee")
+        withdrawn_user = self.create_user("withdrawn_attendee")
+
+        event = self.create_event()
+
+        EventRegistration.objects.create(
+            event=event,
+            user=active_user,
+            status=EventRegistration.Status.REGISTERED,
+        )
+
+        EventRegistration.objects.create(
+            event=event,
+            user=withdrawn_user,
+            status=EventRegistration.Status.CANCELLED,
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "The event has been postponed indefinitely."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=active_user,
+                event=event,
+                verb=Notification.Verb.EVENT_CANCELLED,
+            ).count(),
+            1,
+        )
+
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=withdrawn_user,
+                event=event,
+                verb=Notification.Verb.EVENT_CANCELLED,
+            ).count(),
+            0,
+        )
+
+    def test_cancellation_notifies_vibe_and_moment_authors(self):
+        vibe_author = self.create_user("vibe_author")
+        moment_author = self.create_user("moment_author")
+
+        event = self.create_event()
+
+        vibe = Vibe.objects.create(
+            author=vibe_author,
+            event=event,
+            text="Looking forward to this event!",
+        )
+
+        moment = Moment.objects.create(
+            author=moment_author,
+            event=event,
+            image_url="https://example.com/event.jpg",
+            caption="Event announcement.",
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "The event has been cancelled."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        for recipient in (vibe_author, moment_author):
+            self.assertEqual(
+                Notification.objects.filter(
+                    recipient=recipient,
+                    event=event,
+                    verb=Notification.Verb.EVENT_CANCELLED,
+                ).count(),
+                1,
+            )
+
+        # Cancellation must preserve the associated content.
+        self.assertTrue(Vibe.objects.filter(pk=vibe.pk, event=event).exists())
+        self.assertTrue(Moment.objects.filter(pk=moment.pk, event=event).exists())
+
+    def test_recipient_in_multiple_categories_gets_only_one_notification(self):
+        attendee = self.create_user("attendee_and_author")
+        event = self.create_event()
+
+        EventRegistration.objects.create(
+            event=event,
+            user=attendee,
+            status=EventRegistration.Status.REGISTERED,
+        )
+
+        Vibe.objects.create(
+            author=attendee,
+            event=event,
+            text="I am attending!",
+        )
+
+        Moment.objects.create(
+            author=attendee,
+            event=event,
+            image_url="https://example.com/attendee.jpg",
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "The event cannot take place."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=attendee,
+                event=event,
+                verb=Notification.Verb.EVENT_CANCELLED,
+            ).count(),
+            1,
+        )
+
+    def test_cancellation_respects_explicit_notification_preferences(self):
+        opted_out_user = self.create_user("opted_out_user")
+        opted_in_user = self.create_user("opted_in_user")
+
+        UserSettings.objects.create(
+            user=opted_out_user,
+            event_cancellations=False,
+        )
+
+        UserSettings.objects.create(
+            user=opted_in_user,
+            event_cancellations=True,
+            in_app_notifications=True,
+        )
+
+        event = self.create_event()
+
+        EventRegistration.objects.create(
+            event=event,
+            user=opted_out_user,
+        )
+
+        EventRegistration.objects.create(
+            event=event,
+            user=opted_in_user,
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "The event has been cancelled."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertFalse(
+            Notification.objects.filter(
+                recipient=opted_out_user,
+                event=event,
+                verb=Notification.Verb.EVENT_CANCELLED,
+            ).exists()
+        )
+
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=opted_in_user,
+                event=event,
+                verb=Notification.Verb.EVENT_CANCELLED,
+            ).exists()
+        )
+
+    def test_user_without_settings_record_receives_cancellation_notification(self):
+        attendee = self.create_user("default_settings_attendee")
+        event = self.create_event()
+
+        EventRegistration.objects.create(
+            event=event,
+            user=attendee,
+        )
+
+        self.assertFalse(
+            UserSettings.objects.filter(user=attendee).exists()
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "The event has been cancelled."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=attendee,
+                event=event,
+                verb=Notification.Verb.EVENT_CANCELLED,
+            ).exists()
+        )
+
+    def test_cancellation_preserves_event_and_moderation_history(self):
+        event = self.create_event(
+            status=Event.Status.PUBLISHED,
+            moderation_status=Event.ModerationStatus.APPROVED,
+            reviewed_by=self.staff,
+            reviewed_at=timezone.now(),
+            review_notes="Event verified.",
+        )
+
+        review = EventModerationReview.objects.create(
+            event=event,
+            reviewer=self.staff,
+            decision=EventModerationReview.Decision.APPROVED,
+            review_notes="Event verified.",
+        )
+
+        self.authenticate(self.owner)
+
+        response = self.client.post(
+            f"/api/events/manage/{event.id}/cancel/",
+            {"reason": "The event organiser cannot proceed."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        event.refresh_from_db()
+
+        self.assertTrue(Event.objects.filter(pk=event.pk).exists())
+        self.assertEqual(event.status, Event.Status.CANCELLED)
+        self.assertEqual(event.moderation_status, Event.ModerationStatus.APPROVED)
+        self.assertTrue(
+            EventModerationReview.objects.filter(
+                pk=review.pk,
+                event=event,
+            ).exists()
+        )
 
     def test_cancelled_event_cannot_be_edited(self):
         event = self.create_event(

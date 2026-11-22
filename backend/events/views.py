@@ -338,25 +338,38 @@ class EventManagementDetailView(APIView):
         )
 
 
+
 class EventManagementCancelView(APIView):
     """
-    Cancel a published event belonging to a Hub.
+    Cancel an upcoming published event belonging to a Hub.
+
+    Only the actual Hub Owner can cancel an event.
+    A cancellation reason is mandatory.
+    Associated users are notified.
     """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request, event_id):
-        event = cancel_event(
+        event, notifications_created = cancel_event(
             event_id=event_id,
             user=request.user,
+            reason=request.data.get("reason", ""),
         )
 
         return Response({
-            "message": "Event cancelled successfully.",
+            "success": True,
+            "message": (
+                "Event cancelled successfully. "
+                "Associated users have been notified."
+            ),
             "event_id": str(event.id),
             "status": event.status,
             "moderation_status": event.moderation_status,
-        })
+            "cancellation_reason": event.cancellation_reason,
+            "cancelled_at": event.cancelled_at,
+            "notifications_created": notifications_created,
+        }, status=status.HTTP_200_OK)
 
 
 class EventModerationQueueView(generics.ListAPIView):

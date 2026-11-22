@@ -1,4 +1,5 @@
-from accounts.models import Notification
+
+from accounts.models import Notification, UserSettings
 
 
 def create_notification(
@@ -13,8 +14,25 @@ def create_notification(
     recipient_id=None,
 ):
     recipient_id = recipient_id or getattr(recipient, "pk", None)
+
     if actor is None or recipient_id is None or actor.pk == recipient_id:
         return None
+
+    # Respect cancellation notification preferences.
+    # If no settings record exists, use the model defaults (True).
+    if verb == Notification.Verb.EVENT_CANCELLED:
+        settings = UserSettings.objects.filter(
+            user_id=recipient_id,
+        ).only(
+            "event_cancellations",
+            "in_app_notifications",
+        ).first()
+
+        if settings is not None and (
+            not settings.event_cancellations
+            or not settings.in_app_notifications
+        ):
+            return None
 
     return Notification.objects.create(
         actor=actor,
@@ -40,30 +58,40 @@ def notify_hub_managers(
             HubMembership.Role.ADMIN,
             HubMembership.Role.EDITOR,
         )
+
     recipients = set(
         hub.memberships.filter(
             status=HubMembership.Status.APPROVED,
             role__in=roles,
         ).values_list("user_id", flat=True)
     )
+
     recipients.add(hub.owner_id)
     recipients.discard(actor.pk)
+
     notifications = []
+
     for recipient_id in recipients:
-        notifications.append(create_notification(
-            actor=actor,
-            recipient_id=recipient_id,
-            verb=verb,
-            event=event,
-            hub=hub,
-        ))
+        notifications.append(
+            create_notification(
+                actor=actor,
+                recipient_id=recipient_id,
+                verb=verb,
+                event=event,
+                hub=hub,
+            )
+        )
+
     return notifications
 
 
-def notify_staff(*, actor, verb, event=None, hub=None, exclude_ids=()):
+def notify_staff(
+    *, actor, verb, event=None, hub=None, exclude_ids=(),
+):
     from django.contrib.auth import get_user_model
 
     User = get_user_model()
+
     return [
         create_notification(
             actor=actor,
@@ -72,6 +100,10 @@ def notify_staff(*, actor, verb, event=None, hub=None, exclude_ids=()):
             event=event,
             hub=hub,
         )
-        for recipient in User.objects.filter(is_staff=True, is_active=True)
-        .exclude(pk__in={actor.pk, *exclude_ids})
+        for recipient in User.objects.filter(
+            is_staff=True,
+            is_active=True,
+        ).exclude(
+            pk__in={actor.pk, *exclude_ids}
+        )
     ]

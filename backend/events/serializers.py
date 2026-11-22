@@ -1,4 +1,6 @@
 
+import re
+
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -16,7 +18,14 @@ class EventModerationHistorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EventModerationReview
-        fields = ["id", "decision", "review_category", "review_notes", "reviewed_at", "reviewer_username"]
+        fields = [
+            "id",
+            "decision",
+            "review_category",
+            "review_notes",
+            "reviewed_at",
+            "reviewer_username",
+        ]
         read_only_fields = fields
 
 
@@ -41,9 +50,48 @@ class EventChoiceSerializer(serializers.ModelSerializer):
 class EventSubmissionSerializer(serializers.ModelSerializer):
     """
     Validates event submissions made on behalf of a BYB Hub.
+
+    Organiser contact details are collected for private BYB moderation
+    and are never returned in the submission response.
     """
 
     hub_id = serializers.UUIDField(write_only=True)
+
+    organiser_contact_name = serializers.CharField(
+        max_length=150,
+        required=True,
+        trim_whitespace=True,
+    )
+
+    organiser_designation = serializers.CharField(
+        max_length=100,
+        required=True,
+        trim_whitespace=True,
+    )
+
+    organiser_phone = serializers.CharField(
+        max_length=20,
+        required=True,
+        trim_whitespace=True,
+    )
+
+    organiser_whatsapp = serializers.CharField(
+        max_length=20,
+        required=False,
+        allow_blank=True,
+        default="",
+        trim_whitespace=True,
+    )
+
+    organiser_email = serializers.EmailField(
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+
+    organiser_contact_consent = serializers.BooleanField(
+        required=True,
+    )
 
     class Meta:
         model = Event
@@ -62,8 +110,57 @@ class EventSubmissionSerializer(serializers.ModelSerializer):
             "city",
             "online_join_url",
             "online_access_instructions",
+            "organiser_contact_name",
+            "organiser_designation",
+            "organiser_phone",
+            "organiser_whatsapp",
+            "organiser_email",
+            "organiser_contact_consent",
         ]
         read_only_fields = ["id"]
+        extra_kwargs = {
+            "organiser_contact_name": {"write_only": True},
+            "organiser_designation": {"write_only": True},
+            "organiser_phone": {"write_only": True},
+            "organiser_whatsapp": {"write_only": True},
+            "organiser_email": {"write_only": True},
+            "organiser_contact_consent": {"write_only": True},
+        }
+
+    @staticmethod
+    def validate_phone_number(value):
+        """
+        Accepts international phone numbers with common formatting.
+
+        The number must contain between 7 and 15 digits.
+        """
+        digits = re.sub(r"\D", "", value)
+
+        if not 7 <= len(digits) <= 15:
+            raise serializers.ValidationError(
+                "Enter a valid phone number containing 7 to 15 digits."
+            )
+
+        if not re.fullmatch(r"\+?[0-9\s().-]+", value):
+            raise serializers.ValidationError(
+                "Use only digits, spaces, +, parentheses, dots or hyphens."
+            )
+
+        if "+" in value and not value.startswith("+"):
+            raise serializers.ValidationError(
+                "The + country-code prefix must appear at the beginning."
+            )
+
+        return value
+
+    def validate_organiser_phone(self, value):
+        return self.validate_phone_number(value)
+
+    def validate_organiser_whatsapp(self, value):
+        if not value:
+            return value
+
+        return self.validate_phone_number(value)
 
     def validate_hub_id(self, value):
         try:
@@ -98,9 +195,34 @@ class EventSubmissionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 "ends_at": "Event end must be after its start."
             })
+
         if starts_at <= timezone.now():
             raise serializers.ValidationError({
                 "starts_at": "New events must start in the future."
+            })
+
+        # Organiser contact verification requirements.
+        if not attrs.get("organiser_contact_name", "").strip():
+            raise serializers.ValidationError({
+                "organiser_contact_name": "Organiser contact name is required."
+            })
+
+        if not attrs.get("organiser_designation", "").strip():
+            raise serializers.ValidationError({
+                "organiser_designation": "Organiser designation is required."
+            })
+
+        if not attrs.get("organiser_phone", "").strip():
+            raise serializers.ValidationError({
+                "organiser_phone": "Organiser phone number is required."
+            })
+
+        if attrs.get("organiser_contact_consent") is not True:
+            raise serializers.ValidationError({
+                "organiser_contact_consent": (
+                    "Consent is required for BYB to contact the organiser "
+                    "to verify the event."
+                )
             })
 
         venue_name = attrs.get("venue_name", "").strip()
@@ -161,6 +283,8 @@ class EventSubmissionSerializer(serializers.ModelSerializer):
 class EventDiscoverySerializer(serializers.ModelSerializer):
     """
     Public representation of an approved event.
+
+    Organiser contact details are deliberately excluded.
     Online joining details are only visible to eligible participants,
     Hub event managers, and BYB staff.
     """
@@ -174,6 +298,7 @@ class EventDiscoverySerializer(serializers.ModelSerializer):
         source="created_by.username",
         read_only=True,
     )
+
     is_registered = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -203,23 +328,28 @@ class EventDiscoverySerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+
         request = self.context.get("request")
         user = getattr(request, "user", None)
+
         private_access = bool(
             getattr(instance, "is_registered", False)
             or getattr(instance, "can_manage_event", False)
             or (user and user.is_authenticated and user.is_staff)
         )
+
         if not private_access:
             data.pop("online_join_url", None)
             data.pop("online_access_instructions", None)
+
         return data
 
 
 class HubEventManagementSerializer(serializers.ModelSerializer):
     """
     Event details visible to eligible managers of its organising Hub.
-    Includes moderation feedback and submission information.
+
+    Organiser contact details remain restricted to BYB staff.
     """
 
     organising_hub_name = serializers.CharField(
@@ -237,7 +367,11 @@ class HubEventManagementSerializer(serializers.ModelSerializer):
         read_only=True,
         allow_null=True,
     )
-    moderation_history = EventModerationHistorySerializer(many=True, read_only=True)
+
+    moderation_history = EventModerationHistorySerializer(
+        many=True,
+        read_only=True,
+    )
 
     class Meta:
         model = Event
@@ -354,11 +488,8 @@ class EventUpdateSerializer(serializers.ModelSerializer):
         if (
             instance
             and "starts_at" in attrs
-            # datetime-local controls preserve whole seconds, while API
-            # timestamps may include fractional seconds. Compare at the
-            # precision managers can edit so saving an unchanged date does
-            # not accidentally resubmit a past event.
-            and starts_at.replace(microsecond=0) != instance.starts_at.replace(microsecond=0)
+            and starts_at.replace(microsecond=0)
+            != instance.starts_at.replace(microsecond=0)
             and starts_at <= timezone.now()
         ):
             raise serializers.ValidationError({
@@ -406,7 +537,10 @@ class EventUpdateSerializer(serializers.ModelSerializer):
 
 class EventModerationQueueSerializer(serializers.ModelSerializer):
     """
-    Event details shown to BYB staff in the moderation queue.
+    Event details shown to authorised BYB staff in the moderation queue.
+
+    This is the only event serializer that exposes organiser contact data.
+    The moderation endpoint must remain staff-protected.
     """
 
     organising_hub_name = serializers.CharField(
@@ -418,7 +552,11 @@ class EventModerationQueueSerializer(serializers.ModelSerializer):
         source="created_by.username",
         read_only=True,
     )
-    moderation_history = EventModerationHistorySerializer(many=True, read_only=True)
+
+    moderation_history = EventModerationHistorySerializer(
+        many=True,
+        read_only=True,
+    )
 
     class Meta:
         model = Event
@@ -444,6 +582,14 @@ class EventModerationQueueSerializer(serializers.ModelSerializer):
             "review_category",
             "review_notes",
             "moderation_history",
+
+            # Private organiser contact information.
+            "organiser_contact_name",
+            "organiser_designation",
+            "organiser_phone",
+            "organiser_whatsapp",
+            "organiser_email",
+            "organiser_contact_consent",
         ]
         read_only_fields = fields
 
@@ -465,6 +611,7 @@ class EventModerationReviewSerializer(serializers.Serializer):
         allow_blank=True,
         max_length=5000,
     )
+
     review_category = serializers.ChoiceField(
         choices=Event.RejectionCategory.choices,
         required=False,
@@ -481,13 +628,23 @@ class EventModerationReviewSerializer(serializers.Serializer):
                     "Please provide a reason when rejecting an event."
                 )
             })
-        if attrs["decision"] == "reject" and not attrs.get("review_category"):
+
+        if (
+            attrs["decision"] == "reject"
+            and not attrs.get("review_category")
+        ):
             raise serializers.ValidationError({
                 "review_category": "Choose a rejection category."
             })
-        if attrs["decision"] == "approve" and attrs.get("review_category"):
+
+        if (
+            attrs["decision"] == "approve"
+            and attrs.get("review_category")
+        ):
             raise serializers.ValidationError({
-                "review_category": "Rejection categories are only valid for rejections."
+                "review_category": (
+                    "Rejection categories are only valid for rejections."
+                )
             })
 
         return attrs

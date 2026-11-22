@@ -168,6 +168,27 @@ class Event(models.Model):
         default=Status.DRAFT,
     )
 
+    # Event cancellation
+    # Events are retained in the database for historical records.
+    cancellation_reason = models.CharField(
+        max_length=1000,
+        blank=True,
+        default="",
+    )
+
+    cancelled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cancelled_events",
+    )
+
     # BYB moderation
     moderation_status = models.CharField(
         max_length=20,

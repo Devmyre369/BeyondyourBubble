@@ -82,6 +82,14 @@ class EventDiscoveryAPITests(APITestCase):
             "venue_name": "Main Auditorium",
             "venue_address": "Lucknow, Uttar Pradesh",
             "city": "Lucknow",
+
+            # Organiser contact information required for submission.
+            "organiser_contact_name": "Rahul Sharma",
+            "organiser_designation": "Event Coordinator",
+            "organiser_phone": "+919876543210",
+            "organiser_whatsapp": "+919876543210",
+            "organiser_email": "organiser@example.com",
+            "organiser_contact_consent": True,
         }
         payload.update(overrides)
         return payload

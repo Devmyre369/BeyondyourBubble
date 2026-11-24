@@ -43,16 +43,45 @@ class EventDiscoveryListCreateView(generics.ListCreateAPIView):
     pagination_class = EventPagination
 
     def get_queryset(self):
+        user = self.request.user
+
+        if user.is_authenticated:
+            member_hub_ids = list(
+                HubMembership.objects.filter(
+                    user=user,
+                    status=HubMembership.Status.APPROVED,
+                ).values_list("hub_id", flat=True)
+            )
+            visibility = (
+                Q(
+                    status=Event.Status.PUBLISHED,
+                    moderation_status=Event.ModerationStatus.APPROVED,
+                )
+                | Q(
+                    organising_hub_id__in=member_hub_ids,
+                    moderation_status=Event.ModerationStatus.PENDING,
+                )
+            )
+            if getattr(user, "is_staff", False):
+                visibility |= Q(
+                    moderation_status__in=[
+                        Event.ModerationStatus.PENDING,
+                        Event.ModerationStatus.REJECTED,
+                    ]
+                )
+        else:
+            visibility = Q(
+                status=Event.Status.PUBLISHED,
+                moderation_status=Event.ModerationStatus.APPROVED,
+            )
+
         queryset = Event.objects.filter(
-            status=Event.Status.PUBLISHED,
-            moderation_status=Event.ModerationStatus.APPROVED,
             organising_hub__is_active=True,
-        ).select_related(
+        ).filter(visibility).select_related(
             "organising_hub",
             "created_by",
         )
 
-        user = self.request.user
         if user.is_authenticated:
             queryset = queryset.annotate(
                 is_registered=Exists(EventRegistration.objects.filter(
